@@ -113,8 +113,10 @@ button { cursor: pointer; }
 .saldo.negativo { border-top-color: var(--alerta); }
 .saldo.sin { border-top-color: var(--linea); }
 .saldo h3 { margin: 0 0 6px; font-size: 17px; }
-.saldo .cant { font-size: 36px; font-weight: 800; line-height: 1.1; }
-.saldo .cant small { font-size: 17px; font-weight: 600; color: var(--gris); margin-left: 4px; }
+.saldo { container-type: inline-size; }
+/* El número se achica con el ancho de la tarjeta y, si igual no entra, la unidad pasa abajo. */
+.saldo .cant { font-size: clamp(22px, 15cqi, 36px); font-weight: 800; line-height: 1.1; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 4px; }
+.saldo .cant small { font-size: 17px; font-weight: 600; color: var(--gris); }
 .saldo .det { color: var(--gris); font-size: 14px; margin-top: 6px; line-height: 1.4; }
 .chip {
   display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 99px;
@@ -272,7 +274,7 @@ select.txt.grande { font-size: 18px; font-weight: 600; padding: 15px 12px; backg
 @media (max-width: 520px) {
   .saldos .saldo { padding: 12px; }
   .saldos .saldo h3 { font-size: 15px; min-height: 2.5em; }
-  .saldos .saldo .cant { font-size: 30px; }
+  .saldos .saldo .cant { font-size: clamp(20px, 15cqi, 30px); }
   .saldos .saldo .det { font-size: 13px; }
 }
 /* insumos con stock por estancia (Fardos) */
@@ -282,7 +284,7 @@ select.txt.grande { font-size: 18px; font-weight: 600; padding: 15px 12px; backg
 .por-estancia b.rojo, .rojo { color: var(--alerta); }
 .cajas-estancia { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
 .cajas-estancia .saldo h3 { margin-bottom: 2px; }
-.cajas-estancia .saldo .cant { font-size: 32px; }
+.cajas-estancia .saldo .cant { font-size: clamp(20px, 15cqi, 32px); }
 .cajas-estancia .detalle td { font-size: 13px; padding: 5px 0; }
 .cajas-estancia .detalle td:first-child { width: auto; }
 @media (max-width: 400px) { .cajas-estancia .detalle td { display: block; border: 0; padding: 1px 0; } .cajas-estancia .detalle tr { display: block; padding: 4px 0; border-bottom: 1px solid var(--linea); } }

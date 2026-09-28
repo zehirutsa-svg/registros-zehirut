@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.5.0';
+const VERSION = '1.5.1';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -550,7 +550,7 @@ function htmlSaldo() {
         return '<button class="saldo ' + (alerta ? 'bajo' : '') + '" data-a="verInsumo" data-i="' + esc(i.nombre) + '">' +
           '<h3>' + esc(i.nombre) + ' ' + (partes.some((p) => p.n.x.pendiente) ? '<span class="chip pend">sin enviar</span>' : '') + '</h3>' +
           partes.map((p) => '<div class="por-estancia"><span>' + esc(p.nom) + '</span><b class="' +
-            (p.n.x.cantidad < 0 ? 'rojo' : '') + '">' + num(p.n.x.cantidad) + '</b></div>').join('') +
+            (p.n.x.cantidad < 0 ? 'rojo' : '') + '">' + num(p.n.x.cantidad, 0) + '</b></div>').join('') +
           '<div class="det">' + esc(unidadTxt(i.unidad, 2)) +
           (partes.some((p) => !p.n.x.ultimoConteo) ? '<br><span class="chip">Falta conteo inicial</span>' : '') + '</div></button>';
       }
@@ -558,7 +558,7 @@ function htmlSaldo() {
       const linea = [n.kg, n.dias != null ? 'alcanza ~' + n.dias + (n.dias === 1 ? ' día' : ' días') : ''].filter(Boolean).join(' · ');
       return '<button class="saldo ' + n.cls + '" data-a="verInsumo" data-i="' + esc(i.nombre) + '">' +
         '<h3>' + esc(i.nombre) + ' ' + (n.x.pendiente ? '<span class="chip pend">sin enviar</span>' : '') + '</h3>' +
-        '<div class="cant">' + num(n.x.cantidad) + '<small>' + esc(unidadTxt(i.unidad, n.x.cantidad)) + '</small></div>' +
+        '<div class="cant">' + num(n.x.cantidad, 0) + '<small>' + esc(unidadTxt(i.unidad, n.x.cantidad)) + '</small></div>' +
         '<div class="det">' + (linea || '&nbsp;') +
         (n.bajo ? '<br><span class="chip alerta">Bajo el mínimo</span>' : '') +
         (n.x.cantidad < 0 ? '<br><span class="chip alerta">Saldo negativo</span>' : '') +
@@ -580,7 +580,7 @@ function cajaSaldo(i, n, titulo) {
     i.minimo != null ? ['Stock mínimo', num(i.minimo) + ' ' + unidadTxt(i.unidad, i.minimo)] : null,
   ].filter(Boolean);
   return '<div class="saldo ' + n.cls + '">' + (titulo ? '<h3>' + esc(titulo) + '</h3>' : '') +
-    '<div class="cant">' + num(n.x.cantidad) + '<small>' + esc(unidadTxt(i.unidad, n.x.cantidad)) + '</small>' +
+    '<div class="cant">' + num(n.x.cantidad, 0) + '<small>' + esc(unidadTxt(i.unidad, n.x.cantidad)) + '</small>' +
     (n.x.pendiente ? ' <span class="chip pend">sin enviar</span>' : '') + '</div>' +
     (n.bajo ? '<span class="chip alerta">Bajo el mínimo</span> ' : '') + (n.x.cantidad < 0 ? '<span class="chip alerta">Saldo negativo: falta un ingreso o un conteo</span>' : '') +
     '<table class="detalle" style="margin-top:8px">' + datosFicha.map(([a, b]) => '<tr><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table></div>';
