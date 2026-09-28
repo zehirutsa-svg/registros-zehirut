@@ -301,7 +301,7 @@ label.btn { text-align: center; cursor: pointer; }
 .lluvia-finca:last-of-type { margin-bottom: 4px; }
 .lluvia-finca > b, .tarjeta > b { display: block; font-size: 17px; margin-bottom: 6px; }
 .barra-fila { display: grid; grid-template-columns: minmax(110px, 38%) 1fr 72px; align-items: center; gap: 8px; margin: 5px 0; }
-.barra-fila.chica { grid-template-columns: 82px 1fr 64px; margin: 3px 0; font-size: 13px; }
+.barra-fila.chica { grid-template-columns: 116px 1fr 64px; margin: 3px 0; font-size: 13px; }
 .barra-nombre { font-size: 15px; }
 .barra-fila.chica .barra-nombre { font-size: 13px; color: var(--gris); }
 .barra-fondo { height: 14px; background: #edf1f5; border-radius: 99px; overflow: hidden; }
@@ -318,3 +318,4 @@ label.btn { text-align: center; cursor: pointer; }
 .leyenda { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--gris); margin-bottom: 10px; }
 .leyenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 .leyenda i.mes { background: #7cc4a0; } .leyenda i.temporada { background: var(--azul); } .leyenda i.anio { background: #8fb9e6; }
+.barra-relleno.anterior { background: #aab6c4; }

@@ -128,8 +128,9 @@ renombrados "VIEJO - NO USAR…"; la conexión no puede editar el texto de un do
 
 Una sola pantalla (sin pestañas): el día (‹ › entre días con lluvia; ambas estancias con barras),
 botón "Compartir por WhatsApp" (navigator.share en el celular, wa.me en la PC; día + acumulados de
-temporada y año con barras ▓░ entre ``` como en ZehirutApp), acumulados con barras de colores (mes,
-temporada set–ago, año). "Cargar lluvia" abre el formulario y vuelve al día cargado. Sectores con su
+temporada y año con barras ▓░ entre ``` como en ZehirutApp), acumulados con barras (mes actual, temporada
+actual "26-27" y total de la temporada anterior "25-26" para comparar; sin el año, pedido 28/09; el
+rótulo va al lado de cada barra, sin leyenda). WhatsApp: día + temporada actual y anterior, misma escala. "Cargar lluvia" abre el formulario y vuelve al día cargado. Sectores con su
 referencia (C Central, D Retiro / B Retiro, E Central).
 
 Ya existe en ZehirutApp (`Lluvias.js`: planilla "Registro de Lluvias Zehirut S.A.", sectores por

@@ -749,6 +749,9 @@ function datosLluvias_(desde) {
   const mes = Number(hoy.slice(5, 7));
   const inicioTemp = (mes >= 9 ? Number(anio) : Number(anio) - 1) + '-09-01';
   const finTemp = (Number(inicioTemp.slice(0, 4)) + 1) + '-08-31';
+  // Temporada anterior completa (set-ago), para comparar con la actual.
+  const inicioAnt = (Number(inicioTemp.slice(0, 4)) - 1) + '-09-01';
+  const finAnt = inicioTemp.slice(0, 4) + '-08-31';
   const resumen = {};
   const registros = [];
   for (let i = 1; i < valores.length; i++) {
@@ -758,9 +761,10 @@ function datosLluvias_(desde) {
     if (!esFecha_(fecha)) continue;
     const mm = Number(f[4]) || 0;
     const k = f[1] + '|' + f[2];
-    if (!resumen[k]) resumen[k] = { finca: String(f[1]), sector: String(f[2]), anio: 0, temporada: 0 };
+    if (!resumen[k]) resumen[k] = { finca: String(f[1]), sector: String(f[2]), anio: 0, temporada: 0, anterior: 0 };
     if (fecha.slice(0, 4) === anio) resumen[k].anio += mm;
     if (fecha >= inicioTemp && fecha <= finTemp) resumen[k].temporada += mm;
+    if (fecha >= inicioAnt && fecha <= finAnt) resumen[k].anterior += mm;
     if (fecha >= desde) registros.push({ finca: String(f[1]), sector: String(f[2]), fecha, mm, usuario: String(f[5]) });
   }
   const yy = (a) => String(a).slice(-2);
@@ -771,6 +775,9 @@ function datosLluvias_(desde) {
       .sort((a, b) => (a.finca !== b.finca ? (a.finca < b.finca ? -1 : 1) : (a.sector < b.sector ? -1 : 1))),
     anio: Number(anio),
     temporada: 'SET' + yy(inicioTemp.slice(0, 4)) + '/AGO' + yy(finTemp.slice(0, 4)),
+    // Rótulos cortos para la app: 26-27 (actual) y 25-26 (anterior).
+    temporadaCorta: yy(inicioTemp.slice(0, 4)) + '-' + yy(finTemp.slice(0, 4)),
+    temporadaAnterior: yy(inicioAnt.slice(0, 4)) + '-' + yy(inicioTemp.slice(0, 4)),
   };
 }
 

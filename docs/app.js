@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.6.0';
+const VERSION = '1.6.1';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -1074,8 +1074,8 @@ function registrosLluvia() {
   return Object.keys(mapa).map((k) => mapa[k]);
 }
 
-/** Acumulados por sector: temporada y año (de Google, corregidos con lo que está en la cola) y mes
- *  actual (de los registros de los últimos días). */
+/** Acumulados por sector: mes actual (de los registros de los últimos días), temporada actual (de
+ *  Google, corregida con lo que está en la cola) y total de la temporada anterior, para comparar. */
 function acumuladosLluvia() {
   const d = lluviasDatos();
   const hoy = hoyISO();
@@ -1084,10 +1084,10 @@ function acumuladosLluvia() {
   const iniTemp = (Number(hoy.slice(5, 7)) >= 9 ? Number(anio) : Number(anio) - 1) + '-09-01';
   const acum = {};
   const clave = (f, s) => f + '|' + s;
-  FINCAS.forEach(([f]) => (d.sectores[f] || []).forEach((s) => { acum[clave(f, s)] = { mes: 0, temporada: 0, anio: 0 }; }));
+  FINCAS.forEach(([f]) => (d.sectores[f] || []).forEach((s) => { acum[clave(f, s)] = { mes: 0, temporada: 0, anio: 0, anterior: 0 }; }));
   (d.resumen || []).forEach((r) => {
-    const a = acum[clave(r.finca, r.sector)] || (acum[clave(r.finca, r.sector)] = { mes: 0, temporada: 0, anio: 0 });
-    a.temporada = r.temporada; a.anio = r.anio;
+    const a = acum[clave(r.finca, r.sector)] || (acum[clave(r.finca, r.sector)] = { mes: 0, temporada: 0, anio: 0, anterior: 0 });
+    a.temporada = r.temporada; a.anio = r.anio; a.anterior = r.anterior || 0;
   });
   const servidor = {};
   d.registros.forEach((r) => { servidor[r.fecha + '|' + r.finca + '|' + r.sector] = r.mm; });
@@ -1102,7 +1102,12 @@ function acumuladosLluvia() {
       if (r.fecha.slice(0, 4) === anio) a.anio += dif;
     }
   });
-  return { acum, mesTxt: MESES_LARGO[Number(mes.slice(5)) - 1], temporada: d.temporada || '', anio: d.anio || Number(anio) };
+  const yy = (n) => String(n).slice(-2);
+  const ini = Number(iniTemp.slice(0, 4));
+  return {
+    acum, mesTxt: MESES_LARGO[Number(mes.slice(5)) - 1],
+    actual: d.temporadaCorta || yy(ini) + '-' + yy(ini + 1), anterior: d.temporadaAnterior || yy(ini - 1) + '-' + yy(ini),
+  };
 }
 
 function htmlLluvias() {
@@ -1148,16 +1153,16 @@ function htmlLluviaDia() {
 function htmlLluviaAcumulados() {
   const a = acumuladosLluvia();
   const valores = Object.keys(a.acum).map((k) => a.acum[k]);
-  const max = Math.max(1, ...valores.map((v) => Math.max(v.temporada, v.anio, v.mes)));
+  const max = Math.max(1, ...valores.map((v) => Math.max(v.mes, v.temporada, v.anterior)));
+  const mes = a.mesTxt.charAt(0).toUpperCase() + a.mesTxt.slice(1);
   const barra = (cls, etiqueta, v) => '<div class="barra-fila chica"><span class="barra-nombre">' + etiqueta + '</span>' +
     '<span class="barra-fondo"><span class="barra-relleno ' + cls + '" style="width:' + (v > 0 ? Math.max(3, (v / max) * 100) : 0) + '%"></span></span>' +
     '<span class="barra-valor">' + num(v, 0) + ' mm</span></div>';
-  return '<h3 style="margin:22px 0 4px">Acumulados</h3>' +
-    '<div class="leyenda"><span><i class="mes"></i>' + a.mesTxt.charAt(0).toUpperCase() + a.mesTxt.slice(1) + '</span><span><i class="temporada"></i>Temporada ' + esc(a.temporada) + '</span><span><i class="anio"></i>Año ' + a.anio + '</span></div>' +
+  return '<h3 style="margin:22px 0 8px">Acumulados</h3>' +
     FINCAS.map(([f, nom]) => '<div class="tarjeta"><b>' + nom + '</b>' + (lluviasDatos().sectores[f] || []).map((s) => {
-      const v = a.acum[f + '|' + s] || { mes: 0, temporada: 0, anio: 0 };
+      const v = a.acum[f + '|' + s] || { mes: 0, temporada: 0, anterior: 0 };
       return '<div class="lluvia-sector"><span class="lluvia-sector-nombre">' + esc(nombreSector(f, s)) + '</span>' +
-        barra('mes', a.mesTxt.charAt(0).toUpperCase() + a.mesTxt.slice(1), v.mes) + barra('temporada', 'Temporada', v.temporada) + barra('anio', 'Año', v.anio) + '</div>';
+        barra('mes', mes, v.mes) + barra('temporada', 'Temporada ' + a.actual, v.temporada) + barra('anterior', 'Temporada ' + a.anterior, v.anterior) + '</div>';
     }).join('') + '</div>').join('');
 }
 
@@ -1178,9 +1183,10 @@ function textoWhatsappLluvia() {
     });
     lineas.push('');
   });
-  ['temporada', 'anio'].forEach((campo) => {
-    const max = Math.max(1, ...Object.keys(a.acum).map((k) => a.acum[k][campo]));
-    lineas.push('📊 *Acumulado ' + (campo === 'temporada' ? 'temporada ' + a.temporada : 'año ' + a.anio) + '*');
+  // Misma escala para las dos temporadas, así las barras se comparan entre sí.
+  const max = Math.max(1, ...Object.keys(a.acum).map((k) => Math.max(a.acum[k].temporada, a.acum[k].anterior)));
+  ['temporada', 'anterior'].forEach((campo) => {
+    lineas.push('📊 *Temporada ' + (campo === 'temporada' ? a.actual + '* (hasta hoy)' : a.anterior + '* (total)'));
     lineas.push('```');
     FINCAS.forEach(([f, nom], n) => {
       if (n) lineas.push('');
