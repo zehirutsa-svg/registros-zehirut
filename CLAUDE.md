@@ -103,6 +103,10 @@ Resumen, Stock por día, Corrales por día, Ingredientes por día, Stock actual.
 conexión devuelve solo ~100 filas por hoja; con el historial completo la tarea se trababa bajando el xlsx. **Por qué una planilla aparte:** la conexión a Drive de Claude (la que usa
 la tarea) solo ve archivos creados por ella misma; esa planilla la creó esa conexión y el script le
 escribe. De "Datos base confinamiento" la tarea solo usa Corrales y Parámetros.
+La tarea (Cowork, "Informe confinamiento ZEHIRUT", trig_014qydevJNGPz1BWHB7ZbT1v, 8:45 diario) busca las
+instrucciones **por título exacto** "Instrucciones tarea diaria - Informe confinamiento" (ignora "VIEJO…").
+Para cambiarlas: crear un doc nuevo con ese título y renombrar el anterior "VIEJO - NO USAR - … vN"
+(no editar la tarea: reenviarla por RemoteTrigger exige mandar ~90 KB de config, riesgoso).
 Instrucciones de la tarea (v3): Google Doc id 1FlKEzFKtSPwaExD55js1bl0HwKCZQGyJ790bOmez7vg (v1 y v2 quedaron
 renombrados "VIEJO - NO USAR…"; la conexión no puede editar el texto de un doc existente, solo crear).
 
