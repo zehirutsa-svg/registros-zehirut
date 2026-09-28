@@ -69,6 +69,10 @@ Hembras C6P: el usuario las agrega después (todavía no tienen ubicación).
 - **Ingresos a mano** (los insumos llegan antes que la factura): quedan "sin factura" y después
   se les asocia una factura. Foto del remito opcional.
 - Stock guardado en kg, mostrado en bolsas (fardos: en unidades).
+- **Navegación de Stock (pedido 28/09, "menos botones")**: sin pestañas. Tarjetas → ficha del insumo
+  (saldo, Consumo/Ingreso/Conteo, sus movimientos) → formulario de UN tipo con el insumo ya elegido
+  (fecha, cantidad, destino en desplegable). La flecha vuelve un paso. Configurar = botón chico al pie,
+  solo con la casilla Configurar. No volver a agregar pestañas ni grillas de botones.
 - **Destino opcional** en los consumos: lo importante es cuánto se usó por día (ej. "tantos
   fardos hoy" sin destino). Facilitar la carga por sobre el detalle.
 - Stock inicial y primeros consumos los carga el usuario (Enrique) cuando la app esté lista.

@@ -104,7 +104,7 @@ button { cursor: pointer; }
 .pie { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; color: var(--gris); font-size: 14px; }
 
 /* ---------------------------------------------------------------- tarjetas de saldo */
-.saldos { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.saldos { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 10px; }
 .saldo {
   background: var(--papel); border-radius: var(--radio); box-shadow: var(--sombra); padding: 14px 16px;
   border-top: 6px solid var(--verde); text-align: left; border-left: 0; border-right: 0; border-bottom: 0;
@@ -265,3 +265,13 @@ table.tabla { width: 100%; border-collapse: collapse; background: #fff; border-r
   .item-cfg .grilla > :first-child { grid-column: 1 / -1; }
 }
 select.txt.grande { font-size: 18px; font-weight: 600; padding: 15px 12px; background: var(--papel); border-color: #cfc8b6; }
+.aviso-btn { display: block; width: 100%; border: 0; text-align: left; font-size: 15px; }
+.btn.consumo { background: var(--naranja); }
+.btn.ingreso { background: var(--verde); }
+.btn.conteo { background: var(--azul); }
+@media (max-width: 520px) {
+  .saldos .saldo { padding: 12px; }
+  .saldos .saldo h3 { font-size: 15px; min-height: 2.5em; }
+  .saldos .saldo .cant { font-size: 30px; }
+  .saldos .saldo .det { font-size: 13px; }
+}

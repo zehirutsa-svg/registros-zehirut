@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.1.1';
+const VERSION = '1.2.0';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -40,8 +40,9 @@ function guardarTodo() {
 // Estado de pantalla (no se guarda, salvo lo que conviene recordar entre aperturas).
 const ui = {
   pantalla: 'inicio',
-  insumoVer: null,   // ficha de un insumo abierta (dentro de la pestaña Saldo)
-  tabStock: 'saldo',
+  vistaStock: 'lista',  // lista | ficha | form | sinFactura | config
+  insumoVer: null,      // insumo de la ficha abierta
+  movsVisibles: 15,
   tabLluvias: 'cargar',
   pin: '',
   errorPin: '',
@@ -50,8 +51,6 @@ const ui = {
   errorSync: '',
   form: null,        // formulario de carga de stock
   lluvia: null,      // formulario de lluvias
-  filtroInsumo: '',
-  filtroTipo: '',
   cfg: null,         // copia editable de insumos/destinos
 };
 
@@ -467,15 +466,33 @@ function htmlInicio() {
 }
 
 // ---------------------------------------------------------------- stock
+// Un solo camino, sin pestañas: tarjetas → ficha del insumo → formulario de lo que se
+// quiere cargar. La flecha de arriba vuelve siempre un paso.
 function htmlStock() {
-  const lista = [['saldo', 'Saldo']];
-  if (puede('Stock', 'CARGAR')) lista.push(['cargar', 'Cargar']);
-  lista.push(['movs', 'Movimientos']);
-  if (sesion.configura) lista.push(['config', 'Configurar']);
-  if (!lista.some((t) => t[0] === ui.tabStock)) ui.tabStock = 'saldo';
-  const cuerpo = ui.tabStock === 'saldo' && ui.insumoVer ? htmlFicha(ui.insumoVer)
-    : { saldo: htmlSaldo, cargar: htmlCargar, movs: htmlMovimientos, config: htmlConfig }[ui.tabStock]();
-  return barra('Stock de insumos', true) + tabs(lista, ui.tabStock, 'tabStock') + '<div class="contenido">' + cuerpo + '</div>';
+  const i = ui.insumoVer && stockDatos().insumos.find((x) => x.nombre === ui.insumoVer);
+  if ((ui.vistaStock === 'ficha' || ui.vistaStock === 'form') && !i) ui.vistaStock = 'lista';
+  if (ui.vistaStock === 'form' && !(ui.form && ui.form.clase)) ui.vistaStock = 'ficha';
+  if (ui.vistaStock === 'config' && !sesion.configura) ui.vistaStock = 'lista';
+  const vistas = {
+    lista: ['Stock de insumos', htmlSaldo],
+    ficha: [ui.insumoVer, () => htmlFicha(ui.insumoVer)],
+    form: [ui.form ? ui.form.clase + ' · ' + ui.form.insumo : '', htmlCargar],
+    sinFactura: ['Ingresos sin factura', htmlSinFactura],
+    config: ['Configurar', htmlConfig],
+  };
+  const [titulo, fn] = vistas[ui.vistaStock] || vistas.lista;
+  return barra(titulo, true) + '<div class="contenido">' + fn() + '</div>';
+}
+
+/** Un paso atrás dentro de Stock (o al inicio si ya está en las tarjetas). */
+function atrasStock() {
+  leerCamposForm();
+  const v = ui.vistaStock;
+  if (v === 'form') ui.vistaStock = 'ficha';
+  else if (v === 'ficha' || v === 'sinFactura' || v === 'config') { ui.vistaStock = 'lista'; ui.insumoVer = null; ui.cfg = null; }
+  else ui.pantalla = 'inicio';
+  render();
+  window.scrollTo(0, 0);
 }
 
 /** Datos de una tarjeta/ficha: saldo, estado y cuántos días alcanza al consumo de la última semana. */
@@ -495,11 +512,10 @@ function htmlSaldo() {
   const s = saldos();
   const c7 = consumo7();
   const ins = stockDatos().insumos.filter((i) => i.activo || (s[i.nombre] && s[i.nombre].cantidad));
-  if (!ins.length) return '<p class="vacio">Todavía no hay insumos cargados.</p>';
   const sinFactura = movimientos().filter((m) => m.tipo === 'Ingreso' && !m.anulado && !m.factura).length;
-  return (sinFactura ? '<div class="aviso amarillo">🧾 Hay <b>' + sinFactura + ' ingreso(s) sin factura</b> asociada. ' +
-    '<button class="btn sec chico" data-a="verSinFactura">Ver</button></div>' : '') +
-    '<div class="saldos">' + ins.map((i) => {
+  return (sinFactura ? '<button class="aviso amarillo aviso-btn" data-a="vista" data-v="sinFactura">🧾 Hay <b>' + sinFactura +
+    (sinFactura === 1 ? ' ingreso' : ' ingresos') + ' sin factura</b>. Tocá para verlos.</button>' : '') +
+    (ins.length ? '<div class="saldos">' + ins.map((i) => {
       const n = infoInsumo(i, s, c7);
       const linea = [n.kg, n.dias != null ? 'alcanza ~' + n.dias + (n.dias === 1 ? ' día' : ' días') : ''].filter(Boolean).join(' · ');
       return '<button class="saldo ' + n.cls + '" data-a="verInsumo" data-i="' + esc(i.nombre) + '">' +
@@ -510,17 +526,17 @@ function htmlSaldo() {
         (n.x.cantidad < 0 ? '<br><span class="chip alerta">Saldo negativo</span>' : '') +
         (!n.x.ultimoConteo ? '<br><span class="chip">Sin conteo inicial</span>' : '') +
         '</div></button>';
-    }).join('') + '</div>';
+    }).join('') + '</div>' : '<p class="vacio">Todavía no hay insumos cargados.</p>') +
+    (sesion.configura ? '<div style="text-align:center;margin-top:22px"><button class="btn sec chico" data-a="vista" data-v="config">⚙ Configurar insumos y corrales</button></div>' : '');
 }
 
-/** Ficha de un insumo: su saldo, cómo viene el consumo, sus últimos movimientos y cargar. */
+/** Ficha de un insumo: saldo, cómo viene el consumo, botones para cargar y sus movimientos. */
 function htmlFicha(nombre) {
   const i = stockDatos().insumos.find((x) => x.nombre === nombre);
-  if (!i) { ui.insumoVer = null; return htmlSaldo(); }
   const n = infoInsumo(i, saldos(), consumo7());
   const movs = movimientos().filter((m) => m.insumo === nombre);
   const botones = [];
-  if (puede('Stock', 'CARGAR')) {
+  if (puede('Stock', 'CARGAR') && i.activo) {
     botones.push(['Consumo', 'consumo', '⬆ Consumo'], ['Ingreso', 'ingreso', '⬇ Ingreso']);
     if (puede('Stock', 'ADMINISTRAR')) botones.push(['Conteo', 'conteo', '✔ Conteo']);
   }
@@ -531,52 +547,49 @@ function htmlFicha(nombre) {
     ['Último conteo', n.x.ultimoConteo ? fechaTxt(n.x.ultimoConteo) : 'Nunca (cargá un conteo para el stock inicial)'],
     i.minimo != null ? ['Stock mínimo', num(i.minimo) + ' ' + unidadTxt(i.unidad, i.minimo)] : null,
   ].filter(Boolean);
+  const mostrar = ui.movsVisibles || 15;
   return '<div class="form">' +
-    '<button class="btn sec chico" data-a="cerrarFicha" style="margin-bottom:12px">‹ Todos los insumos</button>' +
-    '<div class="saldo ' + n.cls + '" style="margin-bottom:12px"><h3>' + esc(i.nombre) + '</h3>' +
+    '<div class="saldo ' + n.cls + '" style="margin-bottom:12px">' +
     '<div class="cant">' + num(n.x.cantidad) + '<small>' + esc(unidadTxt(i.unidad, n.x.cantidad)) + '</small>' +
     (n.x.pendiente ? ' <span class="chip pend">sin enviar</span>' : '') + '</div>' +
     (n.bajo ? '<span class="chip alerta">Bajo el mínimo</span> ' : '') + (n.x.cantidad < 0 ? '<span class="chip alerta">Saldo negativo: falta un ingreso o un conteo</span>' : '') +
     '<table class="detalle" style="margin-top:8px">' + datosFicha.map(([a, b]) => '<tr><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table></div>' +
     (botones.length ? '<div class="segmento" style="margin-bottom:18px">' + botones.map(([c, cls, t]) =>
-      '<button class="' + cls + ' activo" data-a="cargarDesde" data-c="' + c + '" data-i="' + esc(i.nombre) + '">' + t + '</button>').join('') + '</div>' : '') +
-    '<h3 style="margin:0 0 8px">Últimos movimientos</h3>' +
-    (movs.length ? movs.slice(0, 15).map((m) => htmlMov(m, true)).join('') : '<p class="vacio">Sin movimientos en los últimos ' + DIAS_HISTORIAL + ' días.</p>') +
+      '<button class="' + cls + ' activo" data-a="cargarDesde" data-c="' + c + '">' + t + '</button>').join('') + '</div>' : '') +
+    '<h3 style="margin:0 0 8px">Movimientos</h3>' +
+    (movs.length ? movs.slice(0, mostrar).map((m) => htmlMov(m, true)).join('') +
+      (movs.length > mostrar ? '<button class="btn sec" data-a="masMovs">Ver más</button>' : '')
+      : '<p class="vacio">Sin movimientos en los últimos ' + DIAS_HISTORIAL + ' días.</p>') +
     '</div>';
 }
 
-function nuevoForm(clase) {
-  const prev = ui.form || {};
-  return { clase: clase || prev.clase || 'Consumo', fecha: prev.fecha || hoyISO(), insumo: prev.insumo || '', cantidad: '', destino: '', proveedor: '', remito: '', factura: '', nota: '' };
+function htmlSinFactura() {
+  const movs = movimientos().filter((m) => m.tipo === 'Ingreso' && !m.anulado && !m.factura);
+  if (!movs.length) return '<p class="vacio">No hay ingresos sin factura. 👍</p>';
+  return '<div class="form"><div class="aviso">Tocá un ingreso para asociarle la factura cuando llegue.</div>' +
+    movs.map((m) => htmlMov(m)).join('') + '</div>';
 }
 
+function nuevoForm(clase, insumo) {
+  const prev = ui.form || {};
+  return { clase, insumo, fecha: prev.fecha || hoyISO(), cantidad: '', destino: '', proveedor: '', remito: '', factura: '', nota: '' };
+}
+
+/** Formulario de un solo tipo de carga para el insumo de la ficha (ya elegidos). */
 function htmlCargar() {
-  if (!ui.form) ui.form = nuevoForm();
   const f = ui.form;
   const s = stockDatos();
-  const ins = s.insumos.filter((i) => i.activo);
-  const insSel = ins.find((i) => i.nombre === f.insumo);
-  const clases = [['Consumo', 'consumo', '⬆ Consumo'], ['Ingreso', 'ingreso', '⬇ Ingreso']];
-  if (puede('Stock', 'ADMINISTRAR')) clases.push(['Conteo', 'conteo', '✔ Conteo']);
+  const ins = s.insumos.find((i) => i.nombre === f.insumo);
+  const saldo = (saldos()[f.insumo] || {}).cantidad || 0;
   const rel = fechaRelativa(f.fecha);
-  let h = '<div class="form">' +
-    '<div class="campo"><div class="segmento">' + clases.map(([c, cls, t]) =>
-      '<button class="' + cls + (f.clase === c ? ' activo' : '') + '" data-a="clase" data-c="' + c + '">' + t + '</button>').join('') + '</div></div>';
-  if (f.clase === 'Conteo') h += '<div class="aviso">El conteo <b>reemplaza el saldo</b> por lo que hay en el depósito (stock inicial o control).</div>';
+  let h = '<div class="form">';
+  if (f.clase === 'Conteo') h += '<div class="aviso">El conteo <b>reemplaza el saldo</b> (hoy ' + num(saldo) + ' ' + esc(unidadTxt(ins.unidad, saldo)) + ') por lo que hay en el depósito.</div>';
   h += '<div class="campo"><span class="etq">Fecha</span><div class="fecha-fila">' +
     '<button class="nav" data-a="fecha" data-d="-1" aria-label="Día anterior">‹</button>' +
     '<label class="fecha">' + fechaTxt(f.fecha, true) + (rel ? '<span class="hoy">' + rel + '</span>' : '') +
     '<input type="date" id="f-fecha" value="' + f.fecha + '" max="' + hoyISO() + '"></label>' +
     '<button class="nav" data-a="fecha" data-d="1" aria-label="Día siguiente"' + (f.fecha >= hoyISO() ? ' disabled' : '') + '>›</button></div></div>';
-  const sal = saldos();
-  h += '<div class="campo"><label for="f-insumo">Insumo</label><select class="txt grande" id="f-insumo">' +
-    '<option value="">Elegí el insumo…</option>' + ins.map((i) => {
-      const x = (sal[i.nombre] || {}).cantidad || 0;
-      return '<option value="' + esc(i.nombre) + '"' + (f.insumo === i.nombre ? ' selected' : '') + '>' +
-        esc(i.nombre) + ' (hay ' + num(x) + ' ' + esc(unidadTxt(i.unidad, x)) + ')</option>';
-    }).join('') + '</select></div>';
-  const unidad = insSel ? unidadTxt(insSel.unidad, 2) : '';
-  h += '<div class="campo"><span class="etq">' + (f.clase === 'Conteo' ? 'Cantidad contada' : 'Cantidad') + (unidad ? ' <small>(en ' + esc(unidad) + ')</small>' : '') + '</span>' +
+  h += '<div class="campo"><span class="etq">' + (f.clase === 'Conteo' ? 'Cantidad contada' : 'Cantidad') + ' <small>(en ' + esc(unidadTxt(ins.unidad, 2)) + ')</small></span>' +
     '<div class="cantidad"><button data-a="mas" data-d="-1" aria-label="Menos">−</button>' +
     '<input id="f-cantidad" inputmode="decimal" autocomplete="off" value="' + esc(f.cantidad) + '" placeholder="0">' +
     '<button data-a="mas" data-d="1" aria-label="Más">+</button></div>' +
@@ -596,7 +609,7 @@ function htmlCargar() {
       '<div class="campo"><label for="f-factura">Factura N° <small>(opc.)</small></label><input class="txt" id="f-factura" value="' + esc(f.factura) + '" placeholder="si ya llegó"></div></div>';
   }
   h += '<div class="campo"><label for="f-nota">Nota <small>(opcional)</small></label><input class="txt" id="f-nota" value="' + esc(f.nota) + '"></div>';
-  h += '<button class="btn" data-a="guardarMov">Guardar ' + f.clase.toLowerCase() + '</button></div>';
+  h += '<button class="btn ' + f.clase.toLowerCase() + '" data-a="guardarMov">Guardar ' + f.clase.toLowerCase() + '</button></div>';
   return h;
 }
 
@@ -612,8 +625,8 @@ function equivale() {
 
 function leerCamposForm() {
   const f = ui.form;
-  if (!f) return;
-  ['cantidad', 'proveedor', 'remito', 'factura', 'nota'].forEach((k) => {
+  if (!f || ui.vistaStock !== 'form') return;
+  ['cantidad', 'proveedor', 'remito', 'factura', 'nota', 'destino'].forEach((k) => {
     const el = $('#f-' + k);
     if (el) f[k] = el.value;
   });
@@ -623,11 +636,8 @@ async function guardarMov() {
   leerCamposForm();
   const f = ui.form;
   const cantidad = leerNumero(f.cantidad);
-  const faltas = [];
-  if (!f.insumo) faltas.push('elegí el insumo');
-  if (!isFinite(cantidad) || cantidad < 0 || (f.clase !== 'Conteo' && cantidad === 0)) faltas.push('poné una cantidad válida');
-  if (f.fecha > hoyISO()) faltas.push('la fecha no puede ser futura');
-  if (faltas.length) { toast('Falta: ' + faltas.join(', ') + '.', 3500); return; }
+  if (!isFinite(cantidad) || cantidad < 0 || (f.clase !== 'Conteo' && cantidad === 0)) { toast('Poné una cantidad válida.', 3000); return; }
+  if (f.fecha > hoyISO()) { toast('La fecha no puede ser futura.', 3000); return; }
   const ins = stockDatos().insumos.find((i) => i.nombre === f.insumo);
   // Cantidades que suelen ser un error de tipeo: se confirma antes de guardar.
   const saldo = (saldos()[f.insumo] || {}).cantidad || 0;
@@ -644,42 +654,12 @@ async function guardarMov() {
   if (f.clase === 'Ingreso') { op.proveedor = f.proveedor.trim(); op.remito = f.remito.trim(); op.factura = f.factura.trim(); }
   if (f.nota.trim()) op.nota = f.nota.trim();
   agregarACola(op);
-  toast('✓ Guardado: ' + f.clase.toLowerCase() + ' de ' + num(cantidad) + ' ' + unidadTxt(ins.unidad, cantidad) + ' de ' + f.insumo + (navigator.onLine ? '' : ' (se envía cuando haya señal)'), 3200);
-  // Queda el mismo insumo elegido: es común cargar varios corrales seguidos del mismo.
-  ui.form = Object.assign(nuevoForm(f.clase), { fecha: f.fecha, insumo: f.insumo });
-  // Si se vino desde la ficha de un insumo, se vuelve a la ficha (se ve el saldo nuevo).
-  if (f.desdeFicha) { ui.insumoVer = f.insumo; ui.tabStock = 'saldo'; }
+  toast('✓ Guardado: ' + f.clase.toLowerCase() + ' de ' + num(cantidad) + ' ' + unidadTxt(ins.unidad, cantidad) + (navigator.onLine ? '' : ' (se envía cuando haya señal)'), 3200);
+  // Vuelve a la ficha, que ya muestra el saldo nuevo. La fecha elegida queda para la próxima carga.
+  ui.form = { fecha: f.fecha };
+  ui.vistaStock = 'ficha';
   render();
   window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function htmlMovimientos() {
-  const s = stockDatos();
-  let movs = movimientos();
-  if (ui.filtroInsumo) movs = movs.filter((m) => m.insumo === ui.filtroInsumo);
-  if (ui.filtroTipo === 'sinFactura') movs = movs.filter((m) => m.tipo === 'Ingreso' && !m.anulado && !m.factura);
-  else if (ui.filtroTipo) movs = movs.filter((m) => m.tipo === ui.filtroTipo);
-  let h = '<div class="filtros">' +
-    '<select class="txt" id="filtro-insumo"><option value="">Todos los insumos</option>' +
-    s.insumos.map((i) => '<option ' + (ui.filtroInsumo === i.nombre ? 'selected' : '') + '>' + esc(i.nombre) + '</option>').join('') + '</select>' +
-    '<select class="txt" id="filtro-tipo">' + [['', 'Todo'], ['Consumo', 'Consumos'], ['Ingreso', 'Ingresos'], ['Conteo', 'Conteos'], ['sinFactura', 'Ingresos sin factura']]
-      .map(([v, t]) => '<option value="' + v + '" ' + (ui.filtroTipo === v ? 'selected' : '') + '>' + t + '</option>').join('') + '</select></div>';
-  if (!movs.length) return h + '<p class="vacio">No hay movimientos' + (ui.filtroInsumo || ui.filtroTipo ? ' con ese filtro' : ' en los últimos ' + DIAS_HISTORIAL + ' días') + '.</p>';
-  const porDia = {};
-  movs.forEach((m) => { (porDia[m.fecha] = porDia[m.fecha] || []).push(m); });
-  Object.keys(porDia).sort().reverse().forEach((dia) => {
-    const lista = porDia[dia];
-    const totales = {};
-    lista.forEach((m) => { if (m.tipo === 'Consumo' && !m.anulado) totales[m.insumo] = (totales[m.insumo] || 0) + m.cantidad; });
-    const rel = fechaRelativa(dia);
-    h += '<div class="dia"><h4><span>' + (rel ? rel + ' · ' : '') + fechaTxt(dia, true) + '</span>' +
-      (Object.keys(totales).length ? '<span>Consumo: ' + Object.keys(totales).map((k) => {
-        const i = s.insumos.find((x) => x.nombre === k) || {};
-        return num(totales[k]) + ' ' + esc(unidadTxt(i.unidad || '', totales[k])) + ' ' + esc(abreviar(k));
-      }).join(' · ') + '</span>' : '') + '</h4>' +
-      lista.map(htmlMov).join('') + '</div>';
-  });
-  return h;
 }
 
 function abreviar(nombre) {
@@ -901,8 +881,6 @@ function despuesDeRender() {
     const el = $('#f-' + k);
     if (el) el.addEventListener('input', () => { ui.form[k] = el.value; });
   });
-  const fins = $('#f-insumo');
-  if (fins) fins.addEventListener('change', () => { leerCamposForm(); ui.form.insumo = fins.value; render(); });
   const fdes = $('#f-destino');
   if (fdes) fdes.addEventListener('change', () => { ui.form.destino = fdes.value; });
   const ff = $('#f-fecha');
@@ -910,10 +888,6 @@ function despuesDeRender() {
   const lf = $('#l-fecha');
   if (lf) lf.addEventListener('change', () => { if (lf.value && lf.value <= hoyISO()) { ui.lluvia.fecha = lf.value; ui.lluvia.mm = {}; render(); } });
   document.querySelectorAll('[data-sector]').forEach((el) => el.addEventListener('input', () => { ui.lluvia.mm[el.dataset.sector] = el.value; }));
-  const fi = $('#filtro-insumo');
-  if (fi) fi.addEventListener('change', () => { ui.filtroInsumo = fi.value; render(); });
-  const ft = $('#filtro-tipo');
-  if (ft) ft.addEventListener('change', () => { ui.filtroTipo = ft.value; render(); });
   document.querySelectorAll('[data-cfg][data-k]').forEach((el) => {
     el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', () => {
       const item = ui.cfg[el.dataset.cfg][Number(el.dataset.n)];
@@ -937,9 +911,12 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'ir':
+      // La flecha de Stock vuelve un paso (formulario → ficha → tarjetas → inicio).
+      if (ui.pantalla === 'stock' && b.dataset.p === 'inicio') { atrasStock(); break; }
       ui.pantalla = b.dataset.p;
       ui.cfg = null;
       ui.insumoVer = null;
+      ui.vistaStock = 'lista';
       render();
       window.scrollTo(0, 0);
       break;
@@ -952,26 +929,16 @@ document.addEventListener('click', (e) => {
     }
     case 'sync': sincronizar(); break;
     case 'salir': salir(); break;
-    case 'tabStock':
-      leerCamposForm();
-      ui.tabStock = b.dataset.t;
-      ui.insumoVer = null;
-      if (ui.form) ui.form.desdeFicha = false;
-      if (ui.tabStock !== 'config') ui.cfg = null;
-      render();
-      break;
     case 'tabLluvias': ui.tabLluvias = b.dataset.t; render(); break;
-    case 'verInsumo': ui.insumoVer = b.dataset.i; ui.tabStock = 'saldo'; render(); window.scrollTo(0, 0); break;
-    case 'cerrarFicha': ui.insumoVer = null; render(); break;
+    case 'verInsumo': ui.insumoVer = b.dataset.i; ui.vistaStock = 'ficha'; ui.movsVisibles = 15; render(); window.scrollTo(0, 0); break;
+    case 'vista': ui.vistaStock = b.dataset.v; render(); window.scrollTo(0, 0); break;
+    case 'masMovs': ui.movsVisibles = (ui.movsVisibles || 15) + 30; render(); break;
     case 'cargarDesde':
-      ui.form = Object.assign(nuevoForm(b.dataset.c), { insumo: b.dataset.i, fecha: hoyISO(), desdeFicha: true });
-      ui.insumoVer = null;
-      ui.tabStock = 'cargar';
+      ui.form = nuevoForm(b.dataset.c, ui.insumoVer);
+      ui.vistaStock = 'form';
       render();
       window.scrollTo(0, 0);
       break;
-    case 'verSinFactura': ui.filtroTipo = 'sinFactura'; ui.filtroInsumo = ''; ui.tabStock = 'movs'; render(); break;
-    case 'clase': leerCamposForm(); ui.form.clase = b.dataset.c; render(); break;
     case 'fecha': {
       leerCamposForm();
       const f = sumarDias(ui.form.fecha, Number(b.dataset.d));
