@@ -93,11 +93,13 @@ function nuevoLibro(nombres, url) {
 }
 const libro = nuevoLibro(['Hoja 1'], 'https://docs.google.com/spreadsheets/d/PRUEBA');
 const libroLluvias = nuevoLibro(['Lluvias'], 'https://docs.google.com/spreadsheets/d/LLUVIAS');
+// "datos para el informe" (la planilla que lee la tarea diaria de Claude)
+const libroInforme = nuevoLibro(['Hoja 1'], 'https://docs.google.com/spreadsheets/d/INFORME');
 libroLluvias.getSheetByName('Lluvias').getRange(1, 1, 1, 7).setValues([['ID', 'Finca', 'Sector', 'Fecha', 'mm', 'Usuario', 'Fecha carga']]);
 
 const validacion = { requireValueInList() { return this; }, setAllowInvalid() { return this; }, build() { return {}; } };
 const contexto = {
-  SpreadsheetApp: { getActive: () => libro, openById: () => libroLluvias, newDataValidation: () => validacion },
+  SpreadsheetApp: { getActive: () => libro, openById: (id) => (id === '1DXk0c3HOAsjoPwmfZzqSCUEZ9ByAOL9XlkmRdEBT7Ds' ? libroLluvias : libroInforme), newDataValidation: () => validacion },
   Utilities: { formatDate, newBlob: (bytes, tipo, nombre) => ({ nombre, bytes }), base64Decode: (b) => Buffer.from(b, 'base64') },
   CacheService: {
     getScriptCache: () => ({
@@ -169,6 +171,7 @@ http.createServer((req, res) => {
     const todas = {};
     libro.hojas.forEach((h) => { todas[h.nombre] = h.celdas; });
     todas['(planilla Lluvias)'] = libroLluvias.hojas[0].celdas;
+    libroInforme.hojas.forEach((h) => { todas['(informe) ' + h.nombre] = h.celdas; });
     res.end(JSON.stringify(todas, null, 1));
     return;
   }

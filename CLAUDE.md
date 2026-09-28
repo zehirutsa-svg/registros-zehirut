@@ -96,10 +96,14 @@ Hembras C6P: el usuario las agrega después (todavía no tienen ubicación).
 ## Tapfeed: consumo del confinamiento (decidido 28/09/2026)
 
 Reparto acordado: **la app solo registra** (no hace informes); **la tarea diaria de Claude solo hace
-informes** y debe leer TODO de la planilla de la app (hojas Stock, Movimientos, Tapfeed) en vez de
-"Stock inicial / Llegadas / Consumo fuera de confi" de "Datos base confinamiento" (de esa planilla
-solo sigue usando la hoja Corrales). Pendiente: reescribir el documento de instrucciones de la tarea
-("Instrucciones tarea diaria - Informe confinamiento", Drive id 1v_GFB4H5jcWXCOsyjtvnPMM_0GZ0mYEsV3bJwhBzJVs).
+informes** leyendo la planilla **"Registros Zehirut – datos para el informe"** (Drive id
+18sle8JEHOrayTQhC0dX5UIf-FsW6rFm2RLpTSgQ3aEo, carpeta Confinamiento ZEHIRUT), que el script reescribe
+entera con cada cambio de stock (publicarDatosInforme_: Leeme, Stock actual, Saldo diario, Consumos
+diarios, Ingresos, Tapfeed). **Por qué una planilla aparte:** la conexión a Drive de Claude (la que usa
+la tarea) solo ve archivos creados por ella misma; esa planilla la creó esa conexión y el script le
+escribe. De "Datos base confinamiento" la tarea solo usa Corrales y Parámetros.
+Instrucciones de la tarea (v2): Google Doc id 1g8QO9Jm5PK-tWX39v5BXfrlH2sH-OFLLbyI_D7Aca5M (el viejo quedó
+renombrado "VIEJO - NO USAR…"; la conexión no puede editar el texto de un doc existente, solo crear).
 
 - Botón "Subir informe Tapfeed" al pie de Stock (solo casilla Configurar). El PDF "Uso de ingredientes
   por grupo" se lee EN LA APP con pdf.js (cdnjs, se baja al usarlo): período, corrales (cabezas) y kg

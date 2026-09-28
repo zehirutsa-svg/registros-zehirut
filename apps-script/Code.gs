@@ -74,6 +74,11 @@ const TAPFEED_CARPETA = '1ZybVBnxzMW_9OixfT_ut9GuvKtQbagH1';
 // Carga inicial (una sola vez): archivo CSV en el Drive del dueño, fuera del repositorio porque
 // tiene datos de la empresa. Se importa solo y se renombra "(importado)".
 const CARGA_INICIAL = 'Registros Zehirut - carga inicial.csv';
+// "Registros Zehirut – datos para el informe" (carpeta Confinamiento ZEHIRUT): la creó la conexión a
+// Drive de Claude, que solo puede leer archivos creados por ella; esta app la mantiene al día y de
+// ahí lee la tarea que arma el informe diario del confinamiento.
+const INFORME_PLANILLA_ID = '18sle8JEHOrayTQhC0dX5UIf-FsW6rFm2RLpTSgQ3aEo';
+const INFORME_DESDE = '2026-09-15';   // primer día de la hoja "Saldo diario"
 const SECTORES_POR_FINCA = {
   'LA PRUDENCIA': ['A', 'C', 'D', 'F'],
   'LA PACIENCIA': ['A', 'B', 'C', 'E', 'F'],
@@ -221,6 +226,7 @@ function importarCargaInicial_(ss) {
     if (filas.length) sh.getRange(sh.getLastRow() + 1, 1, filas.length, COLS_MOV.length).setValues(filas);
     registrar_(ss, [[ahora, 'Carga inicial', 'Importar ' + CARGA_INICIAL, filas.length + ' movimientos', 'Aplicado', '']]);
     reconstruirStock_(ss);
+    publicarDatosInforme_(ss);
   });
   archivo.setName(CARGA_INICIAL.replace('.csv', ' (importado).csv'));
 }
@@ -245,6 +251,7 @@ function conLock_(fn) {
 function doGet() {
   asegurarConfigurado_();
   importarCargaInicial_(SpreadsheetApp.getActive());
+  publicarDatosInforme_(SpreadsheetApp.getActive());
   const url = SpreadsheetApp.getActive().getUrl();
   return HtmlService.createHtmlOutput(
     '<div style="font-family:sans-serif;font-size:20px;padding:24px">' +
@@ -635,7 +642,7 @@ function guardar_(body) {
     if (nuevas.length) shM.getRange(shM.getLastRow() + 1, 1, nuevas.length, COLS_MOV.length).setValues(nuevas);
     if (lluvias.length) guardarLluvias_(lluvias, u.nombre);
     registrar_(ss, log);
-    if (tocoStock) reconstruirStock_(ss);
+    if (tocoStock) { reconstruirStock_(ss); publicarDatosInforme_(ss); }
     return { ok: true, resultados };
   });
 }
@@ -876,6 +883,116 @@ function cargarTapfeed_(body) {
     if (filasT.length) shT.getRange(shT.getLastRow() + 1, 1, filasT.length, COLS_TAPFEED.length).setValues(filasT);
     registrar_(ss, log);
     reconstruirStock_(ss);
+    publicarDatosInforme_(ss);
     return { ok: true, fecha, consumos: filasMov.length, archivo: url };
   });
+}
+
+// ---------------------------------------------------------------- datos para el informe diario
+// Hojas (se reescriben enteras en cada cambio; cantidades en la unidad del insumo y en kg):
+//   Leeme            — qué es y cuándo se actualizó
+//   Stock actual     — saldo de cada insumo (y estancia)
+//   Saldo diario     — saldo al cierre de cada día desde INFORME_DESDE
+//   Consumos diarios — por día e insumo: Confinamiento (Tapfeed) / otros destinos / total
+//   Ingresos         — cada entrada de insumos
+//   Tapfeed          — detalle por corral de cada informe de Tapfeed
+function publicarDatosInforme_(ss) {
+  try {
+    const dest = SpreadsheetApp.openById(INFORME_PLANILLA_ID);
+    const movs = leerMovimientos_(ss).filter((m) => !m.anulado);
+    const insumos = leerInsumos_(ss);
+    const porNombre = {};
+    insumos.forEach((i) => { porNombre[i.nombre] = i; });
+    const kgDe = (insumo, cant) => {
+      const i = porNombre[insumo] || {};
+      return i.kgUnidad ? Math.round(cant * i.kgUnidad * 100) / 100 : (i.unidad === 'kg' ? cant : '');
+    };
+    const est = (e) => (e ? nombreEstancia_(e) : '');
+    const hoy = Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd');
+    const escribir = (nombre, filas) => {
+      let h = dest.getSheetByName(nombre);
+      if (!h) h = dest.insertSheet(nombre);
+      h.clear();
+      h.getRange(1, 1, filas.length, filas[0].length).setValues(filas);
+      h.getRange(1, 1, 1, filas[0].length).setFontWeight('bold').setBackground('#eeeeee');
+      h.setFrozenRows(1);
+      return h;
+    };
+
+    const saldos = calcularStock_(insumos, movs);
+    const stock = [['Insumo', 'Estancia', 'Saldo', 'Unidad', 'Saldo kg', 'Último conteo', 'Último movimiento']];
+    Object.keys(saldos).map((k) => saldos[k]).forEach((x) => {
+      const i = porNombre[x.insumo];
+      if (!i || (!i.activo && !x.ultimo)) return;
+      stock.push([x.insumo, est(x.estancia), x.cantidad, i.unidad, kgDe(x.insumo, x.cantidad),
+        x.ultimoConteo ? ddmmaaaa_(x.ultimoConteo) : '', x.ultimo ? ddmmaaaa_(x.ultimo) : '']);
+    });
+
+    // Saldo al cierre de cada día: se recorren los movimientos en orden y se anota el saldo de cada
+    // insumo al terminar cada día (un conteo fija el saldo, como en el stock de la app).
+    const orden = movs.slice().sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.ts - b.ts));
+    const claves = Object.keys(saldos);
+    const actual = {};
+    claves.forEach((k) => { actual[k] = 0; });
+    const diario = [['Fecha', 'Insumo', 'Estancia', 'Saldo', 'Unidad', 'Saldo kg']];
+    let j = 0;
+    for (let dia = orden.length && orden[0].fecha < INFORME_DESDE ? orden[0].fecha : INFORME_DESDE; dia <= hoy; dia = sumarDias_(dia, 1)) {
+      while (j < orden.length && orden[j].fecha <= dia) {
+        const m = orden[j++];
+        const k = claveStock_(m.insumo, m.estancia);
+        if (!(k in actual)) { actual[k] = 0; claves.push(k); }
+        if (m.tipo === 'Conteo') actual[k] = m.cantidad;
+        else if (m.tipo === 'Ingreso') actual[k] += m.cantidad;
+        else if (m.tipo === 'Consumo') actual[k] -= m.cantidad;
+      }
+      if (dia < INFORME_DESDE) continue;
+      claves.forEach((k) => {
+        const x = saldos[k] || { insumo: k.split('|')[0], estancia: k.split('|')[1] || '' };
+        const i = porNombre[x.insumo];
+        if (!i || !i.activo) return;
+        const cant = Math.round(actual[k] * 1000) / 1000;
+        diario.push([ddmmaaaa_(dia), x.insumo, est(x.estancia), cant, i.unidad, kgDe(x.insumo, cant)]);
+      });
+    }
+
+    const cons = {};
+    movs.filter((m) => m.tipo === 'Consumo').forEach((m) => {
+      const k = m.fecha + '|' + m.insumo + '|' + m.estancia;
+      const c = cons[k] || (cons[k] = { fecha: m.fecha, insumo: m.insumo, estancia: m.estancia, confi: 0, otros: 0 });
+      if (m.destino === 'Confinamiento') c.confi += m.cantidad; else c.otros += m.cantidad;
+    });
+    const consumos = [['Fecha', 'Insumo', 'Estancia', 'Unidad', 'Confinamiento', 'Otros destinos', 'Total', 'Confinamiento kg', 'Otros destinos kg', 'Total kg']];
+    Object.keys(cons).sort().forEach((k) => {
+      const c = cons[k];
+      const r3 = (n) => Math.round(n * 1000) / 1000;
+      consumos.push([ddmmaaaa_(c.fecha), c.insumo, est(c.estancia), (porNombre[c.insumo] || {}).unidad || '',
+        r3(c.confi), r3(c.otros), r3(c.confi + c.otros), kgDe(c.insumo, c.confi), kgDe(c.insumo, c.otros), kgDe(c.insumo, c.confi + c.otros)]);
+    });
+
+    const ingresos = [['Fecha', 'Insumo', 'Estancia', 'Cantidad', 'Unidad', 'Kg', 'Proveedor', 'Remito', 'Factura', 'Nota']];
+    orden.filter((m) => m.tipo === 'Ingreso').forEach((m) => {
+      ingresos.push([ddmmaaaa_(m.fecha), m.insumo, est(m.estancia), m.cantidad, m.unidad, kgDe(m.insumo, m.cantidad), m.proveedor, m.remito, m.factura, m.nota]);
+    });
+
+    const shT = ss.getSheetByName('Tapfeed');
+    const tapfeed = shT.getLastRow() > 0 ? shT.getRange(1, 1, shT.getLastRow(), COLS_TAPFEED.length).getValues()
+      .map((f, n) => (n ? [ddmmaaaa_(iso_(f[0]))].concat(f.slice(1, 7)) : f.slice(0, 7))) : [COLS_TAPFEED.slice(0, 7)];
+
+    const leeme = escribir('Leeme', [['Registros Zehirut – datos para el informe'],
+      ['La actualiza sola la app Registros Zehirut con cada carga. No editar a mano.'],
+      ['Actualizada: ' + Utilities.formatDate(new Date(), ZONA, 'dd/MM/yyyy HH:mm')],
+      ['Fechas en DD/MM/AAAA. Cantidades en la unidad del insumo y en kg. Movimientos anulados: no se incluyen.']]);
+    escribir('Stock actual', stock);
+    escribir('Saldo diario', diario);
+    escribir('Consumos diarios', consumos);
+    escribir('Ingresos', ingresos);
+    escribir('Tapfeed', tapfeed);
+    dest.getSheets().forEach((h) => {
+      if (['Leeme', 'Stock actual', 'Saldo diario', 'Consumos diarios', 'Ingresos', 'Tapfeed'].indexOf(h.getName()) === -1) dest.deleteSheet(h);
+    });
+    dest.setActiveSheet(leeme);
+  } catch (e) {
+    // Nunca frena una carga: si falla, queda anotado y se reintenta con el próximo cambio.
+    console.error('No se pudo actualizar la planilla del informe: ' + e);
+  }
 }
