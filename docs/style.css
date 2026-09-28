@@ -294,3 +294,27 @@ select.txt.grande { font-size: 18px; font-weight: 600; padding: 15px 12px; backg
 label.btn { text-align: center; cursor: pointer; }
 .aviso.rojo-fondo { background: var(--alerta-claro); color: #7a1414; }
 .aviso ul, .aviso.rojo-fondo ul { margin: 6px 0 0; padding-left: 20px; }
+/* ---------------------------------------------------------------- lluvias (barras) */
+.btn.azul { background: var(--azul); }
+.btn.whatsapp { background: #1f9d55; margin-top: 12px; }
+.lluvia-finca { margin-bottom: 12px; }
+.lluvia-finca:last-of-type { margin-bottom: 4px; }
+.lluvia-finca > b, .tarjeta > b { display: block; font-size: 17px; margin-bottom: 6px; }
+.barra-fila { display: grid; grid-template-columns: minmax(110px, 38%) 1fr 72px; align-items: center; gap: 8px; margin: 5px 0; }
+.barra-fila.chica { grid-template-columns: 82px 1fr 64px; margin: 3px 0; font-size: 13px; }
+.barra-nombre { font-size: 15px; }
+.barra-fila.chica .barra-nombre { font-size: 13px; color: var(--gris); }
+.barra-fondo { height: 14px; background: #edf1f5; border-radius: 99px; overflow: hidden; }
+.barra-fila.chica .barra-fondo { height: 10px; }
+.barra-relleno { display: block; height: 100%; border-radius: 99px; }
+.barra-relleno.dia { background: linear-gradient(90deg, #5fa8e0, var(--azul)); }
+.barra-relleno.mes { background: #7cc4a0; }
+.barra-relleno.temporada { background: var(--azul); }
+.barra-relleno.anio { background: #8fb9e6; }
+.barra-valor { text-align: right; font-weight: 700; white-space: nowrap; }
+.lluvia-sector { padding: 8px 0; border-top: 1px solid var(--linea); }
+.lluvia-sector:first-of-type { border-top: 0; }
+.lluvia-sector-nombre { font-weight: 700; font-size: 15px; }
+.leyenda { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--gris); margin-bottom: 10px; }
+.leyenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.leyenda i.mes { background: #7cc4a0; } .leyenda i.temporada { background: var(--azul); } .leyenda i.anio { background: #8fb9e6; }

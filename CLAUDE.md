@@ -126,6 +126,12 @@ renombrados "VIEJO - NO USAR…"; la conexión no puede editar el texto de un do
 
 ## Segundo módulo: Lluvias
 
+Una sola pantalla (sin pestañas): el día (‹ › entre días con lluvia; ambas estancias con barras),
+botón "Compartir por WhatsApp" (navigator.share en el celular, wa.me en la PC; día + acumulados de
+temporada y año con barras ▓░ entre ``` como en ZehirutApp), acumulados con barras de colores (mes,
+temporada set–ago, año). "Cargar lluvia" abre el formulario y vuelve al día cargado. Sectores con su
+referencia (C Central, D Retiro / B Retiro, E Central).
+
 Ya existe en ZehirutApp (`Lluvias.js`: planilla "Registro de Lluvias Zehirut S.A.", sectores por
 estancia, ID AAAAMMDDFINCASECTOR, resumen año / temporada set-ago). Se integra acá; Osmar con
 acceso total.

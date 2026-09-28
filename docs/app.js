@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.5.1';
+const VERSION = '1.6.0';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -47,7 +47,8 @@ const ui = {
   insumoVer: null,      // insumo de la ficha abierta
   movsVisibles: 15,
   tf: null,             // informe de Tapfeed en lectura / vista previa
-  tabLluvias: 'cargar',
+  vistaLluvia: 'dia',   // dia | cargar
+  lluviaDia: null,      // día que se muestra en Lluvias
   pin: '',
   errorPin: '',
   entrando: false,
@@ -1048,6 +1049,15 @@ async function cfgGuardar(tipo) {
 }
 
 // ---------------------------------------------------------------- lluvias
+// Una sola pantalla: el día elegido (las dos estancias, con barras), compartir por WhatsApp y
+// los acumulados con barras (mes, temporada set-ago y año). "Cargar lluvia" abre el formulario y
+// al guardar vuelve al día cargado.
+const FINCAS = [['LA PRUDENCIA', 'La Prudencia'], ['LA PACIENCIA', 'La Paciencia']];
+// Referencia de cada sector, igual que en ZehirutApp.
+const REF_SECTOR = { 'LA PRUDENCIA': { C: 'Central', D: 'Retiro' }, 'LA PACIENCIA': { B: 'Retiro', E: 'Central' } };
+const nombreSector = (finca, s) => 'Sector ' + s + (REF_SECTOR[finca] && REF_SECTOR[finca][s] ? ' (' + REF_SECTOR[finca][s] + ')' : '');
+const MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'setiembre', 'octubre', 'noviembre', 'diciembre'];
+
 function lluviasDatos() {
   return (datos && datos.lluvias) || { sectores: { 'LA PRUDENCIA': ['A', 'C', 'D', 'F'], 'LA PACIENCIA': ['A', 'B', 'C', 'E', 'F'] }, registros: [], resumen: [] };
 }
@@ -1064,11 +1074,135 @@ function registrosLluvia() {
   return Object.keys(mapa).map((k) => mapa[k]);
 }
 
+/** Acumulados por sector: temporada y año (de Google, corregidos con lo que está en la cola) y mes
+ *  actual (de los registros de los últimos días). */
+function acumuladosLluvia() {
+  const d = lluviasDatos();
+  const hoy = hoyISO();
+  const mes = hoy.slice(0, 7);
+  const anio = hoy.slice(0, 4);
+  const iniTemp = (Number(hoy.slice(5, 7)) >= 9 ? Number(anio) : Number(anio) - 1) + '-09-01';
+  const acum = {};
+  const clave = (f, s) => f + '|' + s;
+  FINCAS.forEach(([f]) => (d.sectores[f] || []).forEach((s) => { acum[clave(f, s)] = { mes: 0, temporada: 0, anio: 0 }; }));
+  (d.resumen || []).forEach((r) => {
+    const a = acum[clave(r.finca, r.sector)] || (acum[clave(r.finca, r.sector)] = { mes: 0, temporada: 0, anio: 0 });
+    a.temporada = r.temporada; a.anio = r.anio;
+  });
+  const servidor = {};
+  d.registros.forEach((r) => { servidor[r.fecha + '|' + r.finca + '|' + r.sector] = r.mm; });
+  registrosLluvia().forEach((r) => {
+    const a = acum[clave(r.finca, r.sector)];
+    if (!a) return;
+    if (r.fecha.slice(0, 7) === mes) a.mes += Number(r.mm) || 0;
+    if (r.pendiente) {
+      // Lo que todavía no llegó a Google se suma (descontando lo que reemplaza, si ya había).
+      const dif = (Number(r.mm) || 0) - (Number(servidor[r.fecha + '|' + r.finca + '|' + r.sector]) || 0);
+      if (r.fecha >= iniTemp) a.temporada += dif;
+      if (r.fecha.slice(0, 4) === anio) a.anio += dif;
+    }
+  });
+  return { acum, mesTxt: MESES_LARGO[Number(mes.slice(5)) - 1], temporada: d.temporada || '', anio: d.anio || Number(anio) };
+}
+
 function htmlLluvias() {
-  const lista = [['cargar', 'Cargar'], ['resumen', 'Resumen']];
-  if (!puede('Lluvias', 'CARGAR')) { lista.shift(); ui.tabLluvias = 'resumen'; }
-  const cuerpo = ui.tabLluvias === 'cargar' ? htmlLluviaCargar() : htmlLluviaResumen();
-  return barra('Lluvias', true) + tabs(lista, ui.tabLluvias, 'tabLluvias') + '<div class="contenido">' + cuerpo + '</div>';
+  if (ui.vistaLluvia === 'cargar' && puede('Lluvias', 'CARGAR')) {
+    return barra('Cargar lluvia', true) + '<div class="contenido">' + htmlLluviaCargar() + '</div>';
+  }
+  ui.vistaLluvia = 'dia';
+  return barra('Lluvias', true) + '<div class="contenido"><div class="form">' + htmlLluviaDia() + htmlLluviaAcumulados() + '</div></div>';
+}
+
+/** Días con lluvia registrada (el más reciente primero). */
+function diasConLluvia() {
+  return registrosLluvia().map((r) => r.fecha).filter((f, i, a) => a.indexOf(f) === i).sort().reverse();
+}
+
+function htmlLluviaDia() {
+  const dias = diasConLluvia();
+  if (!ui.lluviaDia || dias.indexOf(ui.lluviaDia) === -1) ui.lluviaDia = dias[0] || null;
+  let h = puede('Lluvias', 'CARGAR') ? '<button class="btn azul" data-a="lluviaCargar" style="margin-bottom:14px">🌧️ Cargar lluvia</button>' : '';
+  if (!ui.lluviaDia) return h + '<p class="vacio">No hay lluvias registradas en los últimos ' + DIAS_HISTORIAL + ' días.</p>';
+  const i = dias.indexOf(ui.lluviaDia);
+  const regs = registrosLluvia().filter((r) => r.fecha === ui.lluviaDia);
+  const max = Math.max(1, ...regs.map((r) => Number(r.mm) || 0));
+  const rel = fechaRelativa(ui.lluviaDia);
+  h += '<div class="fecha-fila" style="margin-bottom:10px">' +
+    '<button class="nav" data-a="lluviaDia" data-d="1"' + (i >= dias.length - 1 ? ' disabled' : '') + ' aria-label="Lluvia anterior">‹</button>' +
+    '<div class="fecha">' + fechaTxt(ui.lluviaDia, true) + (rel ? '<span class="hoy">' + rel + '</span>' : '') + '</div>' +
+    '<button class="nav" data-a="lluviaDia" data-d="-1"' + (i <= 0 ? ' disabled' : '') + ' aria-label="Lluvia siguiente">›</button></div>';
+  h += '<div class="tarjeta">' + FINCAS.map(([f, nom]) => {
+    const sect = lluviasDatos().sectores[f] || [];
+    return '<div class="lluvia-finca"><b>' + nom + '</b>' + sect.map((s) => {
+      const r = regs.find((x) => x.finca === f && x.sector === s);
+      const mm = r ? Number(r.mm) || 0 : null;
+      return '<div class="barra-fila"><span class="barra-nombre">' + esc(nombreSector(f, s)) + '</span>' +
+        '<span class="barra-fondo"><span class="barra-relleno dia" style="width:' + (mm ? Math.max(4, (mm / max) * 100) : 0) + '%"></span></span>' +
+        '<span class="barra-valor">' + (mm == null ? '—' : num(mm, 1) + ' mm' + (r.pendiente ? '*' : '')) + '</span></div>';
+    }).join('') + '</div>';
+  }).join('') + (regs.some((r) => r.pendiente) ? '<small style="color:var(--gris)">* sin enviar todavía</small>' : '') + '</div>';
+  h += '<button class="btn whatsapp" data-a="lluviaWhatsapp">📲 Compartir por WhatsApp</button>';
+  return h;
+}
+
+function htmlLluviaAcumulados() {
+  const a = acumuladosLluvia();
+  const valores = Object.keys(a.acum).map((k) => a.acum[k]);
+  const max = Math.max(1, ...valores.map((v) => Math.max(v.temporada, v.anio, v.mes)));
+  const barra = (cls, etiqueta, v) => '<div class="barra-fila chica"><span class="barra-nombre">' + etiqueta + '</span>' +
+    '<span class="barra-fondo"><span class="barra-relleno ' + cls + '" style="width:' + (v > 0 ? Math.max(3, (v / max) * 100) : 0) + '%"></span></span>' +
+    '<span class="barra-valor">' + num(v, 0) + ' mm</span></div>';
+  return '<h3 style="margin:22px 0 4px">Acumulados</h3>' +
+    '<div class="leyenda"><span><i class="mes"></i>' + a.mesTxt.charAt(0).toUpperCase() + a.mesTxt.slice(1) + '</span><span><i class="temporada"></i>Temporada ' + esc(a.temporada) + '</span><span><i class="anio"></i>Año ' + a.anio + '</span></div>' +
+    FINCAS.map(([f, nom]) => '<div class="tarjeta"><b>' + nom + '</b>' + (lluviasDatos().sectores[f] || []).map((s) => {
+      const v = a.acum[f + '|' + s] || { mes: 0, temporada: 0, anio: 0 };
+      return '<div class="lluvia-sector"><span class="lluvia-sector-nombre">' + esc(nombreSector(f, s)) + '</span>' +
+        barra('mes', a.mesTxt.charAt(0).toUpperCase() + a.mesTxt.slice(1), v.mes) + barra('temporada', 'Temporada', v.temporada) + barra('anio', 'Año', v.anio) + '</div>';
+    }).join('') + '</div>').join('');
+}
+
+/** Texto para WhatsApp: la lluvia del día y los acumulados de la temporada con barras de texto.
+ *  Las tablas van entre ``` para que WhatsApp las muestre alineadas. */
+function textoWhatsappLluvia() {
+  const dia = ui.lluviaDia;
+  const regs = registrosLluvia().filter((r) => r.fecha === dia);
+  const a = acumuladosLluvia();
+  const corto = (f, s) => s + (REF_SECTOR[f] && REF_SECTOR[f][s] ? ' ' + REF_SECTOR[f][s] : '');
+  const barraTxt = (v, max) => { const n = max > 0 ? Math.round((v / max) * 10) : 0; return '▓'.repeat(n) + '░'.repeat(10 - n); };
+  const lineas = ['🌧️ *Lluvia del ' + fechaTxt(dia, true) + '*', ''];
+  FINCAS.forEach(([f, nom]) => {
+    lineas.push('*' + nom + '*');
+    (lluviasDatos().sectores[f] || []).forEach((s) => {
+      const r = regs.find((x) => x.finca === f && x.sector === s);
+      lineas.push(nombreSector(f, s) + ': ' + (r ? num(r.mm, 1) + ' mm' : 'sin registro'));
+    });
+    lineas.push('');
+  });
+  ['temporada', 'anio'].forEach((campo) => {
+    const max = Math.max(1, ...Object.keys(a.acum).map((k) => a.acum[k][campo]));
+    lineas.push('📊 *Acumulado ' + (campo === 'temporada' ? 'temporada ' + a.temporada : 'año ' + a.anio) + '*');
+    lineas.push('```');
+    FINCAS.forEach(([f, nom], n) => {
+      if (n) lineas.push('');
+      lineas.push(nom);
+      (lluviasDatos().sectores[f] || []).forEach((s) => {
+        const v = (a.acum[f + '|' + s] || {})[campo] || 0;
+        lineas.push((corto(f, s) + '          ').slice(0, 10) + barraTxt(v, max) + ' ' + num(v, 0) + ' mm');
+      });
+    });
+    lineas.push('```');
+    lineas.push('');
+  });
+  return lineas.join('\n').trim();
+}
+
+async function compartirLluvia() {
+  const texto = textoWhatsappLluvia();
+  // En el celular se abre el menú de compartir (WhatsApp y sus grupos); en la PC, WhatsApp Web.
+  if (navigator.share && /Android|iPhone|iPad/i.test(navigator.userAgent)) {
+    try { await navigator.share({ text: texto }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
 }
 
 function htmlLluviaCargar() {
@@ -1079,8 +1213,8 @@ function htmlLluviaCargar() {
   registrosLluvia().forEach((r) => { if (r.fecha === l.fecha && r.finca === l.finca) actuales[r.sector] = r; });
   const rel = fechaRelativa(l.fecha);
   return '<div class="form">' +
-    '<div class="campo"><div class="segmento">' + ['LA PRUDENCIA', 'LA PACIENCIA'].map((f) =>
-      '<button class="neutro' + (l.finca === f ? ' activo' : '') + '" data-a="finca" data-f="' + f + '">' + f.replace('LA ', 'La ').replace('PRUDENCIA', 'Prudencia').replace('PACIENCIA', 'Paciencia') + '</button>').join('') + '</div></div>' +
+    '<div class="campo"><div class="segmento">' + FINCAS.map(([f, nom]) =>
+      '<button class="neutro' + (l.finca === f ? ' activo' : '') + '" data-a="finca" data-f="' + f + '">' + nom + '</button>').join('') + '</div></div>' +
     '<div class="campo"><span class="etq">Fecha de la lluvia</span><div class="fecha-fila">' +
     '<button class="nav" data-a="fechaLluvia" data-d="-1">‹</button>' +
     '<label class="fecha">' + fechaTxt(l.fecha, true) + (rel ? '<span class="hoy">' + rel + '</span>' : '') +
@@ -1090,11 +1224,11 @@ function htmlLluviaCargar() {
     sectores.map((s) => {
       const a = actuales[s];
       const val = l.mm[s] != null ? l.mm[s] : '';
-      return '<div class="sector"><b>Sector ' + s + '</b><input inputmode="decimal" data-sector="' + s + '" value="' + esc(val) + '" placeholder="mm">' +
-        '<small>' + (a ? 'Cargado: ' + num(a.mm) + ' mm' + (a.pendiente ? ' (sin enviar)' : '') : '') + '</small></div>';
+      return '<div class="sector"><b>' + esc(nombreSector(l.finca, s)) + '</b><input inputmode="decimal" data-sector="' + s + '" value="' + esc(val) + '" placeholder="mm">' +
+        '<small>' + (a ? 'Ya cargado: ' + num(a.mm) + ' mm' + (a.pendiente ? ' (sin enviar)' : '') : '') + '</small></div>';
     }).join('') + '</div></div>' +
-    '<div class="aviso">Si un sector ya tenía mm cargados ese día, se reemplazan por lo nuevo (igual que en ZehirutApp).</div>' +
-    '<button class="btn" data-a="guardarLluvia" style="background:var(--azul)">Guardar lluvia</button></div>';
+    (Object.keys(actuales).length ? '<div class="aviso amarillo">Ese día ya tiene lluvia cargada en algún sector: lo que escribas lo reemplaza.</div>' : '') +
+    '<button class="btn azul" data-a="guardarLluvia">Guardar lluvia</button></div>';
 }
 
 function guardarLluvia() {
@@ -1112,34 +1246,12 @@ function guardarLluvia() {
   if (!registros.length) { toast('Cargá los mm de al menos un sector.', 3000); return; }
   agregarACola({ tipo: 'lluvia', finca: l.finca, fecha: l.fecha, registros });
   toast('✓ Lluvia guardada: ' + registros.map((r) => r.sector + ' ' + num(r.mm) + ' mm').join(', '), 3200);
-  ui.lluvia = { finca: l.finca, fecha: l.fecha, mm: {} };
+  // Vuelve a la pantalla principal mostrando ese día.
+  ui.lluviaDia = l.fecha;
+  ui.lluvia = null;
+  ui.vistaLluvia = 'dia';
   render();
-}
-
-function htmlLluviaResumen() {
-  const d = lluviasDatos();
-  const regs = registrosLluvia();
-  let h = '';
-  if (d.resumen && d.resumen.length) {
-    h += '<h3>Acumulado por sector</h3><div class="tabla-scroll"><table class="tabla"><tr><th>Estancia · Sector</th><th>Año ' + (d.anio || '') + '</th><th>Temporada ' + esc(d.temporada || '') + '</th></tr>' +
-      d.resumen.map((r) => '<tr><td>' + esc(r.finca.replace('LA ', '')) + ' · ' + esc(r.sector) + '</td><td class="mm">' + num(r.anio, 1) + ' mm</td><td class="mm">' + num(r.temporada, 1) + ' mm</td></tr>').join('') +
-      '</table></div>';
-  }
-  const fechas = regs.map((r) => r.fecha).filter((f, i, a) => a.indexOf(f) === i).sort().reverse().slice(0, 20);
-  if (!fechas.length) return h + '<p class="vacio">No hay lluvias registradas en los últimos ' + DIAS_HISTORIAL + ' días.</p>';
-  h += '<h3>Últimas lluvias</h3>';
-  ['LA PRUDENCIA', 'LA PACIENCIA'].forEach((finca) => {
-    const sect = d.sectores[finca] || [];
-    const fs = fechas.filter((f) => regs.some((r) => r.fecha === f && r.finca === finca));
-    if (!fs.length) return;
-    h += '<div class="tabla-scroll"><table class="tabla"><tr><th>' + esc(finca) + '</th>' + sect.map((s) => '<th>' + s + '</th>').join('') + '</tr>' +
-      fs.map((f) => '<tr><td>' + fechaTxt(f) + '</td>' + sect.map((s) => {
-        const r = regs.find((x) => x.fecha === f && x.finca === finca && x.sector === s);
-        return '<td class="mm">' + (r ? num(r.mm, 1) + (r.pendiente ? '*' : '') : '—') + '</td>';
-      }).join('') + '</tr>').join('') + '</table></div>';
-  });
-  if (regs.some((r) => r.pendiente)) h += '<p style="color:var(--gris);font-size:14px">* sin enviar todavía</p>';
-  return h;
+  window.scrollTo(0, 0);
 }
 
 // ---------------------------------------------------------------- eventos
@@ -1184,10 +1296,12 @@ document.addEventListener('click', (e) => {
     case 'ir':
       // La flecha de Stock vuelve un paso (formulario → ficha → tarjetas → inicio).
       if (ui.pantalla === 'stock' && b.dataset.p === 'inicio') { atrasStock(); break; }
+      if (ui.pantalla === 'lluvias' && ui.vistaLluvia === 'cargar' && b.dataset.p === 'inicio') { ui.vistaLluvia = 'dia'; ui.lluvia = null; render(); break; }
       ui.pantalla = b.dataset.p;
       ui.cfg = null;
       ui.insumoVer = null;
       ui.vistaStock = 'lista';
+      ui.vistaLluvia = 'dia';
       render();
       window.scrollTo(0, 0);
       break;
@@ -1199,7 +1313,6 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'salir': salir(); break;
-    case 'tabLluvias': ui.tabLluvias = b.dataset.t; render(); break;
     case 'verInsumo': ui.insumoVer = b.dataset.i; ui.vistaStock = 'ficha'; ui.movsVisibles = 15; render(); window.scrollTo(0, 0); break;
     case 'vista': ui.vistaStock = b.dataset.v; render(); window.scrollTo(0, 0); break;
     case 'tfConfirmar': tfConfirmar(); break;
@@ -1242,6 +1355,14 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'guardarLluvia': guardarLluvia(); break;
+    case 'lluviaCargar': ui.lluvia = null; ui.vistaLluvia = 'cargar'; render(); window.scrollTo(0, 0); break;
+    case 'lluviaWhatsapp': compartirLluvia(); break;
+    case 'lluviaDia': {
+      const dias = diasConLluvia();
+      const i = dias.indexOf(ui.lluviaDia) + Number(b.dataset.d);
+      if (dias[i]) { ui.lluviaDia = dias[i]; render(); }
+      break;
+    }
     default: break;
   }
 });
