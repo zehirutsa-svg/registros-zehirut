@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.7.0';
+const VERSION = '1.8.0';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -48,6 +48,7 @@ const ui = {
   insumoVer: null,      // insumo de la ficha abierta
   movsVisibles: 15,
   tf: null,             // informe de Tapfeed en lectura / vista previa
+  excel: null,          // período elegido para bajar el Excel
   vistaLluvia: 'dia',   // dia | cargar
   lluviaDia: null,      // día que se muestra en Lluvias
   pin: '',
@@ -519,6 +520,7 @@ function htmlStock() {
     sinFactura: ['Ingresos sin factura', htmlSinFactura],
     config: ['Configurar', htmlConfig],
     tapfeed: ['Informe Tapfeed', htmlTapfeed],
+    excel: ['Bajar Excel', htmlExcel],
   };
   const [titulo, fn] = vistas[ui.vistaStock] || vistas.lista;
   return barra(titulo, true) + '<div class="contenido">' + fn() + '</div>';
@@ -529,7 +531,7 @@ function atrasStock() {
   leerCamposForm();
   const v = ui.vistaStock;
   if (v === 'form') ui.vistaStock = 'ficha';
-  else if (v === 'ficha' || v === 'sinFactura' || v === 'config' || v === 'tapfeed') { ui.vistaStock = 'lista'; ui.insumoVer = null; ui.cfg = null; ui.tf = null; }
+  else if (v === 'ficha' || v === 'sinFactura' || v === 'config' || v === 'tapfeed' || v === 'excel') { ui.vistaStock = 'lista'; ui.insumoVer = null; ui.cfg = null; ui.tf = null; }
   else ui.pantalla = 'inicio';
   render();
   window.scrollTo(0, 0);
@@ -580,8 +582,9 @@ function htmlSaldo() {
         (!n.x.ultimoConteo ? '<br><span class="chip">Sin conteo inicial</span>' : '') +
         '</div></button>';
     }).join('') + '</div>' : '<p class="vacio">Todavía no hay insumos cargados.</p>') +
-    (sesion.configura && !esCombustible() ? '<div class="pie-stock"><button class="btn sec chico" data-a="vista" data-v="tapfeed">📄 Subir informe Tapfeed</button>' +
-      '<button class="btn sec chico" data-a="vista" data-v="config">⚙ Configurar insumos y corrales</button></div>' : '');
+    '<div class="pie-stock"><button class="btn sec chico" data-a="vista" data-v="excel">📥 Bajar Excel</button>' +
+    (sesion.configura && !esCombustible() ? '<button class="btn sec chico" data-a="vista" data-v="tapfeed">📄 Subir informe Tapfeed</button>' +
+      '<button class="btn sec chico" data-a="vista" data-v="config">⚙ Configurar insumos y corrales</button>' : '') + '</div>';
 }
 
 /** Ficha de un insumo: saldo, cómo viene el consumo, botones para cargar y sus movimientos. */
@@ -1066,6 +1069,45 @@ async function tfConfirmar() {
   }
 }
 
+// ------ bajar Excel de lo registrado (necesita señal: lo arma Google)
+function htmlExcel() {
+  if (!ui.excel) ui.excel = { desde: hoyISO().slice(0, 8) + '01', hasta: hoyISO() };
+  const e = ui.excel;
+  const min = esCombustible() ? ' min="' + COMBUSTIBLE_DESDE + '"' : '';
+  return '<div class="form"><div class="aviso">Baja todo lo registrado en el período: un <b>Resumen</b>, una hoja por ' +
+    (esCombustible() ? 'combustible' : 'insumo') + ' (saldo con fórmula) y la tabla de <b>Movimientos</b> con el código del bien de uso (para Albor).</div>' +
+    '<div class="fila2"><div class="campo"><label for="x-desde">Desde</label><input class="txt" type="date" id="x-desde" value="' + e.desde + '"' + min + ' max="' + hoyISO() + '"></div>' +
+    '<div class="campo"><label for="x-hasta">Hasta</label><input class="txt" type="date" id="x-hasta" value="' + e.hasta + '"' + min + ' max="' + hoyISO() + '"></div></div>' +
+    '<button class="btn" data-a="bajarExcel"' + (e.bajando ? ' disabled' : '') + '>' + (e.bajando ? 'Armando el Excel…' : '📥 Bajar Excel') + '</button></div>';
+}
+
+async function bajarExcel() {
+  const e = ui.excel;
+  e.desde = $('#x-desde').value || e.desde;
+  e.hasta = $('#x-hasta').value || e.hasta;
+  if (e.hasta < e.desde) { toast('"Hasta" es anterior a "Desde".', 3000); return; }
+  if (!navigator.onLine) { toast('Sin señal: el Excel lo arma Google, hace falta señal.', 3500); return; }
+  e.bajando = true;
+  render();
+  try {
+    const r = await llamar({ accion: 'excel', pin: sesion.pin, modulo: ui.modStock, desde: e.desde, hasta: e.hasta });
+    const bin = atob(r.base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = r.nombre;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    toast('✓ Excel descargado: ' + r.nombre, 3500);
+  } catch (err) {
+    toast('No se pudo bajar el Excel: ' + ((err && err.message) || err), 5000);
+  } finally {
+    e.bajando = false;
+    render();
+  }
+}
+
 // ------ configurar insumos y destinos (solo quien administra Stock; necesita señal)
 function htmlConfig() {
   const s = stockDatos();
@@ -1395,6 +1437,7 @@ document.addEventListener('click', (e) => {
     case 'verInsumo': ui.insumoVer = b.dataset.i; ui.vistaStock = 'ficha'; ui.movsVisibles = 15; render(); window.scrollTo(0, 0); break;
     case 'vista': ui.vistaStock = b.dataset.v; render(); window.scrollTo(0, 0); break;
     case 'tfConfirmar': tfConfirmar(); break;
+    case 'bajarExcel': bajarExcel(); break;
     case 'tfOtro': ui.tf = null; render(); break;
     case 'masMovs': ui.movsVisibles = (ui.movsVisibles || 15) + 30; render(); break;
     case 'cargarDesde':

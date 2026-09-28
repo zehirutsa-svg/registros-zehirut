@@ -134,6 +134,16 @@ trabajo" = tractores), Estancia opcional (columna Finca). Columnas nuevas en Mov
 Trabajo, Finca. No se migró nada de ZehirutApp (arranca en cero el 01/10; stock inicial con Conteo).
 Configurar (insumos de Stock) no toca los de Combustible. Sin Excel propio (la app solo registra).
 
+## Excel (Stock y Combustible)
+
+Bajar lo registrado NO es un reporte (aclarado por el usuario 28/09): botón "📥 Bajar Excel" al pie de las
+tarjetas (todos los que ven el módulo), período desde/hasta. exportarExcel_: Resumen (saldo inicial,
+entradas, salidas, saldo final, kg), una hoja por insumo/estancia con el formato de las planillas de
+siempre (Fecha | Destino | Cód. bien de uso | Trabajo | Estancia | Salida | Entrada | Saldo con fórmula; el
+primer conteo = "Stock inicial", los demás = "Ajuste por conteo" con la diferencia) y Movimientos (tabla
+plana). **Cód. bien de uso = código de Bienes de Uso de ZehirutApp, el que usa Albor** (en combustible
+sale de la máquina). Se arma en un Sheet temporal y se exporta a xlsx (scope script.external_request).
+
 ## Segundo módulo: Lluvias
 
 Una sola pantalla (sin pestañas): el día (‹ › entre días con lluvia; ambas estancias con barras),

@@ -59,7 +59,7 @@ class Rango {
     return this;
   }
 }
-['setFontWeight', 'setBackground', 'setBackgrounds', 'setNumberFormat', 'setHorizontalAlignment',
+['setFontWeight', 'setBackground', 'setBackgrounds', 'setNumberFormat', 'setHorizontalAlignment', 'merge', 'setBorder',
   'setVerticalAlignment', 'setFontSize', 'setDataValidation', 'insertCheckboxes', 'setNote'].forEach((m) => { Rango.prototype[m] = function () { return this; }; });
 
 class Hoja {
@@ -77,7 +77,8 @@ class Hoja {
   getDataRange() { return new Rango(this, 1, 1, this.getLastRow(), this.getLastColumn()); }
   clear() { this.celdas = []; }
 }
-['setFrozenRows', 'setFrozenColumns', 'setColumnWidth', 'setColumnWidths'].forEach((m) => { Hoja.prototype[m] = function () { return this; }; });
+Hoja.prototype.setName = function (n) { this.nombre = n; return this; };
+['setFrozenRows', 'setFrozenColumns', 'setColumnWidth', 'setColumnWidths', 'autoResizeColumns', 'setRowHeight'].forEach((m) => { Hoja.prototype[m] = function () { return this; }; });
 
 function nuevoLibro(nombres, url) {
   const hojas = nombres.map((n) => new Hoja(n));
@@ -99,8 +100,10 @@ libroLluvias.getSheetByName('Lluvias').getRange(1, 1, 1, 7).setValues([['ID', 'F
 
 const validacion = { requireValueInList() { return this; }, setAllowInvalid() { return this; }, build() { return {}; } };
 const contexto = {
-  SpreadsheetApp: { getActive: () => libro, openById: (id) => (id === '1DXk0c3HOAsjoPwmfZzqSCUEZ9ByAOL9XlkmRdEBT7Ds' ? libroLluvias : libroInforme), newDataValidation: () => validacion },
-  Utilities: { formatDate, newBlob: (bytes, tipo, nombre) => ({ nombre, bytes }), base64Decode: (b) => Buffer.from(b, 'base64') },
+  SpreadsheetApp: { flush() {}, create: (n) => { ultimoExcel = nuevoLibro(['Hoja 1'], 'excel'); ultimoExcel.nombre = n; ultimoExcel.getId = () => 'EXCEL'; return ultimoExcel; }, getActive: () => libro, openById: (id) => (id === '1DXk0c3HOAsjoPwmfZzqSCUEZ9ByAOL9XlkmRdEBT7Ds' ? libroLluvias : libroInforme), newDataValidation: () => validacion },
+  UrlFetchApp: { fetch: () => ({ getResponseCode: () => 200, getBlob: () => ({ getBytes: () => [80, 75] }) }) },
+  ScriptApp: { getOAuthToken: () => 'x' },
+  Utilities: { base64Encode: (b) => Buffer.from(b).toString('base64'), formatDate, newBlob: (bytes, tipo, nombre) => ({ nombre, bytes }), base64Decode: (b) => Buffer.from(b, 'base64') },
   CacheService: {
     getScriptCache: () => ({
       get: (k) => (cache[k] && cache[k].hasta > Date.now() ? cache[k].v : null),
@@ -123,6 +126,7 @@ const contexto = {
   // Drive: el PDF de Tapfeed "se guarda" en memoria; la carga inicial se lee de la ruta que diga
   // la variable CARGA_INICIAL (un CSV local, nunca en el repositorio).
   DriveApp: {
+    getFileById: () => ({ setTrashed() {} }),
     getFolderById: () => ({ createFile: (b) => { pdfsGuardados.push(b.nombre); return { getUrl: () => 'https://drive.google.com/PRUEBA/' + encodeURIComponent(b.nombre) }; } }),
     getFilesByName: () => {
       const ruta = process.env.CARGA_INICIAL;
@@ -140,6 +144,7 @@ if (process.env.HOY) {
 }
 const propiedades = {};
 const pdfsGuardados = [];
+let ultimoExcel = null;
 let cargaImportada = false;
 const cache = {};
 vm.createContext(contexto);
@@ -170,6 +175,11 @@ http.createServer((req, res) => {
         res.end(r.texto);
       }, 400);
     });
+    return;
+  }
+  if (url.pathname === '/_excel') {   // contenido del último Excel generado
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify(ultimoExcel ? Object.fromEntries(ultimoExcel.hojas.map((h) => [h.nombre, h.celdas])) : {}, null, 1));
     return;
   }
   if (url.pathname === '/_hojas') {

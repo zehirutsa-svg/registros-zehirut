@@ -350,6 +350,7 @@ function doPost(e) {
       case 'datos': return json_(datos_(body));
       case 'catalogo': return json_(guardarCatalogo_(body));
       case 'tapfeed': return json_(cargarTapfeed_(body));
+      case 'excel': return json_(exportarExcel_(body));
       default: return json_({ ok: false, error: 'acción desconocida' });
     }
   } catch (err) {
@@ -1136,5 +1137,127 @@ function publicarDatosInforme_(ss) {
   } catch (e) {
     // Nunca frena una carga: si falla, queda anotado y se reintenta con el próximo cambio.
     console.error('No se pudo actualizar la planilla del informe: ' + e);
+  }
+}
+
+// ---------------------------------------------------------------- Excel (Stock / Combustible)
+// Bajar lo registrado en un período (para la contadora o para cargar en Albor): Resumen, una hoja
+// por insumo con el formato de las planillas de siempre (saldo con fórmula) y la tabla plana de
+// Movimientos. El "Cód. bien de uso" es el de Bienes de Uso de ZehirutApp (el que usa Albor).
+function exportarExcel_(body) {
+  const ss = SpreadsheetApp.getActive();
+  const u = usuarioDe_(ss, body.pin);
+  const modulo = body.modulo === 'Combustible' ? 'Combustible' : 'Stock';
+  exigir_(u, modulo, 'VER');
+  const hoy = Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd');
+  const desde = esFecha_(body.desde) ? body.desde : hoy.slice(0, 8) + '01';
+  const hasta = esFecha_(body.hasta) ? body.hasta : hoy;
+  if (hasta < desde) throw new Error('la fecha "hasta" es anterior a "desde"');
+
+  const insumos = leerInsumos_(ss).filter((i) => i.modulo === modulo);
+  const porNombre = {};
+  insumos.forEach((i) => { porNombre[i.nombre] = i; });
+  const movs = leerMovimientos_(ss).filter((m) => !m.anulado && porNombre[m.insumo])
+    .sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.ts - b.ts));
+  const maquinas = {};
+  leerMaquinas_(ss).forEach((q) => { maquinas[q.codigo] = q; });
+  const kgDe = (ins, c) => (ins.kgUnidad ? c * ins.kgUnidad : (ins.unidad === 'kg' ? c : ''));
+  const aDate = (iso) => { const p = iso.split('-'); return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])); };
+
+  // Cuentas por insumo (y estancia): saldo al empezar, y las filas del período. Un conteo entra
+  // como "Ajuste por conteo" con la diferencia, así el saldo de la planilla cierra.
+  const cuentas = {};
+  const cuenta = (m) => {
+    const k = claveStock_(m.insumo, m.estancia);
+    return cuentas[k] || (cuentas[k] = { insumo: m.insumo, estancia: m.estancia, inicial: 0, saldo: 0, entradas: 0, salidas: 0, filas: [], antes: false });
+  };
+  insumos.forEach((i) => {
+    if (i.porEstancia) ESTANCIAS.forEach((e) => cuenta({ insumo: i.nombre, estancia: e }));
+    else cuenta({ insumo: i.nombre, estancia: '' });
+  });
+  const plana = [['Fecha', 'Insumo', 'Estancia', 'Tipo', 'Cantidad', 'Unidad', 'Kg', 'Destino', 'Cód. bien de uso', 'Equipo', 'Trabajo',
+    'Finca', 'Proveedor', 'Remito', 'Factura', 'Nota', 'Cargado por']];
+  movs.forEach((m) => {
+    if (m.fecha > hasta) return;
+    const c = cuenta(m);
+    let entra = 0, sale = 0;
+    if (m.tipo === 'Ingreso') entra = m.cantidad;
+    else if (m.tipo === 'Consumo') sale = m.cantidad;
+    else if (m.tipo === 'Conteo') { const dif = m.cantidad - c.saldo; if (dif > 0) entra = dif; else sale = -dif; }
+    c.saldo += entra - sale;
+    // El primer movimiento de un insumo, si es un conteo, es su stock inicial.
+    const esInicial = m.tipo === 'Conteo' && !c.antes;
+    c.antes = true;
+    if (m.fecha < desde) { c.inicial = c.saldo; return; }
+    c.entradas += entra;
+    c.salidas += sale;
+    const codigo = m.maquina && m.maquina !== OTRO_DESTINO ? m.maquina : '';
+    const destino = m.tipo === 'Consumo' ? (m.destino || '') + (m.equipo ? ' - ' + m.equipo : '')
+      : m.tipo === 'Ingreso' ? (m.proveedor || 'Ingreso') + (m.factura ? ' (Fact. ' + m.factura + ')' : '') : esInicial ? 'Stock inicial' : 'Ajuste por conteo (' + m.cantidad + ')';
+    c.filas.push([aDate(m.fecha), destino, codigo, m.trabajo || (m.tipo === 'Consumo' ? '' : esInicial ? 'Stock inicial' : m.tipo), m.finca ? nombreEstancia_(m.finca) : '', sale || '', entra || '']);
+    plana.push([aDate(m.fecha), m.insumo, m.estancia ? nombreEstancia_(m.estancia) : '', m.tipo, m.cantidad, m.unidad, m.kg == null ? '' : m.kg,
+      m.destino, codigo, m.equipo, m.trabajo, m.finca ? nombreEstancia_(m.finca) : '', m.proveedor, m.remito, m.factura, m.nota, m.usuario]);
+  });
+
+  const nombre = (modulo === 'Combustible' ? 'Combustible' : 'Stock insumos') + ' ' + ddmmaaaa_(desde).replace(/\//g, '-') + ' al ' + ddmmaaaa_(hasta).replace(/\//g, '-');
+  const tmp = SpreadsheetApp.create(nombre);
+  try {
+    tmp.setSpreadsheetTimeZone(ZONA);
+    const lista = Object.keys(cuentas).map((k) => cuentas[k]).filter((c) => porNombre[c.insumo] && (porNombre[c.insumo].activo || c.filas.length || c.inicial));
+    // Resumen
+    const res = tmp.getSheets()[0];
+    res.setName('Resumen');
+    const filasRes = [['Insumo', 'Estancia', 'Unidad', 'Saldo al ' + ddmmaaaa_(desde), 'Entradas', 'Salidas', 'Saldo al ' + ddmmaaaa_(hasta), 'Saldo final kg']];
+    lista.forEach((c) => {
+      const i = porNombre[c.insumo];
+      const fin = c.inicial + c.entradas - c.salidas;
+      filasRes.push([c.insumo, c.estancia ? nombreEstancia_(c.estancia) : '', i.unidad, c.inicial, c.entradas, c.salidas, fin, kgDe(i, fin)]);
+    });
+    res.getRange(1, 1).setValue((modulo === 'Combustible' ? 'COMBUSTIBLE' : 'STOCK DE INSUMOS') + ' – del ' + ddmmaaaa_(desde) + ' al ' + ddmmaaaa_(hasta))
+      .setFontSize(14).setFontWeight('bold');
+    res.getRange(3, 1, filasRes.length, filasRes[0].length).setValues(filasRes).setBorder(true, true, true, true, true, true);
+    res.getRange(3, 1, 1, filasRes[0].length).setFontWeight('bold').setBackground('#eeeeee');
+    if (filasRes.length > 1) res.getRange(4, 4, filasRes.length - 1, 5).setNumberFormat('#,##0.##;-#,##0.##;"-"');
+    res.autoResizeColumns(1, filasRes[0].length);
+
+    // Una hoja por insumo (formato de las planillas de siempre, con el saldo como fórmula).
+    lista.forEach((c) => {
+      const i = porNombre[c.insumo];
+      const h = tmp.insertSheet((c.insumo + (c.estancia ? ' ' + nombreEstancia_(c.estancia) : '')).slice(0, 90));
+      const unidad = String(i.unidad).toUpperCase();
+      h.getRange('A1:H1').merge().setValue((modulo === 'Combustible' ? 'CONSUMO DE ' : 'MOVIMIENTOS DE ') + c.insumo.toUpperCase() +
+        (c.estancia ? ' – ' + nombreEstancia_(c.estancia).toUpperCase() : '') + ' (' + unidad + ')')
+        .setFontSize(16).setFontWeight('bold').setHorizontalAlignment('center');
+      h.getRange('A2:H2').setValues([['Fecha', 'Destino', 'Cód. bien de uso', 'Trabajo', 'Estancia', 'Salida', 'Entrada', 'Saldo']])
+        .setFontWeight('bold').setHorizontalAlignment('center').setBackground('#eeeeee');
+      h.getRange(3, 1, 1, 8).setValues([['', '', '', 'Saldo al ' + ddmmaaaa_(desde), '', '', '', c.inicial]]);
+      const filas = c.filas.map((f, n) => f.concat(['=H' + (n + 3) + '-F' + (n + 4) + '+G' + (n + 4)]));
+      if (filas.length) {
+        h.getRange(4, 1, filas.length, 8).setValues(filas);
+        h.getRange(4, 1, filas.length, 1).setNumberFormat('d/m/yy');
+      }
+      const ultima = 3 + filas.length;
+      h.getRange(3, 6, ultima - 2, 3).setNumberFormat('#,##0.##;-#,##0.##;"-"');
+      h.getRange(2, 1, ultima - 1, 8).setBorder(true, true, true, true, true, true);
+      [80, 280, 110, 150, 100, 80, 80, 100].forEach((a, n) => h.setColumnWidth(n + 1, a));
+      h.setFrozenRows(2);
+    });
+
+    // Tabla plana
+    const pl = tmp.insertSheet('Movimientos');
+    pl.getRange(1, 1, plana.length, plana[0].length).setValues(plana);
+    pl.getRange(1, 1, 1, plana[0].length).setFontWeight('bold').setBackground('#eeeeee');
+    if (plana.length > 1) pl.getRange(2, 1, plana.length - 1, 1).setNumberFormat('d/m/yy');
+    pl.setFrozenRows(1);
+    pl.autoResizeColumns(1, plana[0].length);
+
+    SpreadsheetApp.flush();
+    const r = UrlFetchApp.fetch('https://docs.google.com/spreadsheets/d/' + tmp.getId() + '/export?format=xlsx', {
+      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true,
+    });
+    if (r.getResponseCode() !== 200) throw new Error('no se pudo generar el Excel');
+    return { ok: true, nombre: nombre + '.xlsx', base64: Utilities.base64Encode(r.getBlob().getBytes()) };
+  } finally {
+    DriveApp.getFileById(tmp.getId()).setTrashed(true);
   }
 }
