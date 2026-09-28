@@ -23,7 +23,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '2';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '3';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo'];
@@ -31,21 +31,23 @@ const NIVELES = { '': 0, 'VER': 1, 'PROPIAS': 2, 'CARGAR': 2, 'ADMINISTRAR': 3 }
 // "Configurar" (casilla): editar las listas de insumos y destinos. Aparte de los niveles
 // porque quien administra Stock (conteos, anular) no necesariamente arma las listas.
 const COLS_USUARIOS = ['Nombre', 'PIN', 'Activo'].concat(MODULOS, ['Configurar']);
-const COLS_INSUMOS = ['Insumo', 'Unidad', 'Kg por unidad', 'Stock mínimo', 'Activo'];
+// "Por estancia": el insumo lleva un stock separado para cada estancia (ej. Fardos).
+const COLS_INSUMOS = ['Insumo', 'Unidad', 'Kg por unidad', 'Stock mínimo', 'Activo', 'Por estancia'];
 const COLS_DESTINOS = ['Destino', 'Activo'];
 const COLS_MOV = ['ID', 'Fecha', 'Tipo', 'Insumo', 'Cantidad', 'Unidad', 'Kg', 'Destino', 'Proveedor',
-  'Remito', 'Factura', 'Nota', 'Cargado por', 'Hora en el teléfono', 'Recibido', 'Anulado', 'Anulado por / motivo', 'Marca de tiempo'];
+  'Remito', 'Factura', 'Nota', 'Cargado por', 'Hora en el teléfono', 'Recibido', 'Anulado', 'Anulado por / motivo', 'Marca de tiempo',
+  'Estancia'];
 const COLS_REGISTRO = ['Recibido', 'Usuario', 'Acción', 'Detalle', 'Resultado', 'ID'];
 const TIPOS_MOV = ['Ingreso', 'Consumo', 'Conteo'];
 
 // Cargas iniciales (decididas con el usuario el 28/09/2026). Después se editan desde la app.
 const INSUMOS_INICIALES = [
-  ['Fardos', 'fardo', '', '', true],
-  ['Maíz molido', 'kg', 1, '', true],
-  ['Concentrado Desarrollo', 'bolsa', 40, '', true],
-  ['Balanceado Pre destete', 'bolsa', 40, '', true],
-  ['Suplemento E-PRO 35', 'bolsa', 40, '', true],
-  ['Concentrado Beef 1.000 M', 'bolsa', 40, '', true],
+  ['Fardos', 'fardo', '', '', true, true],
+  ['Maíz molido', 'kg', 1, '', true, false],
+  ['Concentrado Desarrollo', 'bolsa', 40, '', true, false],
+  ['Balanceado Pre destete', 'bolsa', 40, '', true, false],
+  ['Suplemento E-PRO 35', 'bolsa', 40, '', true, false],
+  ['Concentrado Beef 1.000 M', 'bolsa', 40, '', true, false],
 ];
 const DESTINOS_INICIALES = ['AC D Norte', 'AC Torta Frente', 'AC Torta Fondo', 'AC B Norte Frente',
   'AC B Norte Fondo', 'AC B Medio Frente', 'AC B Medio Fondo', 'Confinamiento'];
@@ -58,6 +60,7 @@ const USUARIOS_INICIALES = [
 // Lluvias: la planilla de siempre (compartida con ZehirutApp, ver Lluvias.js de ese proyecto).
 const LLUVIAS_PLANILLA_ID = '1DXk0c3HOAsjoPwmfZzqSCUEZ9ByAOL9XlkmRdEBT7Ds';
 const LLUVIAS_HOJA = 'Lluvias';
+const ESTANCIAS = ['LA PRUDENCIA', 'LA PACIENCIA'];
 const SECTORES_POR_FINCA = {
   'LA PRUDENCIA': ['A', 'C', 'D', 'F'],
   'LA PACIENCIA': ['A', 'B', 'C', 'E', 'F'],
@@ -97,6 +100,7 @@ function configurar() {
     usu.getRange(2, 3, 200, 1).insertCheckboxes();
   }
   asegurarColumnaConfigurar_(usu);
+  asegurarColumnasEstancia_(ins, mov);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
   [stock, mov, ins, des, usu, reg].forEach((h, i) => { ss.setActiveSheet(h); ss.moveActiveSheet(i + 1); });
@@ -123,6 +127,25 @@ function asegurarColumnaConfigurar_(usu) {
     }
   }
   usu.getRange(2, col, 200, 1).insertCheckboxes();
+}
+
+/** Versión 3: stock por estancia. En hojas ya existentes agrega "Por estancia" en Insumos
+ *  (tildada solo en Fardos, pedido del 28/09/2026) y "Estancia" al final de Movimientos. */
+function asegurarColumnasEstancia_(ins, mov) {
+  const colIns = COLS_INSUMOS.indexOf('Por estancia') + 1;
+  if (String(ins.getRange(1, colIns).getValue()) !== 'Por estancia') {
+    ins.getRange(1, colIns).setValue('Por estancia').setFontWeight('bold').setBackground('#eeeeee');
+    const n = ins.getLastRow();
+    if (n > 1) {
+      ins.getRange(2, colIns, n - 1, 1).setValues(ins.getRange(2, 1, n - 1, 1).getValues()
+        .map((f) => [String(f[0]).trim() === 'Fardos']));
+    }
+  }
+  ins.getRange(2, colIns, 200, 1).insertCheckboxes();
+  const colMov = COLS_MOV.indexOf('Estancia') + 1;
+  if (String(mov.getRange(1, colMov).getValue()) !== 'Estancia') {
+    mov.getRange(1, colMov).setValue('Estancia').setFontWeight('bold').setBackground('#eeeeee');
+  }
 }
 
 function hoja_(ss, nombre, encabezado) {
@@ -270,6 +293,7 @@ function leerInsumos_(ss) {
       kgUnidad: f[2] === '' ? null : Number(f[2]),
       minimo: f[3] === '' ? null : Number(f[3]),
       activo: f[4] === true || String(f[4]).toUpperCase() === 'TRUE',
+      porEstancia: f[5] === true || String(f[5]).toUpperCase() === 'TRUE',
     }));
 }
 
@@ -304,10 +328,10 @@ function guardarCatalogo_(body) {
         vistos[nombre.toUpperCase()] = true;
         if (kg !== '' && !(kg > 0)) throw new Error('kg por unidad inválido en ' + nombre);
         if (minimo !== '' && !(minimo >= 0)) throw new Error('stock mínimo inválido en ' + nombre);
-        return [nombre, unidad, kg, minimo, x.activo !== false];
+        return [nombre, unidad, kg, minimo, x.activo !== false, x.porEstancia === true];
       });
       leerInsumos_(ss).forEach((i) => {
-        if (usados[i.nombre] && !vistos[i.nombre.toUpperCase()]) filas.push([i.nombre, i.unidad, i.kgUnidad == null ? '' : i.kgUnidad, i.minimo == null ? '' : i.minimo, false]);
+        if (usados[i.nombre] && !vistos[i.nombre.toUpperCase()]) filas.push([i.nombre, i.unidad, i.kgUnidad == null ? '' : i.kgUnidad, i.minimo == null ? '' : i.minimo, false, !!i.porEstancia]);
       });
       sh = ss.getSheetByName('Insumos'); ancho = COLS_INSUMOS.length;
     } else if (body.tipo === 'destinos') {
@@ -358,18 +382,29 @@ function leerMovimientos_(ss) {
     anulado: f[15] === true || String(f[15]).toUpperCase() === 'TRUE',
     anuladoPor: String(f[16]),
     ts: Number(f[17]) || 0,
+    estancia: String(f[18] || ''),
   })).filter((m) => m.id);
 }
 
-/** Saldo de cada insumo: en orden de fecha (y de carga dentro del día), un conteo fija el
- *  saldo y ingresos/consumos suman o restan. Los anulados no cuentan. */
+/** Clave del saldo: el insumo, o insumo|ESTANCIA si lleva stock por estancia. */
+function claveStock_(insumo, estancia) {
+  return estancia ? insumo + '|' + estancia : insumo;
+}
+
+/** Saldo de cada insumo (y estancia): en orden de fecha (y de carga dentro del día), un conteo
+ *  fija el saldo y ingresos/consumos suman o restan. Los anulados no cuentan. */
 function calcularStock_(insumos, movs) {
   const s = {};
-  insumos.forEach((i) => { s[i.nombre] = { insumo: i.nombre, cantidad: 0, ultimoConteo: null, ultimo: null }; });
+  const nuevo = (insumo, estancia) => ({ insumo, estancia: estancia || '', cantidad: 0, ultimoConteo: null, ultimo: null });
+  insumos.forEach((i) => {
+    if (i.porEstancia) ESTANCIAS.forEach((e) => { s[claveStock_(i.nombre, e)] = nuevo(i.nombre, e); });
+    else s[i.nombre] = nuevo(i.nombre, '');
+  });
   movs.filter((m) => !m.anulado)
     .sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.ts - b.ts))
     .forEach((m) => {
-      const x = s[m.insumo] || (s[m.insumo] = { insumo: m.insumo, cantidad: 0, ultimoConteo: null, ultimo: null });
+      const k = claveStock_(m.insumo, m.estancia);
+      const x = s[k] || (s[k] = nuevo(m.insumo, m.estancia));
       if (m.tipo === 'Conteo') { x.cantidad = m.cantidad; x.ultimoConteo = m.fecha; }
       else if (m.tipo === 'Ingreso') x.cantidad += m.cantidad;
       else if (m.tipo === 'Consumo') x.cantidad -= m.cantidad;
@@ -377,6 +412,10 @@ function calcularStock_(insumos, movs) {
       x.ultimo = m.fecha;
     });
   return s;
+}
+
+function nombreEstancia_(e) {
+  return e === 'LA PRUDENCIA' ? 'La Prudencia' : e === 'LA PACIENCIA' ? 'La Paciencia' : e;
 }
 
 function reconstruirStock_(ss, movs) {
@@ -388,21 +427,30 @@ function reconstruirStock_(ss, movs) {
   const desde7 = sumarDias_(hoy, -6);
   const consumo7 = {};
   movs.forEach((m) => {
-    if (!m.anulado && m.tipo === 'Consumo' && m.fecha >= desde7 && m.fecha <= hoy) consumo7[m.insumo] = (consumo7[m.insumo] || 0) + m.cantidad;
+    const k = claveStock_(m.insumo, m.estancia);
+    if (!m.anulado && m.tipo === 'Consumo' && m.fecha >= desde7 && m.fecha <= hoy) consumo7[k] = (consumo7[k] || 0) + m.cantidad;
   });
   const valores = [['Insumo', 'Stock', 'Unidad', 'Stock en kg', 'Consumo últimos 7 días', 'Promedio por día', 'Alcanza para (días)', 'Stock mínimo', 'Último conteo', 'Último movimiento']];
   const fondos = [valores[0].map(() => '#eeeeee')];
-  insumos.filter((i) => i.activo || (saldos[i.nombre] && saldos[i.nombre].ultimo)).forEach((i) => {
-    const x = saldos[i.nombre];
-    const c7 = consumo7[i.nombre] || 0;
-    const prom = Math.round((c7 / 7) * 100) / 100;
-    const bajo = i.minimo != null && x.cantidad < i.minimo;
-    valores.push([
-      i.nombre, x.cantidad, i.unidad, i.kgUnidad ? x.cantidad * i.kgUnidad : (i.unidad === 'kg' ? x.cantidad : ''),
-      c7, prom, prom > 0 ? Math.floor(x.cantidad / prom) : '', i.minimo == null ? '' : i.minimo,
-      x.ultimoConteo ? ddmmaaaa_(x.ultimoConteo) : '', x.ultimo ? ddmmaaaa_(x.ultimo) : '',
-    ]);
-    fondos.push(valores[0].map(() => (bajo ? '#F7C1C1' : '#ffffff')));
+  insumos.forEach((i) => {
+    // Un renglón por estancia si el insumo lleva stock por estancia (más uno "sin estancia"
+    // solo si quedó algo cargado antes de separarlo).
+    const claves = Object.keys(saldos).filter((k) => saldos[k].insumo === i.nombre &&
+      (!i.porEstancia ? !saldos[k].estancia : (saldos[k].estancia || saldos[k].ultimo)));
+    claves.forEach((k) => {
+      const x = saldos[k];
+      if (!i.activo && !x.ultimo) return;
+      const c7 = consumo7[k] || 0;
+      const prom = Math.round((c7 / 7) * 100) / 100;
+      const bajo = i.minimo != null && x.cantidad < i.minimo;
+      valores.push([
+        i.nombre + (i.porEstancia ? ' – ' + (x.estancia ? nombreEstancia_(x.estancia) : 'sin estancia') : ''),
+        x.cantidad, i.unidad, i.kgUnidad ? x.cantidad * i.kgUnidad : (i.unidad === 'kg' ? x.cantidad : ''),
+        c7, prom, prom > 0 ? Math.floor(x.cantidad / prom) : '', i.minimo == null ? '' : i.minimo,
+        x.ultimoConteo ? ddmmaaaa_(x.ultimoConteo) : '', x.ultimo ? ddmmaaaa_(x.ultimo) : '',
+      ]);
+      fondos.push(valores[0].map(() => (bajo ? '#F7C1C1' : '#ffffff')));
+    });
   });
   sh.clear();
   sh.getRange(1, 1, valores.length, valores[0].length).setValues(valores).setBackgrounds(fondos).setVerticalAlignment('middle');
@@ -458,12 +506,12 @@ function guardar_(body) {
           exigir_(u, 'Stock', 'CARGAR');
           const m = validarMov_(op, u, insumos, destinos, hoy);
           const fila = [id, m.fecha, m.tipo, m.insumo, m.cantidad, m.unidad, m.kg == null ? '' : m.kg, m.destino,
-            m.proveedor, m.remito, m.factura, m.nota, u.nombre, horaTel, ahora, false, '', ts];
+            m.proveedor, m.remito, m.factura, m.nota, u.nombre, horaTel, ahora, false, '', ts, m.estancia];
           nuevas.push(fila);
-          porId[id] = { id, fecha: m.fecha, tipo: m.tipo, insumo: m.insumo, cantidad: m.cantidad, usuario: u.nombre, anulado: false, ts };
+          porId[id] = { id, fecha: m.fecha, tipo: m.tipo, insumo: m.insumo, estancia: m.estancia, cantidad: m.cantidad, usuario: u.nombre, anulado: false, ts };
           movs.push(porId[id]);
           tocoStock = true;
-          res('aplicado', m.tipo + ' ' + m.insumo + ' ' + m.cantidad + ' ' + m.unidad + ' (' + ddmmaaaa_(m.fecha) + ')' + (m.destino ? ' → ' + m.destino : ''));
+          res('aplicado', m.tipo + ' ' + m.insumo + (m.estancia ? ' (' + nombreEstancia_(m.estancia) + ')' : '') + ' ' + m.cantidad + ' ' + m.unidad + ' (' + ddmmaaaa_(m.fecha) + ')' + (m.destino ? ' → ' + m.destino : ''));
         } else if (op.tipo === 'anular' || op.tipo === 'factura') {
           exigir_(u, 'Stock', 'CARGAR');
           const ref = porId[texto_(op.ref, 40)];
@@ -540,10 +588,12 @@ function validarMov_(op, u, insumos, destinos, hoy) {
   if (!ins) throw new Error('insumo desconocido: ' + op.insumo);
   const cantidad = Number(op.cantidad);
   if (!isFinite(cantidad) || cantidad < 0 || (tipo !== 'Conteo' && cantidad === 0)) throw new Error('cantidad inválida');
+  const estancia = ins.porEstancia ? String(op.estancia || '') : '';
+  if (ins.porEstancia && ESTANCIAS.indexOf(estancia) === -1) throw new Error('falta elegir la estancia (' + ins.nombre + ' lleva stock por estancia)');
   const destino = tipo === 'Consumo' ? texto_(op.destino, 60) : '';
   if (destino && !destinos[destino]) throw new Error('destino desconocido: ' + destino);
   return {
-    tipo, fecha, insumo: ins.nombre, cantidad, unidad: ins.unidad,
+    tipo, fecha, insumo: ins.nombre, estancia, cantidad, unidad: ins.unidad,
     kg: ins.kgUnidad ? Math.round(cantidad * ins.kgUnidad * 1000) / 1000 : (ins.unidad === 'kg' ? cantidad : null),
     destino,
     proveedor: tipo === 'Ingreso' ? texto_(op.proveedor, 80) : '',

@@ -69,6 +69,9 @@ Hembras C6P: el usuario las agrega después (todavía no tienen ubicación).
 - **Ingresos a mano** (los insumos llegan antes que la factura): quedan "sin factura" y después
   se les asocia una factura. Foto del remito opcional.
 - Stock guardado en kg, mostrado en bolsas (fardos: en unidades).
+- **Stock por estancia** (casilla "Por estancia" en Insumos; hoy solo Fardos, pedido 28/09): un saldo para
+  La Prudencia y otro para La Paciencia; al cargar hay que elegir la estancia (sin preselección).
+  Columna "Estancia" al final de Movimientos. El resto de los insumos: stock único.
 - **Navegación de Stock (pedido 28/09, "menos botones")**: sin pestañas. Tarjetas → ficha del insumo
   (saldo, Consumo/Ingreso/Conteo, sus movimientos) → formulario de UN tipo con el insumo ya elegido
   (fecha, cantidad, destino en desplegable). La flecha vuelve un paso. Configurar = botón chico al pie,

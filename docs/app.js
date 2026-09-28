@@ -7,13 +7,16 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
 const NIVELES = { '': 0, VER: 1, PROPIAS: 2, CARGAR: 2, ADMINISTRAR: 3 };
 const PLURAL = { bolsa: 'bolsas', fardo: 'fardos', litro: 'litros', unidad: 'unidades', kg: 'kg' };
 const UNIDADES = ['bolsa', 'kg', 'fardo', 'litro', 'unidad'];
+// Insumos "por estancia" (ej. Fardos) llevan un stock separado en cada una.
+const ESTANCIAS = [['LA PRUDENCIA', 'La Prudencia'], ['LA PACIENCIA', 'La Paciencia']];
+const nombreEstancia = (e) => (ESTANCIAS.find((x) => x[0] === e) || [e, e])[1];
 
 // ---------------------------------------------------------------- guardado en el teléfono
 const guardado = {
@@ -276,7 +279,7 @@ function movimientos() {
     if (op.tipo === 'mov') {
       const ins = s.insumos.find((i) => i.nombre === op.insumo) || {};
       const m = {
-        id: op.id, fecha: op.fecha, tipo: op.clase, insumo: op.insumo, cantidad: op.cantidad, unidad: ins.unidad || '',
+        id: op.id, fecha: op.fecha, tipo: op.clase, insumo: op.insumo, estancia: op.estancia || '', cantidad: op.cantidad, unidad: ins.unidad || '',
         kg: ins.kgUnidad ? op.cantidad * ins.kgUnidad : null, destino: op.destino || '', proveedor: op.proveedor || '',
         remito: op.remito || '', factura: op.factura || '', nota: op.nota || '', usuario: op.usuario, anulado: false, ts: op.ts, pendiente: true,
       };
@@ -293,12 +296,19 @@ function movimientos() {
   return lista.sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : b.ts - a.ts));
 }
 
-/** Saldo de cada insumo: el que calculó Google, corregido con lo que está en la cola. */
+/** Clave de un saldo: el insumo, o insumo|ESTANCIA si lleva stock por estancia (ej. Fardos). */
+const claveSaldo = (insumo, estancia) => (estancia ? insumo + '|' + estancia : insumo);
+
+/** Saldo de cada insumo (y estancia): el que calculó Google, corregido con lo que está en la cola. */
 function saldos() {
   const s = stockDatos();
   const r = {};
-  s.insumos.forEach((i) => { r[i.nombre] = { cantidad: 0, ultimoConteo: null, pendiente: false }; });
-  s.saldos.forEach((x) => { r[x.insumo] = { cantidad: x.cantidad, ultimoConteo: x.ultimoConteo, pendiente: false }; });
+  const vacio = () => ({ cantidad: 0, ultimoConteo: null, pendiente: false });
+  s.insumos.forEach((i) => {
+    if (i.porEstancia) ESTANCIAS.forEach(([e]) => { r[claveSaldo(i.nombre, e)] = vacio(); });
+    else r[i.nombre] = vacio();
+  });
+  s.saldos.forEach((x) => { r[claveSaldo(x.insumo, x.estancia)] = { cantidad: x.cantidad, ultimoConteo: x.ultimoConteo, pendiente: false }; });
   const servidor = {};
   s.movimientos.forEach((m) => { servidor[m.id] = m; });
   const locales = {};
@@ -308,7 +318,8 @@ function saldos() {
   Object.keys(locales).forEach((id) => {
     const op = locales[id];
     if (anulados.has(id)) return;
-    const x = r[op.insumo] || (r[op.insumo] = { cantidad: 0, ultimoConteo: null });
+    const k = claveSaldo(op.insumo, op.estancia);
+    const x = r[k] || (r[k] = vacio());
     if (op.clase === 'Conteo') { x.cantidad = op.cantidad; x.ultimoConteo = op.fecha; }
     else if (op.clase === 'Ingreso') x.cantidad += op.cantidad;
     else x.cantidad -= op.cantidad;
@@ -317,21 +328,23 @@ function saldos() {
   // Anular algo que ya estaba en Google: se revierte su efecto (un conteo no se puede revertir acá).
   anulados.forEach((ref) => {
     const m = servidor[ref];
-    if (!m || m.anulado || !r[m.insumo]) return;
-    if (m.tipo === 'Ingreso') r[m.insumo].cantidad -= m.cantidad;
-    else if (m.tipo === 'Consumo') r[m.insumo].cantidad += m.cantidad;
-    r[m.insumo].pendiente = true;
+    const x = m && r[claveSaldo(m.insumo, m.estancia)];
+    if (!x || m.anulado) return;
+    if (m.tipo === 'Ingreso') x.cantidad -= m.cantidad;
+    else if (m.tipo === 'Consumo') x.cantidad += m.cantidad;
+    x.pendiente = true;
   });
   Object.keys(r).forEach((k) => { r[k].cantidad = Math.round(r[k].cantidad * 1000) / 1000; });
   return r;
 }
 
-/** Consumo promedio por día de los últimos 7 días (hoy incluido). */
+/** Consumo de los últimos 7 días (hoy incluido), por insumo y estancia. */
 function consumo7() {
   const desde = sumarDias(hoyISO(), -6);
   const r = {};
   movimientos().forEach((m) => {
-    if (!m.anulado && m.tipo === 'Consumo' && m.fecha >= desde) r[m.insumo] = (r[m.insumo] || 0) + m.cantidad;
+    const k = claveSaldo(m.insumo, m.estancia);
+    if (!m.anulado && m.tipo === 'Consumo' && m.fecha >= desde) r[k] = (r[k] || 0) + m.cantidad;
   });
   return r;
 }
@@ -439,7 +452,8 @@ function htmlInicio() {
   if (puede('Stock', 'VER')) {
     const s = saldos();
     const ins = stockDatos().insumos.filter((i) => i.activo);
-    const bajos = ins.filter((i) => i.minimo != null && s[i.nombre] && s[i.nombre].cantidad < i.minimo).length;
+    const bajos = ins.filter((i) => i.minimo != null && (i.porEstancia ? ESTANCIAS.map(([e]) => claveSaldo(i.nombre, e)) : [i.nombre])
+      .some((k) => s[k] && s[k].cantidad < i.minimo)).length;
     mods.push('<button class="modulo" data-a="ir" data-p="stock"><span class="ico">📦</span><span><b>Stock de insumos</b><small>' +
       ins.length + ' insumos' + (bajos ? ' · <span class="chip alerta">' + bajos + ' bajo mínimo</span>' : '') + '</small></span></button>');
   }
@@ -495,10 +509,12 @@ function atrasStock() {
   window.scrollTo(0, 0);
 }
 
-/** Datos de una tarjeta/ficha: saldo, estado y cuántos días alcanza al consumo de la última semana. */
-function infoInsumo(i, s, c7) {
-  const x = s[i.nombre] || { cantidad: 0 };
-  const prom = (c7[i.nombre] || 0) / 7;
+/** Datos de una tarjeta/ficha (de una estancia, si el insumo va por estancia): saldo, estado
+ *  y cuántos días alcanza al consumo de la última semana. */
+function infoInsumo(i, s, c7, estancia) {
+  const k = claveSaldo(i.nombre, estancia);
+  const x = s[k] || { cantidad: 0 };
+  const prom = (c7[k] || 0) / 7;
   const bajo = i.minimo != null && x.cantidad < i.minimo;
   return {
     x, prom, bajo,
@@ -516,6 +532,17 @@ function htmlSaldo() {
   return (sinFactura ? '<button class="aviso amarillo aviso-btn" data-a="vista" data-v="sinFactura">🧾 Hay <b>' + sinFactura +
     (sinFactura === 1 ? ' ingreso' : ' ingresos') + ' sin factura</b>. Tocá para verlos.</button>' : '') +
     (ins.length ? '<div class="saldos">' + ins.map((i) => {
+      if (i.porEstancia) {
+        // Un renglón por estancia, con su propio saldo.
+        const partes = ESTANCIAS.map(([e, nom]) => ({ nom, n: infoInsumo(i, s, c7, e) }));
+        const alerta = partes.some((p) => p.n.cls === 'negativo' || p.n.cls === 'bajo');
+        return '<button class="saldo ' + (alerta ? 'bajo' : '') + '" data-a="verInsumo" data-i="' + esc(i.nombre) + '">' +
+          '<h3>' + esc(i.nombre) + ' ' + (partes.some((p) => p.n.x.pendiente) ? '<span class="chip pend">sin enviar</span>' : '') + '</h3>' +
+          partes.map((p) => '<div class="por-estancia"><span>' + esc(p.nom.replace('La ', '')) + '</span><b class="' +
+            (p.n.x.cantidad < 0 ? 'rojo' : '') + '">' + num(p.n.x.cantidad) + '</b></div>').join('') +
+          '<div class="det">' + esc(unidadTxt(i.unidad, 2)) +
+          (partes.some((p) => !p.n.x.ultimoConteo) ? '<br><span class="chip">Falta conteo inicial</span>' : '') + '</div></button>';
+      }
       const n = infoInsumo(i, s, c7);
       const linea = [n.kg, n.dias != null ? 'alcanza ~' + n.dias + (n.dias === 1 ? ' día' : ' días') : ''].filter(Boolean).join(' · ');
       return '<button class="saldo ' + n.cls + '" data-a="verInsumo" data-i="' + esc(i.nombre) + '">' +
@@ -531,29 +558,47 @@ function htmlSaldo() {
 }
 
 /** Ficha de un insumo: saldo, cómo viene el consumo, botones para cargar y sus movimientos. */
+/** Caja con el saldo grande y sus datos (una por estancia si el insumo va por estancia). */
+function cajaSaldo(i, n, titulo) {
+  const datosFicha = [
+    n.kg ? ['Equivale a', n.kg] : null,
+    ['Consumo', n.prom ? num(n.prom, 1) + ' ' + unidadTxt(i.unidad, Math.round(n.prom * 10) / 10) + ' por día (últimos 7 días)' : 'Sin consumos en 7 días'],
+    n.dias != null ? ['Alcanza para', '~' + n.dias + (n.dias === 1 ? ' día' : ' días')] : null,
+    ['Último conteo', n.x.ultimoConteo ? fechaTxt(n.x.ultimoConteo) : 'Nunca (cargá un conteo)'],
+    i.minimo != null ? ['Stock mínimo', num(i.minimo) + ' ' + unidadTxt(i.unidad, i.minimo)] : null,
+  ].filter(Boolean);
+  return '<div class="saldo ' + n.cls + '">' + (titulo ? '<h3>' + esc(titulo) + '</h3>' : '') +
+    '<div class="cant">' + num(n.x.cantidad) + '<small>' + esc(unidadTxt(i.unidad, n.x.cantidad)) + '</small>' +
+    (n.x.pendiente ? ' <span class="chip pend">sin enviar</span>' : '') + '</div>' +
+    (n.bajo ? '<span class="chip alerta">Bajo el mínimo</span> ' : '') + (n.x.cantidad < 0 ? '<span class="chip alerta">Saldo negativo: falta un ingreso o un conteo</span>' : '') +
+    '<table class="detalle" style="margin-top:8px">' + datosFicha.map(([a, b]) => '<tr><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table></div>';
+}
+
 function htmlFicha(nombre) {
   const i = stockDatos().insumos.find((x) => x.nombre === nombre);
-  const n = infoInsumo(i, saldos(), consumo7());
+  const s = saldos();
+  const c7 = consumo7();
   const movs = movimientos().filter((m) => m.insumo === nombre);
   const botones = [];
   if (puede('Stock', 'CARGAR') && i.activo) {
     botones.push(['Consumo', 'consumo', '⬆ Consumo'], ['Ingreso', 'ingreso', '⬇ Ingreso']);
     if (puede('Stock', 'ADMINISTRAR')) botones.push(['Conteo', 'conteo', '✔ Conteo']);
   }
-  const datosFicha = [
-    n.kg ? ['Equivale a', n.kg] : null,
-    ['Consumo promedio', n.prom ? num(n.prom, 1) + ' ' + unidadTxt(i.unidad, Math.round(n.prom * 10) / 10) + ' por día (últimos 7 días)' : 'Sin consumos en los últimos 7 días'],
-    n.dias != null ? ['Alcanza para', '~' + n.dias + (n.dias === 1 ? ' día' : ' días')] : null,
-    ['Último conteo', n.x.ultimoConteo ? fechaTxt(n.x.ultimoConteo) : 'Nunca (cargá un conteo para el stock inicial)'],
-    i.minimo != null ? ['Stock mínimo', num(i.minimo) + ' ' + unidadTxt(i.unidad, i.minimo)] : null,
-  ].filter(Boolean);
+  let cajas;
+  if (i.porEstancia) {
+    cajas = '<div class="cajas-estancia">' + ESTANCIAS.map(([e, nom]) => cajaSaldo(i, infoInsumo(i, s, c7, e), nom)).join('') + '</div>';
+    // Lo cargado antes de separar por estancia queda aparte: se avisa para corregirlo.
+    const viejo = s[i.nombre];
+    if (viejo && viejo.cantidad) {
+      cajas += '<div class="aviso amarillo">Hay ' + num(viejo.cantidad) + ' ' + esc(unidadTxt(i.unidad, viejo.cantidad)) +
+        ' cargados antes, <b>sin estancia</b>. Anulá esos movimientos (abajo) y cargá el conteo de cada estancia.</div>';
+    }
+  } else {
+    cajas = cajaSaldo(i, infoInsumo(i, s, c7));
+  }
   const mostrar = ui.movsVisibles || 15;
   return '<div class="form">' +
-    '<div class="saldo ' + n.cls + '" style="margin-bottom:12px">' +
-    '<div class="cant">' + num(n.x.cantidad) + '<small>' + esc(unidadTxt(i.unidad, n.x.cantidad)) + '</small>' +
-    (n.x.pendiente ? ' <span class="chip pend">sin enviar</span>' : '') + '</div>' +
-    (n.bajo ? '<span class="chip alerta">Bajo el mínimo</span> ' : '') + (n.x.cantidad < 0 ? '<span class="chip alerta">Saldo negativo: falta un ingreso o un conteo</span>' : '') +
-    '<table class="detalle" style="margin-top:8px">' + datosFicha.map(([a, b]) => '<tr><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table></div>' +
+    '<div style="margin-bottom:12px">' + cajas + '</div>' +
     (botones.length ? '<div class="segmento" style="margin-bottom:18px">' + botones.map(([c, cls, t]) =>
       '<button class="' + cls + ' activo" data-a="cargarDesde" data-c="' + c + '">' + t + '</button>').join('') + '</div>' : '') +
     '<h3 style="margin:0 0 8px">Movimientos</h3>' +
@@ -572,7 +617,7 @@ function htmlSinFactura() {
 
 function nuevoForm(clase, insumo) {
   const prev = ui.form || {};
-  return { clase, insumo, fecha: prev.fecha || hoyISO(), cantidad: '', destino: '', proveedor: '', remito: '', factura: '', nota: '' };
+  return { clase, insumo, estancia: '', fecha: prev.fecha || hoyISO(), cantidad: '', destino: '', proveedor: '', remito: '', factura: '', nota: '' };
 }
 
 /** Formulario de un solo tipo de carga para el insumo de la ficha (ya elegidos). */
@@ -580,10 +625,18 @@ function htmlCargar() {
   const f = ui.form;
   const s = stockDatos();
   const ins = s.insumos.find((i) => i.nombre === f.insumo);
-  const saldo = (saldos()[f.insumo] || {}).cantidad || 0;
+  const saldo = (saldos()[claveSaldo(f.insumo, f.estancia)] || {}).cantidad || 0;
   const rel = fechaRelativa(f.fecha);
   let h = '<div class="form">';
-  if (f.clase === 'Conteo') h += '<div class="aviso">El conteo <b>reemplaza el saldo</b> (hoy ' + num(saldo) + ' ' + esc(unidadTxt(ins.unidad, saldo)) + ') por lo que hay en el depósito.</div>';
+  // Insumo con stock por estancia: primero se elige de cuál (no hay una elegida de antemano).
+  if (ins.porEstancia) {
+    h += '<div class="campo"><span class="etq">Estancia</span><div class="segmento">' + ESTANCIAS.map(([e, nom]) =>
+      '<button class="neutro' + (f.estancia === e ? ' activo' : '') + '" data-a="estancia" data-e="' + e + '">' + nom + '</button>').join('') + '</div></div>';
+  }
+  if (f.clase === 'Conteo' && (!ins.porEstancia || f.estancia)) {
+    h += '<div class="aviso">El conteo <b>reemplaza el saldo</b>' + (f.estancia ? ' de ' + nombreEstancia(f.estancia) : '') +
+      ' (hoy ' + num(saldo) + ' ' + esc(unidadTxt(ins.unidad, saldo)) + ') por lo que hay en el depósito.</div>';
+  }
   h += '<div class="campo"><span class="etq">Fecha</span><div class="fecha-fila">' +
     '<button class="nav" data-a="fecha" data-d="-1" aria-label="Día anterior">‹</button>' +
     '<label class="fecha">' + fechaTxt(f.fecha, true) + (rel ? '<span class="hoy">' + rel + '</span>' : '') +
@@ -639,8 +692,9 @@ async function guardarMov() {
   if (!isFinite(cantidad) || cantidad < 0 || (f.clase !== 'Conteo' && cantidad === 0)) { toast('Poné una cantidad válida.', 3000); return; }
   if (f.fecha > hoyISO()) { toast('La fecha no puede ser futura.', 3000); return; }
   const ins = stockDatos().insumos.find((i) => i.nombre === f.insumo);
+  if (ins.porEstancia && !f.estancia) { toast('Elegí la estancia: La Prudencia o La Paciencia.', 3000); return; }
   // Cantidades que suelen ser un error de tipeo: se confirma antes de guardar.
-  const saldo = (saldos()[f.insumo] || {}).cantidad || 0;
+  const saldo = (saldos()[claveSaldo(f.insumo, f.estancia)] || {}).cantidad || 0;
   if (f.clase === 'Consumo' && cantidad > saldo && saldo >= 0) {
     const ok = await cartel({
       icono: '🤔', titulo: '¿Seguro?', si: 'Guardar igual', no: 'Revisar',
@@ -650,11 +704,13 @@ async function guardarMov() {
     if (!ok) return;
   }
   const op = { tipo: 'mov', clase: f.clase, fecha: f.fecha, insumo: f.insumo, cantidad };
+  if (ins.porEstancia) op.estancia = f.estancia;
   if (f.clase === 'Consumo' && f.destino) op.destino = f.destino;
   if (f.clase === 'Ingreso') { op.proveedor = f.proveedor.trim(); op.remito = f.remito.trim(); op.factura = f.factura.trim(); }
   if (f.nota.trim()) op.nota = f.nota.trim();
   agregarACola(op);
-  toast('✓ Guardado: ' + f.clase.toLowerCase() + ' de ' + num(cantidad) + ' ' + unidadTxt(ins.unidad, cantidad) + (navigator.onLine ? '' : ' (se envía cuando haya señal)'), 3200);
+  toast('✓ Guardado: ' + f.clase.toLowerCase() + ' de ' + num(cantidad) + ' ' + unidadTxt(ins.unidad, cantidad) +
+    (op.estancia ? ' en ' + nombreEstancia(op.estancia) : '') + (navigator.onLine ? '' : ' (se envía cuando haya señal)'), 3200);
   // Vuelve a la ficha, que ya muestra el saldo nuevo. La fecha elegida queda para la próxima carga.
   ui.form = { fecha: f.fecha };
   ui.vistaStock = 'ficha';
@@ -670,6 +726,7 @@ function htmlMov(m, conFecha) {
   const signo = { Consumo: '−', Ingreso: '+', Conteo: '=' }[m.tipo] || '';
   const ico = { Consumo: '⬆', Ingreso: '⬇', Conteo: '✔' }[m.tipo] || '•';
   const extra = [];
+  if (m.estancia) extra.push('<span class="chip azul">' + esc(nombreEstancia(m.estancia).replace('La ', '')) + '</span>');
   if (m.tipo === 'Consumo') extra.push(m.destino || 'sin destino');
   if (m.tipo === 'Ingreso') {
     if (m.proveedor) extra.push(m.proveedor);
@@ -688,8 +745,10 @@ async function verMov(id) {
   if (!m) return;
   const filas = [
     ['Tipo', m.tipo], ['Fecha', fechaTxt(m.fecha, true)], ['Insumo', m.insumo],
-    ['Cantidad', num(m.cantidad) + ' ' + unidadTxt(m.unidad, m.cantidad) + (m.kg != null && m.unidad !== 'kg' ? ' (' + num(m.kg) + ' kg)' : '')],
   ];
+  if (m.estancia) filas.push(['Estancia', nombreEstancia(m.estancia)]);
+  filas.push(
+    ['Cantidad', num(m.cantidad) + ' ' + unidadTxt(m.unidad, m.cantidad) + (m.kg != null && m.unidad !== 'kg' ? ' (' + num(m.kg) + ' kg)' : '')]);
   if (m.tipo === 'Consumo') filas.push(['Destino', m.destino || 'Sin destino']);
   if (m.tipo === 'Ingreso') {
     filas.push(['Proveedor', m.proveedor || '—'], ['Remito', m.remito || '—'], ['Factura', m.factura || 'Sin factura']);
@@ -742,7 +801,8 @@ function htmlConfig() {
       UNIDADES.map((u) => '<option ' + (i.unidad === u ? 'selected' : '') + '>' + u + '</option>').join('') + '</select></div>' +
       '<div><span class="mini-etq">Kg por unidad</span><input class="txt" inputmode="decimal" data-cfg="insumos" data-n="' + n + '" data-k="kgUnidad" value="' + esc(i.kgUnidad == null ? '' : i.kgUnidad) + '"></div>' +
       '<div><span class="mini-etq">Stock mínimo</span><input class="txt" inputmode="decimal" data-cfg="insumos" data-n="' + n + '" data-k="minimo" value="' + esc(i.minimo == null ? '' : i.minimo) + '"></div>' +
-      '</div><label class="interruptor"><input type="checkbox" data-cfg="insumos" data-n="' + n + '" data-k="activo" ' + (i.activo ? 'checked' : '') + '> Activo</label></div>').join('') +
+      '</div><div><label class="interruptor"><input type="checkbox" data-cfg="insumos" data-n="' + n + '" data-k="activo" ' + (i.activo ? 'checked' : '') + '> Activo</label>' +
+      '<label class="interruptor" style="margin-top:6px"><input type="checkbox" data-cfg="insumos" data-n="' + n + '" data-k="porEstancia" ' + (i.porEstancia ? 'checked' : '') + '> Por estancia</label></div></div>').join('') +
     '<button class="btn sec chico" data-a="cfgAgregar" data-cfg="insumos" style="margin-top:10px">+ Agregar insumo</button> ' +
     '<button class="btn chico" data-a="cfgGuardar" data-cfg="insumos" style="margin-top:10px">Guardar insumos</button></div>' +
     '<div class="tarjeta"><h3 style="margin-top:0">Destinos (corrales)</h3>' +
@@ -760,7 +820,7 @@ async function cfgGuardar(tipo) {
     lista = ui.cfg.insumos.filter((i) => String(i.nombre).trim()).map((i) => ({
       nombre: String(i.nombre).trim(), unidad: i.unidad,
       kgUnidad: i.unidad === 'kg' ? 1 : (i.kgUnidad === '' || i.kgUnidad == null ? '' : leerNumero(i.kgUnidad)),
-      minimo: i.minimo === '' || i.minimo == null ? '' : leerNumero(i.minimo), activo: !!i.activo,
+      minimo: i.minimo === '' || i.minimo == null ? '' : leerNumero(i.minimo), activo: !!i.activo, porEstancia: !!i.porEstancia,
     }));
     const malo = lista.find((i) => (i.kgUnidad !== '' && !(i.kgUnidad > 0)) || (i.minimo !== '' && !(i.minimo >= 0)));
     if (malo) { toast('Revisá los números de ' + malo.nombre + '.', 3500); return; }
@@ -945,6 +1005,7 @@ document.addEventListener('click', (e) => {
       if (f <= hoyISO()) { ui.form.fecha = f; render(); }
       break;
     }
+    case 'estancia': leerCamposForm(); ui.form.estancia = b.dataset.e; render(); break;
     case 'mas': {
       leerCamposForm();
       const n = leerNumero(ui.form.cantidad);

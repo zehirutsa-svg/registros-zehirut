@@ -49,6 +49,7 @@ class Rango {
     return this;
   }
   setValue(x) { return this.setValues([[x]]); }
+  getValue() { return this.getValues()[0][0]; }
   clearContent() {
     for (let i = 0; i < this.nf; i++) {
       const fila = this.h.celdas[this.f - 1 + i];

@@ -275,3 +275,14 @@ select.txt.grande { font-size: 18px; font-weight: 600; padding: 15px 12px; backg
   .saldos .saldo .cant { font-size: 30px; }
   .saldos .saldo .det { font-size: 13px; }
 }
+/* insumos con stock por estancia (Fardos) */
+.por-estancia { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.por-estancia span { color: var(--gris); font-size: 14px; font-weight: 600; }
+.por-estancia b { font-size: 26px; font-weight: 800; }
+.por-estancia b.rojo, .rojo { color: var(--alerta); }
+.cajas-estancia { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.cajas-estancia .saldo h3 { margin-bottom: 2px; }
+.cajas-estancia .saldo .cant { font-size: 32px; }
+.cajas-estancia .detalle td { font-size: 13px; padding: 5px 0; }
+.cajas-estancia .detalle td:first-child { width: auto; }
+@media (max-width: 400px) { .cajas-estancia .detalle td { display: block; border: 0; padding: 1px 0; } .cajas-estancia .detalle tr { display: block; padding: 4px 0; border-bottom: 1px solid var(--linea); } }
