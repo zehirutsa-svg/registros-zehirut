@@ -308,8 +308,8 @@ label.btn { text-align: center; cursor: pointer; }
 .barra-fila.chica .barra-fondo { height: 10px; }
 .barra-relleno { display: block; height: 100%; border-radius: 99px; }
 .barra-relleno.dia { background: linear-gradient(90deg, #5fa8e0, var(--azul)); }
-.barra-relleno.mes { background: #7cc4a0; }
-.barra-relleno.temporada { background: var(--azul); }
+.barra-relleno.mes { background: #b3dcf5; }          /* mes actual: celeste claro */
+.barra-relleno.temporada { background: #4aa3df; }    /* temporada actual: celeste */
 .barra-relleno.anio { background: #8fb9e6; }
 .barra-valor { text-align: right; font-weight: 700; white-space: nowrap; }
 .lluvia-sector { padding: 8px 0; border-top: 1px solid var(--linea); }
@@ -318,4 +318,4 @@ label.btn { text-align: center; cursor: pointer; }
 .leyenda { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--gris); margin-bottom: 10px; }
 .leyenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 .leyenda i.mes { background: #7cc4a0; } .leyenda i.temporada { background: var(--azul); } .leyenda i.anio { background: #8fb9e6; }
-.barra-relleno.anterior { background: #aab6c4; }
+.barra-relleno.anterior { background: #1d3f7a; }     /* temporada anterior: azul oscuro */
