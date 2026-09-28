@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.4.0';
+const VERSION = '1.4.1';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -547,7 +547,7 @@ function htmlSaldo() {
         const alerta = partes.some((p) => p.n.cls === 'negativo' || p.n.cls === 'bajo');
         return '<button class="saldo ' + (alerta ? 'bajo' : '') + '" data-a="verInsumo" data-i="' + esc(i.nombre) + '">' +
           '<h3>' + esc(i.nombre) + ' ' + (partes.some((p) => p.n.x.pendiente) ? '<span class="chip pend">sin enviar</span>' : '') + '</h3>' +
-          partes.map((p) => '<div class="por-estancia"><span>' + esc(p.nom.replace('La ', '')) + '</span><b class="' +
+          partes.map((p) => '<div class="por-estancia"><span>' + esc(p.nom) + '</span><b class="' +
             (p.n.x.cantidad < 0 ? 'rojo' : '') + '">' + num(p.n.x.cantidad) + '</b></div>').join('') +
           '<div class="det">' + esc(unidadTxt(i.unidad, 2)) +
           (partes.some((p) => !p.n.x.ultimoConteo) ? '<br><span class="chip">Falta conteo inicial</span>' : '') + '</div></button>';
