@@ -98,12 +98,13 @@ Hembras C6P: el usuario las agrega después (todavía no tienen ubicación).
 Reparto acordado: **la app solo registra** (no hace informes); **la tarea diaria de Claude solo hace
 informes** leyendo la planilla **"Registros Zehirut – datos para el informe"** (Drive id
 18sle8JEHOrayTQhC0dX5UIf-FsW6rFm2RLpTSgQ3aEo, carpeta Confinamiento ZEHIRUT), que el script reescribe
-entera con cada cambio de stock (publicarDatosInforme_: Leeme, Stock actual, Saldo diario, Consumos
-diarios, Ingresos, Tapfeed). **Por qué una planilla aparte:** la conexión a Drive de Claude (la que usa
+entera con cada cambio de stock (publicarDatosInforme_). **Datos YA CALCULADOS y cortos (últimos 10 días)**:
+Resumen, Stock por día, Corrales por día, Ingredientes por día, Stock actual. Motivo: read_file_content de la
+conexión devuelve solo ~100 filas por hoja; con el historial completo la tarea se trababa bajando el xlsx. **Por qué una planilla aparte:** la conexión a Drive de Claude (la que usa
 la tarea) solo ve archivos creados por ella misma; esa planilla la creó esa conexión y el script le
 escribe. De "Datos base confinamiento" la tarea solo usa Corrales y Parámetros.
-Instrucciones de la tarea (v2): Google Doc id 1g8QO9Jm5PK-tWX39v5BXfrlH2sH-OFLLbyI_D7Aca5M (el viejo quedó
-renombrado "VIEJO - NO USAR…"; la conexión no puede editar el texto de un doc existente, solo crear).
+Instrucciones de la tarea (v3): Google Doc id 1FlKEzFKtSPwaExD55js1bl0HwKCZQGyJ790bOmez7vg (v1 y v2 quedaron
+renombrados "VIEJO - NO USAR…"; la conexión no puede editar el texto de un doc existente, solo crear).
 
 - Botón "Subir informe Tapfeed" al pie de Stock (solo casilla Configurar). El PDF "Uso de ingredientes
   por grupo" se lee EN LA APP con pdf.js (cdnjs, se baja al usarlo): período, corrales (cabezas) y kg

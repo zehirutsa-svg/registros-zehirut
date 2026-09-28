@@ -78,7 +78,9 @@ const CARGA_INICIAL = 'Registros Zehirut - carga inicial.csv';
 // Drive de Claude, que solo puede leer archivos creados por ella; esta app la mantiene al día y de
 // ahí lee la tarea que arma el informe diario del confinamiento.
 const INFORME_PLANILLA_ID = '18sle8JEHOrayTQhC0dX5UIf-FsW6rFm2RLpTSgQ3aEo';
-const INFORME_DESDE = '2026-09-15';   // primer día de la hoja "Saldo diario"
+const INFORME_DIAS = 10;                 // días que se publican (la tarea lee ~100 filas por hoja)
+const INFORME_INICIO = '2026-09-28';      // desde acá se avisan los días sin Tapfeed
+const INFORME_ACUM_DESDE = '2026-09-21';  // inicio del confinamiento (consumo acumulado)
 const SECTORES_POR_FINCA = {
   'LA PRUDENCIA': ['A', 'C', 'D', 'F'],
   'LA PACIENCIA': ['A', 'B', 'C', 'E', 'F'],
@@ -889,13 +891,14 @@ function cargarTapfeed_(body) {
 }
 
 // ---------------------------------------------------------------- datos para el informe diario
-// Hojas (se reescriben enteras en cada cambio; cantidades en la unidad del insumo y en kg):
-//   Leeme            — qué es y cuándo se actualizó
-//   Stock actual     — saldo de cada insumo (y estancia)
-//   Saldo diario     — saldo al cierre de cada día desde INFORME_DESDE
-//   Consumos diarios — por día e insumo: Confinamiento (Tapfeed) / otros destinos / total
-//   Ingresos         — cada entrada de insumos
-//   Tapfeed          — detalle por corral de cada informe de Tapfeed
+// La tarea lee esta planilla con una herramienta que devuelve solo ~100 filas por hoja: por eso
+// acá va todo YA CALCULADO y corto (últimos INFORME_DIAS días), no el historial completo.
+//   Resumen              — actualización, último día con Tapfeed, días faltantes
+//   Stock por día        — por día e ingrediente del confinamiento: consumo, acumulado, 7 días,
+//                          promedio, saldo y días de stock (todo en kg)
+//   Corrales por día     — por día y corral: cabezas, kg tal cual y kg MS (Tapfeed)
+//   Ingredientes por día — por día e ingrediente: kg tal cual y kg MS (Tapfeed)
+//   Stock actual         — saldo de hoy de todos los insumos
 function publicarDatosInforme_(ss) {
   try {
     const dest = SpreadsheetApp.openById(INFORME_PLANILLA_ID);
@@ -905,10 +908,11 @@ function publicarDatosInforme_(ss) {
     insumos.forEach((i) => { porNombre[i.nombre] = i; });
     const kgDe = (insumo, cant) => {
       const i = porNombre[insumo] || {};
-      return i.kgUnidad ? Math.round(cant * i.kgUnidad * 100) / 100 : (i.unidad === 'kg' ? cant : '');
+      return i.kgUnidad ? cant * i.kgUnidad : (i.unidad === 'kg' ? cant : 0);
     };
-    const est = (e) => (e ? nombreEstancia_(e) : '');
+    const r0 = (n) => Math.round(n);
     const hoy = Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd');
+    const desde = sumarDias_(hoy, -(INFORME_DIAS - 1));
     const escribir = (nombre, filas) => {
       let h = dest.getSheetByName(nombre);
       if (!h) h = dest.insertSheet(nombre);
@@ -919,78 +923,93 @@ function publicarDatosInforme_(ss) {
       return h;
     };
 
-    const saldos = calcularStock_(insumos, movs);
-    const stock = [['Insumo', 'Estancia', 'Saldo', 'Unidad', 'Saldo kg', 'Último conteo', 'Último movimiento']];
-    Object.keys(saldos).map((k) => saldos[k]).forEach((x) => {
-      const i = porNombre[x.insumo];
-      if (!i || (!i.activo && !x.ultimo)) return;
-      stock.push([x.insumo, est(x.estancia), x.cantidad, i.unidad, kgDe(x.insumo, x.cantidad),
-        x.ultimoConteo ? ddmmaaaa_(x.ultimoConteo) : '', x.ultimo ? ddmmaaaa_(x.ultimo) : '']);
+    // Detalle de Tapfeed (hoja de la app).
+    const shT = ss.getSheetByName('Tapfeed');
+    const tf = shT.getLastRow() > 1 ? shT.getRange(2, 1, shT.getLastRow() - 1, COLS_TAPFEED.length).getValues()
+      .map((f) => ({ fecha: iso_(f[0]), corral: String(f[1]), cabezas: Number(f[2]) || 0, insumo: String(f[3]), nombreTf: String(f[4]), kg: Number(f[5]) || 0, ms: Number(f[6]) || 0 })) : [];
+    const diasTf = tf.map((t) => t.fecha).filter((f, i, a) => a.indexOf(f) === i).sort();
+    const faltan = [];
+    for (let f = INFORME_INICIO; f < hoy; f = sumarDias_(f, 1)) if (diasTf.indexOf(f) === -1) faltan.push(ddmmaaaa_(f));
+
+    const corrales = [['Fecha', 'Corral', 'Cabezas', 'Kg tal cual', 'Kg MS']];
+    const ingred = [['Fecha', 'Ingrediente', 'Kg tal cual', 'Kg MS']];
+    diasTf.filter((f) => f >= desde).forEach((f) => {
+      const delDia = tf.filter((t) => t.fecha === f);
+      const pc = {};
+      const pi = {};
+      delDia.forEach((t) => {
+        const c = pc[t.corral] || (pc[t.corral] = { cab: t.cabezas, kg: 0, ms: 0 });
+        c.kg += t.kg; c.ms += t.ms;
+        const nom = t.insumo || t.nombreTf;
+        const i = pi[nom] || (pi[nom] = { kg: 0, ms: 0 });
+        i.kg += t.kg; i.ms += t.ms;
+      });
+      Object.keys(pc).sort((a, b) => a.localeCompare(b, 'es', { numeric: true }))
+        .forEach((c) => corrales.push([ddmmaaaa_(f), c, pc[c].cab, r0(pc[c].kg), Math.round(pc[c].ms * 100) / 100]));
+      Object.keys(pi).sort().forEach((i) => ingred.push([ddmmaaaa_(f), i, r0(pi[i].kg), r0(pi[i].ms)]));
     });
 
-    // Saldo al cierre de cada día: se recorren los movimientos en orden y se anota el saldo de cada
-    // insumo al terminar cada día (un conteo fija el saldo, como en el stock de la app).
+    // Stock por día de los ingredientes del confinamiento (los que tienen nombre en Tapfeed).
+    const ingConfi = insumos.filter((i) => i.tapfeed).map((i) => i.nombre);
+    const consumoDia = {};   // insumo|fecha -> kg (todos los destinos)
+    movs.filter((m) => m.tipo === 'Consumo').forEach((m) => {
+      const k = m.insumo + '|' + m.fecha;
+      consumoDia[k] = (consumoDia[k] || 0) + kgDe(m.insumo, m.cantidad);
+    });
     const orden = movs.slice().sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.ts - b.ts));
-    const claves = Object.keys(saldos);
-    const actual = {};
-    claves.forEach((k) => { actual[k] = 0; });
-    const diario = [['Fecha', 'Insumo', 'Estancia', 'Saldo', 'Unidad', 'Saldo kg']];
-    let j = 0;
-    for (let dia = orden.length && orden[0].fecha < INFORME_DESDE ? orden[0].fecha : INFORME_DESDE; dia <= hoy; dia = sumarDias_(dia, 1)) {
-      while (j < orden.length && orden[j].fecha <= dia) {
-        const m = orden[j++];
-        const k = claveStock_(m.insumo, m.estancia);
-        if (!(k in actual)) { actual[k] = 0; claves.push(k); }
-        if (m.tipo === 'Conteo') actual[k] = m.cantidad;
-        else if (m.tipo === 'Ingreso') actual[k] += m.cantidad;
-        else if (m.tipo === 'Consumo') actual[k] -= m.cantidad;
-      }
-      if (dia < INFORME_DESDE) continue;
-      claves.forEach((k) => {
-        const x = saldos[k] || { insumo: k.split('|')[0], estancia: k.split('|')[1] || '' };
-        const i = porNombre[x.insumo];
-        if (!i || !i.activo) return;
-        const cant = Math.round(actual[k] * 1000) / 1000;
-        diario.push([ddmmaaaa_(dia), x.insumo, est(x.estancia), cant, i.unidad, kgDe(x.insumo, cant)]);
+    const saldoAl = (insumo, fecha) => {
+      let s = 0;
+      orden.forEach((m) => {
+        if (m.insumo !== insumo || m.fecha > fecha) return;
+        if (m.tipo === 'Conteo') s = m.cantidad; else if (m.tipo === 'Ingreso') s += m.cantidad; else if (m.tipo === 'Consumo') s -= m.cantidad;
+      });
+      return kgDe(insumo, s);
+    };
+    const stockDia = [['Fecha', 'Ingrediente', 'Consumo del día kg', 'Consumo acumulado kg (desde 21/09/2026)', 'Consumo últimos 7 días kg',
+      'Promedio diario 7 días kg', 'Saldo kg', 'Días de stock']];
+    for (let f = desde; f <= hoy; f = sumarDias_(f, 1)) {
+      ingConfi.forEach((ins) => {
+        let acum = 0;
+        let siete = 0;
+        Object.keys(consumoDia).forEach((k) => {
+          const p = k.split('|');
+          if (p[0] !== ins || p[1] > f) return;
+          if (p[1] >= INFORME_ACUM_DESDE) acum += consumoDia[k];
+          if (p[1] > sumarDias_(f, -7)) siete += consumoDia[k];
+        });
+        const prom = siete / 7;
+        const saldo = saldoAl(ins, f);
+        stockDia.push([ddmmaaaa_(f), ins, r0(consumoDia[ins + '|' + f] || 0), r0(acum), r0(siete), r0(prom), r0(saldo),
+          prom > 0 ? Math.floor(saldo / prom) : '—']);
       });
     }
 
-    const cons = {};
-    movs.filter((m) => m.tipo === 'Consumo').forEach((m) => {
-      const k = m.fecha + '|' + m.insumo + '|' + m.estancia;
-      const c = cons[k] || (cons[k] = { fecha: m.fecha, insumo: m.insumo, estancia: m.estancia, confi: 0, otros: 0 });
-      if (m.destino === 'Confinamiento') c.confi += m.cantidad; else c.otros += m.cantidad;
-    });
-    const consumos = [['Fecha', 'Insumo', 'Estancia', 'Unidad', 'Confinamiento', 'Otros destinos', 'Total', 'Confinamiento kg', 'Otros destinos kg', 'Total kg']];
-    Object.keys(cons).sort().forEach((k) => {
-      const c = cons[k];
-      const r3 = (n) => Math.round(n * 1000) / 1000;
-      consumos.push([ddmmaaaa_(c.fecha), c.insumo, est(c.estancia), (porNombre[c.insumo] || {}).unidad || '',
-        r3(c.confi), r3(c.otros), r3(c.confi + c.otros), kgDe(c.insumo, c.confi), kgDe(c.insumo, c.otros), kgDe(c.insumo, c.confi + c.otros)]);
+    const saldos = calcularStock_(insumos, movs);
+    const stock = [['Insumo', 'Estancia', 'Saldo', 'Unidad', 'Saldo kg']];
+    Object.keys(saldos).map((k) => saldos[k]).forEach((x) => {
+      const i = porNombre[x.insumo];
+      if (!i || !i.activo) return;
+      stock.push([x.insumo, x.estancia ? nombreEstancia_(x.estancia) : '', Math.round(x.cantidad * 100) / 100, i.unidad, i.kgUnidad || i.unidad === 'kg' ? r0(kgDe(x.insumo, x.cantidad)) : '']);
     });
 
-    const ingresos = [['Fecha', 'Insumo', 'Estancia', 'Cantidad', 'Unidad', 'Kg', 'Proveedor', 'Remito', 'Factura', 'Nota']];
-    orden.filter((m) => m.tipo === 'Ingreso').forEach((m) => {
-      ingresos.push([ddmmaaaa_(m.fecha), m.insumo, est(m.estancia), m.cantidad, m.unidad, kgDe(m.insumo, m.cantidad), m.proveedor, m.remito, m.factura, m.nota]);
-    });
-
-    const shT = ss.getSheetByName('Tapfeed');
-    const tapfeed = shT.getLastRow() > 0 ? shT.getRange(1, 1, shT.getLastRow(), COLS_TAPFEED.length).getValues()
-      .map((f, n) => (n ? [ddmmaaaa_(iso_(f[0]))].concat(f.slice(1, 7)) : f.slice(0, 7))) : [COLS_TAPFEED.slice(0, 7)];
-
-    const leeme = escribir('Leeme', [['Registros Zehirut – datos para el informe'],
-      ['La actualiza sola la app Registros Zehirut con cada carga. No editar a mano.'],
-      ['Actualizada: ' + Utilities.formatDate(new Date(), ZONA, 'dd/MM/yyyy HH:mm')],
-      ['Fechas en DD/MM/AAAA. Cantidades en la unidad del insumo y en kg. Movimientos anulados: no se incluyen.']]);
+    const resumen = escribir('Resumen', [
+      ['Dato', 'Valor'],
+      ['Planilla', 'Registros Zehirut – datos para el informe. La actualiza sola la app con cada carga. No editar.'],
+      ['Actualizada', Utilities.formatDate(new Date(), ZONA, 'dd/MM/yyyy HH:mm')],
+      ['Días incluidos', 'Últimos ' + INFORME_DIAS + ' días: ' + ddmmaaaa_(desde) + ' al ' + ddmmaaaa_(hoy)],
+      ['Días con Tapfeed en ese período', diasTf.filter((f) => f >= desde).map(ddmmaaaa_).join(', ') || 'ninguno'],
+      ['Último día con Tapfeed', diasTf.length ? ddmmaaaa_(diasTf[diasTf.length - 1]) : 'ninguno'],
+      ['Días sin Tapfeed desde ' + ddmmaaaa_(INFORME_INICIO) + ' hasta ayer', faltan.join(', ') || 'ninguno'],
+      ['Unidades', 'Todo en kg, redondeado. Consumo = confinamiento (Tapfeed) + otros destinos (autoconsumo, cargado en la app).'],
+    ]);
+    escribir('Stock por día', stockDia);
+    escribir('Corrales por día', corrales);
+    escribir('Ingredientes por día', ingred);
     escribir('Stock actual', stock);
-    escribir('Saldo diario', diario);
-    escribir('Consumos diarios', consumos);
-    escribir('Ingresos', ingresos);
-    escribir('Tapfeed', tapfeed);
     dest.getSheets().forEach((h) => {
-      if (['Leeme', 'Stock actual', 'Saldo diario', 'Consumos diarios', 'Ingresos', 'Tapfeed'].indexOf(h.getName()) === -1) dest.deleteSheet(h);
+      if (['Resumen', 'Stock por día', 'Corrales por día', 'Ingredientes por día', 'Stock actual'].indexOf(h.getName()) === -1) dest.deleteSheet(h);
     });
-    dest.setActiveSheet(leeme);
+    dest.setActiveSheet(resumen);
   } catch (e) {
     // Nunca frena una carga: si falla, queda anotado y se reintenta con el próximo cambio.
     console.error('No se pudo actualizar la planilla del informe: ' + e);
