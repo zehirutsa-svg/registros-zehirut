@@ -286,3 +286,5 @@ select.txt.grande { font-size: 18px; font-weight: 600; padding: 15px 12px; backg
 .cajas-estancia .detalle td { font-size: 13px; padding: 5px 0; }
 .cajas-estancia .detalle td:first-child { width: auto; }
 @media (max-width: 400px) { .cajas-estancia .detalle td { display: block; border: 0; padding: 1px 0; } .cajas-estancia .detalle tr { display: block; padding: 4px 0; border-bottom: 1px solid var(--linea); } }
+.modal .acciones { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+.btn.rojo-txt { color: var(--alerta); border-color: #f0c4c4; }

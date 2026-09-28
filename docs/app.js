@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -125,21 +125,25 @@ function toast(texto, ms) {
   toastTimer = setTimeout(() => t.classList.add('oculto'), ms || 2600);
 }
 
-/** Cartel modal. Devuelve una promesa: true (sí), false (no) o el texto escrito si tiene input. */
+/** Cartel modal. Devuelve una promesa: true (sí), false (no) o el texto escrito si tiene input.
+ *  Con o.acciones ([{ id, texto, cls }]) muestra esos botones uno debajo del otro y devuelve el id. */
 function cartel(o) {
   return new Promise((resolver) => {
     const m = $('#modal');
+    $('#toast').classList.add('oculto');   // que el aviso flotante no tape los botones
     m.innerHTML = '<div class="caja">' +
       (o.icono ? '<div class="icono">' + o.icono + '</div>' : '') +
       '<h3>' + esc(o.titulo) + '</h3>' +
       '<div>' + (o.html || '') + '</div>' +
       (o.input ? '<input class="txt" id="cartel-input" style="margin-top:12px" placeholder="' + esc(o.input.placeholder || '') + '" value="' + esc(o.input.valor || '') + '">' +
         '<div class="error-txt" id="cartel-error"></div>' : '') +
+      (o.acciones ? '<div class="acciones">' + o.acciones.map((a) =>
+        '<button class="btn ' + (a.cls || '') + '" data-r="' + esc(a.id) + '">' + esc(a.texto) + '</button>').join('') + '</div>' :
       '<div class="botones">' +
       (o.no === '' ? '' : '<button class="btn sec" data-r="no">' + esc(o.no || 'Cancelar') + '</button>') +
       (o.si === '' ? '' : '<button class="btn' + (o.peligro ? ' peligro' : '') + '" data-r="si">' + esc(o.si || 'Aceptar') + '</button>') +
       (o.extra ? '<button class="btn sec" data-r="extra">' + esc(o.extra) + '</button>' : '') +
-      '</div></div>';
+      '</div>') + '</div>';
     m.classList.remove('oculto');
     const inp = $('#cartel-input');
     if (inp) setTimeout(() => inp.focus(), 50);
@@ -148,6 +152,7 @@ function cartel(o) {
       const b = e.target.closest('[data-r]');
       if (!b) { if (e.target === m && o.no !== '') cerrar(false); return; }
       const r = b.dataset.r;
+      if (o.acciones) { cerrar(r); return; }
       if (r === 'si' && inp) {
         const v = inp.value.trim();
         const err = o.validar ? o.validar(v) : '';
@@ -298,6 +303,10 @@ function movimientos() {
 
 /** Clave de un saldo: el insumo, o insumo|ESTANCIA si lleva stock por estancia (ej. Fardos). */
 const claveSaldo = (insumo, estancia) => (estancia ? insumo + '|' + estancia : insumo);
+
+/** Insumo que se produce en la estancia (ej. Fardos): sus ingresos no llevan proveedor, remito ni factura. */
+const esPropio = (nombre) => !!(stockDatos().insumos.find((i) => i.nombre === nombre) || {}).propia;
+const esSinFactura = (m) => m.tipo === 'Ingreso' && !m.anulado && !m.factura && !esPropio(m.insumo);
 
 /** Saldo de cada insumo (y estancia): el que calculó Google, corregido con lo que está en la cola. */
 function saldos() {
@@ -490,7 +499,7 @@ function htmlStock() {
   const vistas = {
     lista: ['Stock de insumos', htmlSaldo],
     ficha: [ui.insumoVer, () => htmlFicha(ui.insumoVer)],
-    form: [ui.form ? ui.form.clase + ' · ' + ui.form.insumo : '', htmlCargar],
+    form: [ui.form ? (ui.form.corrige ? 'Corregir ' + ui.form.clase.toLowerCase() : ui.form.clase) + ' · ' + ui.form.insumo : '', htmlCargar],
     sinFactura: ['Ingresos sin factura', htmlSinFactura],
     config: ['Configurar', htmlConfig],
   };
@@ -528,7 +537,7 @@ function htmlSaldo() {
   const s = saldos();
   const c7 = consumo7();
   const ins = stockDatos().insumos.filter((i) => i.activo || (s[i.nombre] && s[i.nombre].cantidad));
-  const sinFactura = movimientos().filter((m) => m.tipo === 'Ingreso' && !m.anulado && !m.factura).length;
+  const sinFactura = movimientos().filter(esSinFactura).length;
   return (sinFactura ? '<button class="aviso amarillo aviso-btn" data-a="vista" data-v="sinFactura">🧾 Hay <b>' + sinFactura +
     (sinFactura === 1 ? ' ingreso' : ' ingresos') + ' sin factura</b>. Tocá para verlos.</button>' : '') +
     (ins.length ? '<div class="saldos">' + ins.map((i) => {
@@ -609,7 +618,7 @@ function htmlFicha(nombre) {
 }
 
 function htmlSinFactura() {
-  const movs = movimientos().filter((m) => m.tipo === 'Ingreso' && !m.anulado && !m.factura);
+  const movs = movimientos().filter(esSinFactura);
   if (!movs.length) return '<p class="vacio">No hay ingresos sin factura. 👍</p>';
   return '<div class="form"><div class="aviso">Tocá un ingreso para asociarle la factura cuando llegue.</div>' +
     movs.map((m) => htmlMov(m)).join('') + '</div>';
@@ -628,6 +637,7 @@ function htmlCargar() {
   const saldo = (saldos()[claveSaldo(f.insumo, f.estancia)] || {}).cantidad || 0;
   const rel = fechaRelativa(f.fecha);
   let h = '<div class="form">';
+  if (f.corrige) h += '<div class="aviso amarillo">Estás <b>corrigiendo</b> un movimiento. Al guardar, el anterior queda anulado (tachado en el historial) y queda este.</div>';
   // Insumo con stock por estancia: primero se elige de cuál (no hay una elegida de antemano).
   if (ins.porEstancia) {
     h += '<div class="campo"><span class="etq">Estancia</span><div class="segmento">' + ESTANCIAS.map(([e, nom]) =>
@@ -654,7 +664,9 @@ function htmlCargar() {
       dest.map((d) => '<option' + (f.destino === d.nombre ? ' selected' : '') + '>' + esc(d.nombre) + '</option>').join('') +
       '</select></div>';
   }
-  if (f.clase === 'Ingreso') {
+  if (f.clase === 'Ingreso' && ins.propia) {
+    h += '<div class="aviso">Producción propia: sin proveedor, remito ni factura.</div>';
+  } else if (f.clase === 'Ingreso') {
     h += '<div class="campo"><label for="f-proveedor">Proveedor</label>' +
       '<input class="txt" id="f-proveedor" list="lista-prov" value="' + esc(f.proveedor) + '" autocomplete="off">' +
       '<datalist id="lista-prov">' + (s.proveedores || []).map((p) => '<option value="' + esc(p) + '">').join('') + '</datalist></div>' +
@@ -706,10 +718,17 @@ async function guardarMov() {
   const op = { tipo: 'mov', clase: f.clase, fecha: f.fecha, insumo: f.insumo, cantidad };
   if (ins.porEstancia) op.estancia = f.estancia;
   if (f.clase === 'Consumo' && f.destino) op.destino = f.destino;
-  if (f.clase === 'Ingreso') { op.proveedor = f.proveedor.trim(); op.remito = f.remito.trim(); op.factura = f.factura.trim(); }
+  if (f.clase === 'Ingreso' && !ins.propia) { op.proveedor = f.proveedor.trim(); op.remito = f.remito.trim(); op.factura = f.factura.trim(); }
   if (f.nota.trim()) op.nota = f.nota.trim();
+  if (f.corrige) {
+    // Si el original todavía no se había enviado, se saca de la cola y listo; si ya estaba en
+    // Google, se anula (queda tachado) y se carga el corregido.
+    const pendiente = cola.some((o) => o.tipo === 'mov' && o.id === f.corrige);
+    if (pendiente) { cola = cola.filter((o) => o.id !== f.corrige && o.ref !== f.corrige); guardarTodo(); }
+    else agregarACola({ tipo: 'anular', ref: f.corrige, motivo: 'Corregido' });
+  }
   agregarACola(op);
-  toast('✓ Guardado: ' + f.clase.toLowerCase() + ' de ' + num(cantidad) + ' ' + unidadTxt(ins.unidad, cantidad) +
+  toast((f.corrige ? '✓ Corregido: ' : '✓ Guardado: ') + f.clase.toLowerCase() + ' de ' + num(cantidad) + ' ' + unidadTxt(ins.unidad, cantidad) +
     (op.estancia ? ' en ' + nombreEstancia(op.estancia) : '') + (navigator.onLine ? '' : ' (se envía cuando haya señal)'), 3200);
   // Vuelve a la ficha, que ya muestra el saldo nuevo. La fecha elegida queda para la próxima carga.
   ui.form = { fecha: f.fecha };
@@ -729,8 +748,11 @@ function htmlMov(m, conFecha) {
   if (m.estancia) extra.push('<span class="chip azul">' + esc(nombreEstancia(m.estancia).replace('La ', '')) + '</span>');
   if (m.tipo === 'Consumo') extra.push(m.destino || 'sin destino');
   if (m.tipo === 'Ingreso') {
-    if (m.proveedor) extra.push(m.proveedor);
-    extra.push(m.factura ? 'Fact. ' + m.factura : '<span class="chip naranja">sin factura</span>');
+    if (esPropio(m.insumo)) extra.push('producción propia');
+    else {
+      if (m.proveedor) extra.push(m.proveedor);
+      extra.push(m.factura ? 'Fact. ' + m.factura : '<span class="chip naranja">sin factura</span>');
+    }
   }
   extra.push(esc(String(m.usuario || '').split(' ')[0]));
   return '<button class="mov' + (m.anulado ? ' anulado' : '') + '" data-a="verMov" data-id="' + esc(m.id) + '">' +
@@ -750,24 +772,42 @@ async function verMov(id) {
   filas.push(
     ['Cantidad', num(m.cantidad) + ' ' + unidadTxt(m.unidad, m.cantidad) + (m.kg != null && m.unidad !== 'kg' ? ' (' + num(m.kg) + ' kg)' : '')]);
   if (m.tipo === 'Consumo') filas.push(['Destino', m.destino || 'Sin destino']);
-  if (m.tipo === 'Ingreso') {
+  if (m.tipo === 'Ingreso' && !esPropio(m.insumo)) {
     filas.push(['Proveedor', m.proveedor || '—'], ['Remito', m.remito || '—'], ['Factura', m.factura || 'Sin factura']);
   }
   if (m.nota) filas.push(['Nota', m.nota]);
   filas.push(['Cargado por', m.usuario + (m.pendiente ? ' (sin enviar)' : '')]);
   if (m.anulado) filas.push(['Anulado', m.anuladoPor || 'sí']);
   const admin = puede('Stock', 'ADMINISTRAR');
+  // Quien carga corrige/anula lo suyo de los últimos 7 días; quien administra, cualquier cosa.
+  // Un conteo solo lo corrige quien administra (es quien puede cargarlo).
   const puedeAnular = !m.anulado && puede('Stock', 'CARGAR') &&
     (admin || (m.usuario === sesion.nombre && m.fecha >= sumarDias(hoyISO(), -7)));
-  const puedeFactura = !m.anulado && m.tipo === 'Ingreso' && puede('Stock', 'CARGAR');
+  const puedeCorregir = puedeAnular && (m.tipo !== 'Conteo' || admin);
+  const puedeFactura = !m.anulado && m.tipo === 'Ingreso' && !esPropio(m.insumo) && puede('Stock', 'CARGAR');
+  const acciones = [];
+  if (puedeCorregir) acciones.push({ id: 'corregir', texto: '✏️ Corregir', cls: '' });
+  if (puedeFactura) acciones.push({ id: 'factura', texto: m.factura ? '🧾 Cambiar factura' : '🧾 Asociar factura', cls: 'ingreso' });
+  if (puedeAnular) acciones.push({ id: 'anular', texto: '🗑️ Anular', cls: 'sec rojo-txt' });
+  acciones.push({ id: 'cerrar', texto: 'Cerrar', cls: 'sec' });
   const r = await cartel({
     titulo: m.tipo + ' · ' + m.insumo,
     html: '<table class="detalle">' + filas.map(([a, b]) => '<tr><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table>',
-    si: puedeFactura ? (m.factura ? 'Cambiar factura' : 'Asociar factura') : '',
-    no: 'Cerrar',
-    extra: puedeAnular ? 'Anular' : '',
+    acciones,
   });
-  if (r === true && puedeFactura) {
+  if (r === 'corregir') {
+    // Abre el formulario con los datos del movimiento; al guardar se anula este y queda el nuevo.
+    ui.form = {
+      clase: m.tipo, insumo: m.insumo, estancia: m.estancia || '', fecha: m.fecha,
+      cantidad: String(m.cantidad).replace('.', ','), destino: m.destino || '', proveedor: m.proveedor || '',
+      remito: m.remito || '', factura: m.factura || '', nota: m.nota || '', corrige: m.id,
+    };
+    ui.insumoVer = m.insumo;
+    ui.pantalla = 'stock';
+    ui.vistaStock = 'form';
+    render();
+    window.scrollTo(0, 0);
+  } else if (r === 'factura') {
     const fac = await cartel({
       icono: '🧾', titulo: 'Factura del ingreso', si: 'Guardar',
       html: '<p>' + esc(m.insumo) + ' · ' + num(m.cantidad) + ' ' + esc(unidadTxt(m.unidad, m.cantidad)) + ' · ' + fechaTxt(m.fecha) + '</p>',
@@ -775,11 +815,11 @@ async function verMov(id) {
       validar: (v) => (v ? '' : 'Escribí el número de factura.'),
     });
     if (fac) { agregarACola({ tipo: 'factura', ref: m.id, factura: fac }); toast('✓ Factura asociada'); render(); }
-  } else if (r === 'extra') {
+  } else if (r === 'anular') {
     const motivo = await cartel({
       icono: '🗑️', titulo: 'Anular movimiento', si: 'Anular', peligro: true,
       html: '<p>' + esc(m.tipo) + ' de <b>' + num(m.cantidad) + ' ' + esc(unidadTxt(m.unidad, m.cantidad)) + '</b> de ' + esc(m.insumo) + ' (' + fechaTxt(m.fecha) + ').</p>' +
-        '<p>No se borra: queda tachado en el historial. Si estaba mal, después cargalo de nuevo bien.</p>',
+        '<p>No se borra: queda tachado en el historial. Si solo estaba mal un dato, usá <b>Corregir</b>.</p>',
       input: { placeholder: 'Motivo (ej. cantidad equivocada)' },
       validar: (v) => (v ? '' : 'Escribí el motivo.'),
     });
@@ -802,7 +842,8 @@ function htmlConfig() {
       '<div><span class="mini-etq">Kg por unidad</span><input class="txt" inputmode="decimal" data-cfg="insumos" data-n="' + n + '" data-k="kgUnidad" value="' + esc(i.kgUnidad == null ? '' : i.kgUnidad) + '"></div>' +
       '<div><span class="mini-etq">Stock mínimo</span><input class="txt" inputmode="decimal" data-cfg="insumos" data-n="' + n + '" data-k="minimo" value="' + esc(i.minimo == null ? '' : i.minimo) + '"></div>' +
       '</div><div><label class="interruptor"><input type="checkbox" data-cfg="insumos" data-n="' + n + '" data-k="activo" ' + (i.activo ? 'checked' : '') + '> Activo</label>' +
-      '<label class="interruptor" style="margin-top:6px"><input type="checkbox" data-cfg="insumos" data-n="' + n + '" data-k="porEstancia" ' + (i.porEstancia ? 'checked' : '') + '> Por estancia</label></div></div>').join('') +
+      '<label class="interruptor" style="margin-top:6px"><input type="checkbox" data-cfg="insumos" data-n="' + n + '" data-k="porEstancia" ' + (i.porEstancia ? 'checked' : '') + '> Por estancia</label>' +
+      '<label class="interruptor" style="margin-top:6px"><input type="checkbox" data-cfg="insumos" data-n="' + n + '" data-k="propia" ' + (i.propia ? 'checked' : '') + '> Producción propia</label></div></div>').join('') +
     '<button class="btn sec chico" data-a="cfgAgregar" data-cfg="insumos" style="margin-top:10px">+ Agregar insumo</button> ' +
     '<button class="btn chico" data-a="cfgGuardar" data-cfg="insumos" style="margin-top:10px">Guardar insumos</button></div>' +
     '<div class="tarjeta"><h3 style="margin-top:0">Destinos (corrales)</h3>' +
@@ -820,7 +861,7 @@ async function cfgGuardar(tipo) {
     lista = ui.cfg.insumos.filter((i) => String(i.nombre).trim()).map((i) => ({
       nombre: String(i.nombre).trim(), unidad: i.unidad,
       kgUnidad: i.unidad === 'kg' ? 1 : (i.kgUnidad === '' || i.kgUnidad == null ? '' : leerNumero(i.kgUnidad)),
-      minimo: i.minimo === '' || i.minimo == null ? '' : leerNumero(i.minimo), activo: !!i.activo, porEstancia: !!i.porEstancia,
+      minimo: i.minimo === '' || i.minimo == null ? '' : leerNumero(i.minimo), activo: !!i.activo, porEstancia: !!i.porEstancia, propia: !!i.propia,
     }));
     const malo = lista.find((i) => (i.kgUnidad !== '' && !(i.kgUnidad > 0)) || (i.minimo !== '' && !(i.minimo >= 0)));
     if (malo) { toast('Revisá los números de ' + malo.nombre + '.', 3500); return; }

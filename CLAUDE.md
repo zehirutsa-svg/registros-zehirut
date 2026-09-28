@@ -72,6 +72,10 @@ Hembras C6P: el usuario las agrega después (todavía no tienen ubicación).
 - **Stock por estancia** (casilla "Por estancia" en Insumos; hoy solo Fardos, pedido 28/09): un saldo para
   La Prudencia y otro para La Paciencia; al cargar hay que elegir la estancia (sin preselección).
   Columna "Estancia" al final de Movimientos. El resto de los insumos: stock único.
+- **Producción propia** (casilla en Insumos; hoy solo Fardos): sus ingresos no piden proveedor, remito ni
+  factura y nunca cuentan como "sin factura".
+- **Corregir** un movimiento: abre el formulario con sus datos; al guardar anula el viejo (motivo
+  "Corregido") y carga el nuevo. Si el viejo no se había enviado, se reemplaza en la cola.
 - **Navegación de Stock (pedido 28/09, "menos botones")**: sin pestañas. Tarjetas → ficha del insumo
   (saldo, Consumo/Ingreso/Conteo, sus movimientos) → formulario de UN tipo con el insumo ya elegido
   (fecha, cantidad, destino en desplegable). La flecha vuelve un paso. Configurar = botón chico al pie,

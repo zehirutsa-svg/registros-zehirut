@@ -23,7 +23,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '3';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '4';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo'];
@@ -32,7 +32,8 @@ const NIVELES = { '': 0, 'VER': 1, 'PROPIAS': 2, 'CARGAR': 2, 'ADMINISTRAR': 3 }
 // porque quien administra Stock (conteos, anular) no necesariamente arma las listas.
 const COLS_USUARIOS = ['Nombre', 'PIN', 'Activo'].concat(MODULOS, ['Configurar']);
 // "Por estancia": el insumo lleva un stock separado para cada estancia (ej. Fardos).
-const COLS_INSUMOS = ['Insumo', 'Unidad', 'Kg por unidad', 'Stock mínimo', 'Activo', 'Por estancia'];
+// "Producción propia": se produce en la estancia; sus ingresos no llevan proveedor, remito ni factura.
+const COLS_INSUMOS = ['Insumo', 'Unidad', 'Kg por unidad', 'Stock mínimo', 'Activo', 'Por estancia', 'Producción propia'];
 const COLS_DESTINOS = ['Destino', 'Activo'];
 const COLS_MOV = ['ID', 'Fecha', 'Tipo', 'Insumo', 'Cantidad', 'Unidad', 'Kg', 'Destino', 'Proveedor',
   'Remito', 'Factura', 'Nota', 'Cargado por', 'Hora en el teléfono', 'Recibido', 'Anulado', 'Anulado por / motivo', 'Marca de tiempo',
@@ -42,12 +43,12 @@ const TIPOS_MOV = ['Ingreso', 'Consumo', 'Conteo'];
 
 // Cargas iniciales (decididas con el usuario el 28/09/2026). Después se editan desde la app.
 const INSUMOS_INICIALES = [
-  ['Fardos', 'fardo', '', '', true, true],
-  ['Maíz molido', 'kg', 1, '', true, false],
-  ['Concentrado Desarrollo', 'bolsa', 40, '', true, false],
-  ['Balanceado Pre destete', 'bolsa', 40, '', true, false],
-  ['Suplemento E-PRO 35', 'bolsa', 40, '', true, false],
-  ['Concentrado Beef 1.000 M', 'bolsa', 40, '', true, false],
+  ['Fardos', 'fardo', '', '', true, true, true],
+  ['Maíz molido', 'kg', 1, '', true, false, false],
+  ['Concentrado Desarrollo', 'bolsa', 40, '', true, false, false],
+  ['Balanceado Pre destete', 'bolsa', 40, '', true, false, false],
+  ['Suplemento E-PRO 35', 'bolsa', 40, '', true, false, false],
+  ['Concentrado Beef 1.000 M', 'bolsa', 40, '', true, false, false],
 ];
 const DESTINOS_INICIALES = ['AC D Norte', 'AC Torta Frente', 'AC Torta Fondo', 'AC B Norte Frente',
   'AC B Norte Fondo', 'AC B Medio Frente', 'AC B Medio Fondo', 'Confinamiento'];
@@ -101,6 +102,7 @@ function configurar() {
   }
   asegurarColumnaConfigurar_(usu);
   asegurarColumnasEstancia_(ins, mov);
+  asegurarColumnaPropia_(ins);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
   [stock, mov, ins, des, usu, reg].forEach((h, i) => { ss.setActiveSheet(h); ss.moveActiveSheet(i + 1); });
@@ -146,6 +148,21 @@ function asegurarColumnasEstancia_(ins, mov) {
   if (String(mov.getRange(1, colMov).getValue()) !== 'Estancia') {
     mov.getRange(1, colMov).setValue('Estancia').setFontWeight('bold').setBackground('#eeeeee');
   }
+}
+
+/** Versión 4: columna "Producción propia" en una hoja Insumos ya existente (tildada solo en
+ *  Fardos, que se producen en la estancia: pedido del 28/09/2026). */
+function asegurarColumnaPropia_(ins) {
+  const col = COLS_INSUMOS.indexOf('Producción propia') + 1;
+  if (String(ins.getRange(1, col).getValue()) !== 'Producción propia') {
+    ins.getRange(1, col).setValue('Producción propia').setFontWeight('bold').setBackground('#eeeeee');
+    const n = ins.getLastRow();
+    if (n > 1) {
+      ins.getRange(2, col, n - 1, 1).setValues(ins.getRange(2, 1, n - 1, 1).getValues()
+        .map((f) => [String(f[0]).trim() === 'Fardos']));
+    }
+  }
+  ins.getRange(2, col, 200, 1).insertCheckboxes();
 }
 
 function hoja_(ss, nombre, encabezado) {
@@ -294,6 +311,7 @@ function leerInsumos_(ss) {
       minimo: f[3] === '' ? null : Number(f[3]),
       activo: f[4] === true || String(f[4]).toUpperCase() === 'TRUE',
       porEstancia: f[5] === true || String(f[5]).toUpperCase() === 'TRUE',
+      propia: f[6] === true || String(f[6]).toUpperCase() === 'TRUE',
     }));
 }
 
@@ -328,10 +346,10 @@ function guardarCatalogo_(body) {
         vistos[nombre.toUpperCase()] = true;
         if (kg !== '' && !(kg > 0)) throw new Error('kg por unidad inválido en ' + nombre);
         if (minimo !== '' && !(minimo >= 0)) throw new Error('stock mínimo inválido en ' + nombre);
-        return [nombre, unidad, kg, minimo, x.activo !== false, x.porEstancia === true];
+        return [nombre, unidad, kg, minimo, x.activo !== false, x.porEstancia === true, x.propia === true];
       });
       leerInsumos_(ss).forEach((i) => {
-        if (usados[i.nombre] && !vistos[i.nombre.toUpperCase()]) filas.push([i.nombre, i.unidad, i.kgUnidad == null ? '' : i.kgUnidad, i.minimo == null ? '' : i.minimo, false, !!i.porEstancia]);
+        if (usados[i.nombre] && !vistos[i.nombre.toUpperCase()]) filas.push([i.nombre, i.unidad, i.kgUnidad == null ? '' : i.kgUnidad, i.minimo == null ? '' : i.minimo, false, !!i.porEstancia, !!i.propia]);
       });
       sh = ss.getSheetByName('Insumos'); ancho = COLS_INSUMOS.length;
     } else if (body.tipo === 'destinos') {
@@ -596,9 +614,9 @@ function validarMov_(op, u, insumos, destinos, hoy) {
     tipo, fecha, insumo: ins.nombre, estancia, cantidad, unidad: ins.unidad,
     kg: ins.kgUnidad ? Math.round(cantidad * ins.kgUnidad * 1000) / 1000 : (ins.unidad === 'kg' ? cantidad : null),
     destino,
-    proveedor: tipo === 'Ingreso' ? texto_(op.proveedor, 80) : '',
-    remito: tipo === 'Ingreso' ? texto_(op.remito, 40) : '',
-    factura: tipo === 'Ingreso' ? texto_(op.factura, 60) : '',
+    proveedor: tipo === 'Ingreso' && !ins.propia ? texto_(op.proveedor, 80) : '',
+    remito: tipo === 'Ingreso' && !ins.propia ? texto_(op.remito, 40) : '',
+    factura: tipo === 'Ingreso' && !ins.propia ? texto_(op.factura, 60) : '',
     nota: texto_(op.nota, 200),
   };
 }
@@ -692,11 +710,13 @@ function datos_(body) {
     const movs = leerMovimientos_(ss);
     const insumos = leerInsumos_(ss);
     const saldos = calcularStock_(insumos, movs);
+    const propias = {};
+    insumos.forEach((i) => { if (i.propia) propias[i.nombre] = true; });
     r.stock = {
       insumos,
       destinos: leerDestinos_(ss),
       saldos: Object.keys(saldos).map((k) => saldos[k]),
-      movimientos: movs.filter((m) => m.fecha >= desde || (m.tipo === 'Ingreso' && !m.factura && !m.anulado))
+      movimientos: movs.filter((m) => m.fecha >= desde || (m.tipo === 'Ingreso' && !m.factura && !m.anulado && !propias[m.insumo]))
         .map((m) => {
           const x = Object.assign({}, m);
           delete x.fila;
