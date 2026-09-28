@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '5';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '6';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo'];
@@ -36,25 +36,28 @@ const COLS_USUARIOS = ['Nombre', 'PIN', 'Activo'].concat(MODULOS, ['Configurar']
 // "Por estancia": el insumo lleva un stock separado para cada estancia (ej. Fardos).
 // "Producción propia": se produce en la estancia; sus ingresos no llevan proveedor, remito ni factura.
 // "Nombre en Tapfeed": cómo aparece el insumo en el PDF de Tapfeed (ej. "Maiz Molido DGM 1,2").
-const COLS_INSUMOS = ['Insumo', 'Unidad', 'Kg por unidad', 'Stock mínimo', 'Activo', 'Por estancia', 'Producción propia', 'Nombre en Tapfeed'];
+// "Módulo": en qué módulo de la app aparece el insumo (Stock o Combustible); los permisos son los de ese módulo.
+const COLS_INSUMOS = ['Insumo', 'Unidad', 'Kg por unidad', 'Stock mínimo', 'Activo', 'Por estancia', 'Producción propia', 'Nombre en Tapfeed', 'Módulo'];
 const COLS_TAPFEED = ['Fecha', 'Corral', 'Cabezas', 'Insumo', 'Nombre en Tapfeed', 'Kg tal cual', 'Kg MS', 'Archivo', 'Cargado por', 'Recibido'];
 const COLS_DESTINOS = ['Destino', 'Activo'];
 const COLS_MOV = ['ID', 'Fecha', 'Tipo', 'Insumo', 'Cantidad', 'Unidad', 'Kg', 'Destino', 'Proveedor',
   'Remito', 'Factura', 'Nota', 'Cargado por', 'Hora en el teléfono', 'Recibido', 'Anulado', 'Anulado por / motivo', 'Marca de tiempo',
-  'Estancia'];
+  'Estancia', 'Máquina', 'Equipo', 'Trabajo', 'Finca'];
 const COLS_REGISTRO = ['Recibido', 'Usuario', 'Acción', 'Detalle', 'Resultado', 'ID'];
 const TIPOS_MOV = ['Ingreso', 'Consumo', 'Conteo'];
 
 // Cargas iniciales (decididas con el usuario el 28/09/2026). Después se editan desde la app.
 const INSUMOS_INICIALES = [
-  ['Fardos', 'fardo', '', '', true, true, true, ''],
-  ['Maíz molido', 'kg', 1, '', true, false, false, 'Maiz Molido DGM 1,2'],
-  ['Concentrado Desarrollo', 'bolsa', 40, '', true, false, false, 'Concentrado Desarrollo'],
-  ['Balanceado Pre destete', 'bolsa', 40, '', true, false, false, 'Balan Pre destete'],
-  ['Suplemento E-PRO 35', 'bolsa', 40, '', true, false, false, ''],
-  ['Concentrado Beef 1.000 M', 'bolsa', 40, '', true, false, false, ''],
-  ['Silo micropicado Gatton', 'kg', 1, '', true, false, false, 'Micropicado Gatton'],
-  ['Maíz quebrado', 'kg', 1, '', true, false, false, ''],
+  ['Fardos', 'fardo', '', '', true, true, true, '', 'Stock'],
+  ['Maíz molido', 'kg', 1, '', true, false, false, 'Maiz Molido DGM 1,2', 'Stock'],
+  ['Concentrado Desarrollo', 'bolsa', 40, '', true, false, false, 'Concentrado Desarrollo', 'Stock'],
+  ['Balanceado Pre destete', 'bolsa', 40, '', true, false, false, 'Balan Pre destete', 'Stock'],
+  ['Suplemento E-PRO 35', 'bolsa', 40, '', true, false, false, '', 'Stock'],
+  ['Concentrado Beef 1.000 M', 'bolsa', 40, '', true, false, false, '', 'Stock'],
+  ['Silo micropicado Gatton', 'kg', 1, '', true, false, false, 'Micropicado Gatton', 'Stock'],
+  ['Maíz quebrado', 'kg', 1, '', true, false, false, '', 'Stock'],
+  ['Nafta', 'litro', '', '', true, false, false, '', 'Combustible'],
+  ['Diesel', 'litro', '', '', true, false, false, '', 'Combustible'],
 ];
 const DESTINOS_INICIALES = ['AC D Norte', 'AC Torta Frente', 'AC Torta Fondo', 'AC B Norte Frente',
   'AC B Norte Fondo', 'AC B Medio Frente', 'AC B Medio Fondo', 'Confinamiento'];
@@ -68,6 +71,35 @@ const USUARIOS_INICIALES = [
 const LLUVIAS_PLANILLA_ID = '1DXk0c3HOAsjoPwmfZzqSCUEZ9ByAOL9XlkmRdEBT7Ds';
 const LLUVIAS_HOJA = 'Lluvias';
 const ESTANCIAS = ['LA PRUDENCIA', 'LA PACIENCIA'];
+
+// ---- Combustible (tanques de Nafta y Diesel). Arranca el 01/10/2026 (reemplaza al módulo de
+// ZehirutApp). Las máquinas son los Bienes de Uso de las facturas (mismo código y nombre); se
+// editan en la hoja Máquinas. Trabajo obligatorio solo donde "Pide trabajo" (los tractores).
+const COMBUSTIBLE_DESDE = '2026-10-01';
+const OTRO_DESTINO = 'OTRO';
+const COLS_MAQUINAS = ['Código', 'Nombre', 'Combustible', 'Pide trabajo', 'Agrupa', 'Equipos (separados por coma)', 'Activo'];
+const MAQUINAS_INICIALES = [
+  ['TRAC-Val', 'Tractor Valtra BM110', 'Diesel', true, false, '', true],
+  ['TRAC-Mas', 'Tractor Massey 291', 'Diesel', true, false, '', true],
+  ['TRAC-LS', 'Tractor LS Plus100', 'Diesel', true, false, '', true],
+  ['CAM-1', 'Camioneta Toyota Hilux 2022', 'Diesel', false, false, '', true],
+  ['CAM-2', 'Camioneta Isuzu D-Max 2019', 'Diesel', false, false, '', true],
+  ['CAM-3', 'Camioneta Isuzu D-Max 2023', 'Diesel', false, false, '', true],
+  ['CAM-4', 'Camioneta Mazda BT-50 2027', 'Diesel', false, false, '', true],
+  ['GEN-Cat', 'Generador Caterpillar', 'Diesel', false, false, '', true],
+  ['GEN-Yan 1', 'Generador Yanmar 1', 'Diesel', false, false, '', true],
+  ['GEN-Yan 2', 'Generador Yanmar 2', 'Diesel', false, false, '', true],
+  ['GEN-Yan 3', 'Generador Yanmar 3', 'Diesel', false, false, '', true],
+  ['GEN-Lifan', 'Generador Lifan', 'Diesel', false, false, '', true],
+  ['MOTO', 'Motos', 'Nafta', false, true, 'Yamaha, Honda, Moto carro, Kenton', true],
+  ['HM-Ms', 'Motosierras', 'Nafta', false, true, '', true],
+  ['HM-Mb', 'Motobombas', 'Nafta', false, true, '', true],
+  ['HM-Des', 'Desmalezadoras Husqvarna', 'Nafta', false, true, '', true],
+  ['HM-Fum', 'Mochilas Fumigadoras', 'Nafta', false, false, '', true],
+  ['INF-Tc', 'Tanque Combustible (Estático)', 'Diesel', false, false, '', true],
+];
+const TRABAJOS_INICIALES = ['Recorrida', 'Cargada de caminos', 'Traila', 'Plaina', 'Acarreo de fardos', 'Acarreo de postes',
+  'Fumigación', 'Bombeo', 'Generador', 'Asierraje', 'Corpida', 'Limpieza', 'Taller'];
 
 // Carpeta "1 Tapfeed" (dentro de "Confinamiento ZEHIRUT"): ahí se guarda cada PDF subido.
 const TAPFEED_CARPETA = '1ZybVBnxzMW_9OixfT_ut9GuvKtQbagH1';
@@ -123,6 +155,7 @@ function configurar() {
   asegurarColumnasEstancia_(ins, mov);
   asegurarColumnaPropia_(ins);
   asegurarTapfeed_(ss, ins);
+  asegurarCombustible_(ss, ins, mov);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
   [stock, mov, ins, des, usu, reg].forEach((h, i) => { ss.setActiveSheet(h); ss.moveActiveSheet(i + 1); });
@@ -231,6 +264,49 @@ function importarCargaInicial_(ss) {
     publicarDatosInforme_(ss);
   });
   archivo.setName(CARGA_INICIAL.replace('.csv', ' (importado).csv'));
+}
+
+/** Versión 6: Combustible. Columna "Módulo" en Insumos (Stock para los de antes), Nafta y
+ *  Diesel (los agrega asegurarTapfeed_ desde INSUMOS_INICIALES), columnas nuevas de Movimientos
+ *  y las hojas Máquinas y Trabajos con sus listas iniciales. */
+function asegurarCombustible_(ss, ins, mov) {
+  const col = COLS_INSUMOS.indexOf('Módulo') + 1;
+  if (String(ins.getRange(1, col).getValue()) !== 'Módulo') {
+    ins.getRange(1, col).setValue('Módulo').setFontWeight('bold').setBackground('#eeeeee');
+  }
+  const n = ins.getLastRow();
+  if (n > 1) {
+    const vals = ins.getRange(2, 1, n - 1, col).getValues();
+    vals.forEach((f, i) => { if (f[0] && !String(f[col - 1]).trim()) ins.getRange(i + 2, col).setValue('Stock'); });
+  }
+  ['Máquina', 'Equipo', 'Trabajo', 'Finca'].forEach((t) => {
+    const c = COLS_MOV.indexOf(t) + 1;
+    if (String(mov.getRange(1, c).getValue()) !== t) mov.getRange(1, c).setValue(t).setFontWeight('bold').setBackground('#eeeeee');
+  });
+  const maq = hoja_(ss, 'Máquinas', COLS_MAQUINAS);
+  if (maq.getLastRow() < 2) maq.getRange(2, 1, MAQUINAS_INICIALES.length, COLS_MAQUINAS.length).setValues(MAQUINAS_INICIALES);
+  maq.getRange(2, 4, 200, 2).insertCheckboxes();
+  maq.getRange(2, 7, 200, 1).insertCheckboxes();
+  const tra = hoja_(ss, 'Trabajos', ['Trabajo']);
+  if (tra.getLastRow() < 2) tra.getRange(2, 1, TRABAJOS_INICIALES.length, 1).setValues(TRABAJOS_INICIALES.map((t) => [t]));
+}
+
+function leerMaquinas_(ss) {
+  const sh = ss.getSheetByName('Máquinas');
+  const n = sh ? sh.getLastRow() : 0;
+  if (n < 2) return [];
+  const si = (v) => v === true || /^(SI|SÍ|TRUE)$/i.test(String(v).trim());
+  return sh.getRange(2, 1, n - 1, COLS_MAQUINAS.length).getValues().filter((f) => String(f[0]).trim()).map((f) => ({
+    codigo: String(f[0]).trim(), nombre: String(f[1]).trim(), combustible: String(f[2]).trim(),
+    pideTrabajo: si(f[3]), agrupa: si(f[4]),
+    equipos: String(f[5] || '').split(',').map((x) => x.trim()).filter(Boolean), activo: si(f[6]),
+  }));
+}
+
+function leerTrabajos_(ss) {
+  const sh = ss.getSheetByName('Trabajos');
+  const n = sh ? sh.getLastRow() : 0;
+  return n < 2 ? [] : sh.getRange(2, 1, n - 1, 1).getValues().map((f) => String(f[0]).trim()).filter(Boolean);
 }
 
 function hoja_(ss, nombre, encabezado) {
@@ -384,6 +460,7 @@ function leerInsumos_(ss) {
       porEstancia: f[5] === true || String(f[5]).toUpperCase() === 'TRUE',
       propia: f[6] === true || String(f[6]).toUpperCase() === 'TRUE',
       tapfeed: String(f[7] || '').trim(),
+      modulo: String(f[8] || '').trim() || 'Stock',
     }));
 }
 
@@ -420,10 +497,14 @@ function guardarCatalogo_(body) {
         if (minimo !== '' && !(minimo >= 0)) throw new Error('stock mínimo inválido en ' + nombre);
         // El nombre en Tapfeed no se edita desde la app: se conserva el de la hoja.
         const antes = leerInsumos_(ss).find((i) => i.nombre.toUpperCase() === nombre.toUpperCase());
-        return [nombre, unidad, kg, minimo, x.activo !== false, x.porEstancia === true, x.propia === true, antes ? antes.tapfeed : ''];
+        return [nombre, unidad, kg, minimo, x.activo !== false, x.porEstancia === true, x.propia === true, antes ? antes.tapfeed : '', 'Stock'];
       });
+      const filaDe = (i, activo) => [i.nombre, i.unidad, i.kgUnidad == null ? '' : i.kgUnidad, i.minimo == null ? '' : i.minimo, activo, !!i.porEstancia, !!i.propia, i.tapfeed, i.modulo];
       leerInsumos_(ss).forEach((i) => {
-        if (usados[i.nombre] && !vistos[i.nombre.toUpperCase()]) filas.push([i.nombre, i.unidad, i.kgUnidad == null ? '' : i.kgUnidad, i.minimo == null ? '' : i.minimo, false, !!i.porEstancia, !!i.propia, i.tapfeed]);
+        if (i.modulo !== 'Stock') {
+          if (vistos[i.nombre.toUpperCase()]) throw new Error('"' + i.nombre + '" ya existe en el módulo ' + i.modulo);
+          filas.push(filaDe(i, i.activo));
+        } else if (usados[i.nombre] && !vistos[i.nombre.toUpperCase()]) filas.push(filaDe(i, false));
       });
       sh = ss.getSheetByName('Insumos'); ancho = COLS_INSUMOS.length;
     } else if (body.tipo === 'destinos') {
@@ -475,6 +556,10 @@ function leerMovimientos_(ss) {
     anuladoPor: String(f[16]),
     ts: Number(f[17]) || 0,
     estancia: String(f[18] || ''),
+    maquina: String(f[19] || ''),
+    equipo: String(f[20] || ''),
+    trabajo: String(f[21] || ''),
+    finca: String(f[22] || ''),
   })).filter((m) => m.id);
 }
 
@@ -575,6 +660,9 @@ function guardar_(body) {
     leerInsumos_(ss).forEach((i) => { insumos[i.nombre] = i; });
     const destinos = {};
     leerDestinos_(ss).forEach((d) => { destinos[d.nombre] = d; });
+    const maquinas = {};
+    leerMaquinas_(ss).forEach((q) => { maquinas[q.codigo] = q; });
+    const moduloDe = (insumo) => (insumos[insumo] ? insumos[insumo].modulo : 'Stock');
     const yaProcesados = idsRegistro_(ss);
     const nuevas = [];
     const log = [];
@@ -595,25 +683,27 @@ function guardar_(body) {
       if (porId[id] || yaProcesados[id]) return res('duplicado');
       try {
         if (op.tipo === 'mov') {
-          exigir_(u, 'Stock', 'CARGAR');
-          const m = validarMov_(op, u, insumos, destinos, hoy);
+          exigir_(u, moduloDe(texto_(op.insumo, 60)), 'CARGAR');
+          const m = validarMov_(op, u, insumos, destinos, hoy, maquinas);
           const fila = [id, m.fecha, m.tipo, m.insumo, m.cantidad, m.unidad, m.kg == null ? '' : m.kg, m.destino,
-            m.proveedor, m.remito, m.factura, m.nota, u.nombre, horaTel, ahora, false, '', ts, m.estancia];
+            m.proveedor, m.remito, m.factura, m.nota, u.nombre, horaTel, ahora, false, '', ts, m.estancia,
+            m.maquina, m.equipo, m.trabajo, m.finca];
           nuevas.push(fila);
           porId[id] = { id, fecha: m.fecha, tipo: m.tipo, insumo: m.insumo, estancia: m.estancia, cantidad: m.cantidad, usuario: u.nombre, anulado: false, ts };
           movs.push(porId[id]);
           tocoStock = true;
           res('aplicado', m.tipo + ' ' + m.insumo + (m.estancia ? ' (' + nombreEstancia_(m.estancia) + ')' : '') + ' ' + m.cantidad + ' ' + m.unidad + ' (' + ddmmaaaa_(m.fecha) + ')' + (m.destino ? ' → ' + m.destino : ''));
         } else if (op.tipo === 'anular' || op.tipo === 'factura') {
-          exigir_(u, 'Stock', 'CARGAR');
           const ref = porId[texto_(op.ref, 40)];
           if (!ref) throw new Error('ese movimiento no existe');
-          const admin = nivel_(u, 'Stock') >= NIVELES.ADMINISTRAR;
+          const mod = moduloDe(ref.insumo);
+          exigir_(u, mod, 'CARGAR');
+          const admin = nivel_(u, mod) >= NIVELES.ADMINISTRAR;
           if (op.tipo === 'anular') {
             if (ref.anulado) return res('duplicado');
             // Quien carga corrige lo suyo de los últimos 7 días; lo demás, quien administra.
             if (!admin && (ref.usuario !== u.nombre || ref.fecha < sumarDias_(hoy, -7))) {
-              throw new Error('solo quien administra Stock puede anular movimientos de otros o de hace más de 7 días');
+              throw new Error('solo quien administra ' + mod + ' puede anular movimientos de otros o de hace más de 7 días');
             }
             const motivo = texto_(op.motivo, 200);
             ref.anulado = true;
@@ -669,21 +759,39 @@ function marcarNuevaAnulada_(nuevas, id, quien, motivo) {
   nuevas.forEach((f) => { if (f[0] === id) { f[15] = true; f[16] = quien + (motivo ? ': ' + motivo : ''); } });
 }
 
-function validarMov_(op, u, insumos, destinos, hoy) {
+function validarMov_(op, u, insumos, destinos, hoy, maquinas) {
   const tipo = TIPOS_MOV.indexOf(op.clase) === -1 ? null : op.clase;
   if (!tipo) throw new Error('tipo de movimiento inválido');
-  if (tipo === 'Conteo' && nivel_(u, 'Stock') < NIVELES.ADMINISTRAR) throw new Error('solo quien administra Stock carga conteos');
   const fecha = String(op.fecha || '');
   if (!esFecha_(fecha)) throw new Error('fecha inválida');
   if (fecha > sumarDias_(hoy, 1)) throw new Error('fecha futura');
   const ins = insumos[texto_(op.insumo, 60)];
   if (!ins) throw new Error('insumo desconocido: ' + op.insumo);
+  const comb = ins.modulo === 'Combustible';
+  if (tipo === 'Conteo' && nivel_(u, ins.modulo) < NIVELES.ADMINISTRAR) throw new Error('solo quien administra ' + ins.modulo + ' carga conteos');
+  if (comb && fecha < COMBUSTIBLE_DESDE) throw new Error('el registro de combustible arranca el ' + ddmmaaaa_(COMBUSTIBLE_DESDE));
   const cantidad = Number(op.cantidad);
   if (!isFinite(cantidad) || cantidad < 0 || (tipo !== 'Conteo' && cantidad === 0)) throw new Error('cantidad inválida');
   const estancia = ins.porEstancia ? String(op.estancia || '') : '';
   if (ins.porEstancia && ESTANCIAS.indexOf(estancia) === -1) throw new Error('falta elegir la estancia (' + ins.nombre + ' lleva stock por estancia)');
-  const destino = tipo === 'Consumo' ? texto_(op.destino, 60) : '';
-  if (destino && !destinos[destino]) throw new Error('destino desconocido: ' + destino);
+  let destino = tipo === 'Consumo' ? texto_(op.destino, 60) : '';
+  let maquina = '', equipo = '', trabajo = '', finca = '';
+  if (comb && tipo === 'Consumo') {
+    // Combustible: el consumo va a una máquina (o a otro destino escrito a mano).
+    maquina = texto_(op.maquina, 30);
+    if (maquina === OTRO_DESTINO) {
+      if (!destino) throw new Error('escribí el destino del combustible');
+    } else {
+      const q = (maquinas || {})[maquina];
+      if (!q) throw new Error('elegí la máquina');
+      if (q.combustible && q.combustible !== ins.nombre) throw new Error(q.nombre + ' usa ' + q.combustible.toLowerCase() + ', no ' + ins.nombre.toLowerCase());
+      destino = q.nombre;
+      if (q.agrupa) equipo = texto_(op.equipo, 60);
+      trabajo = texto_(op.trabajo, 60);
+      if (q.pideTrabajo && !trabajo) throw new Error('en los tractores hay que cargar el trabajo que se hizo');
+    }
+    finca = ESTANCIAS.indexOf(String(op.finca || '')) !== -1 ? String(op.finca) : '';
+  } else if (destino && !destinos[destino]) throw new Error('destino desconocido: ' + destino);
   return {
     tipo, fecha, insumo: ins.nombre, estancia, cantidad, unidad: ins.unidad,
     kg: ins.kgUnidad ? Math.round(cantidad * ins.kgUnidad * 1000) / 1000 : (ins.unidad === 'kg' ? cantidad : null),
@@ -692,6 +800,7 @@ function validarMov_(op, u, insumos, destinos, hoy) {
     remito: tipo === 'Ingreso' && !ins.propia ? texto_(op.remito, 40) : '',
     factura: tipo === 'Ingreso' && !ins.propia ? texto_(op.factura, 60) : '',
     nota: texto_(op.nota, 200),
+    maquina, equipo, trabajo, finca,
   };
 }
 
@@ -787,16 +896,19 @@ function datos_(body) {
   const u = usuarioDe_(ss, body.pin);
   const desde = esFecha_(body.desde) ? body.desde : '0000-00-00';
   const r = { ok: true, usuario: publico_(u) };
-  if (nivel_(u, 'Stock') >= NIVELES.VER) {
-    const movs = leerMovimientos_(ss);
-    const insumos = leerInsumos_(ss);
+  const mods = ['Stock', 'Combustible'].filter((m) => nivel_(u, m) >= NIVELES.VER);
+  if (mods.length) {
+    const insumos = leerInsumos_(ss).filter((i) => mods.indexOf(i.modulo) !== -1);
+    const deModulo = {};
+    insumos.forEach((i) => { deModulo[i.nombre] = true; });
+    const movs = leerMovimientos_(ss).filter((m) => deModulo[m.insumo]);
     const saldos = calcularStock_(insumos, movs);
     const propias = {};
     insumos.forEach((i) => { if (i.propia) propias[i.nombre] = true; });
     r.stock = {
       insumos,
       destinos: leerDestinos_(ss),
-      saldos: Object.keys(saldos).map((k) => saldos[k]),
+      saldos: Object.keys(saldos).map((k) => saldos[k]).filter((x) => deModulo[x.insumo]),
       movimientos: movs.filter((m) => m.fecha >= desde || (m.tipo === 'Ingreso' && !m.factura && !m.anulado && !propias[m.insumo]))
         .map((m) => {
           const x = Object.assign({}, m);
@@ -805,6 +917,10 @@ function datos_(body) {
         }),
       proveedores: movs.map((m) => m.proveedor).filter((p, i, a) => p && a.indexOf(p) === i).sort(),
     };
+    if (mods.indexOf('Combustible') !== -1) {
+      r.stock.maquinas = leerMaquinas_(ss).filter((q) => q.activo);
+      r.stock.trabajos = leerTrabajos_(ss);
+    }
   }
   if (u.configura) r.tapfeedDias = diasTapfeed_(ss).filter((f) => f >= desde);
   if (nivel_(u, 'Lluvias') >= NIVELES.VER) r.lluvias = datosLluvias_(desde);

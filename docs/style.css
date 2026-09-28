@@ -319,3 +319,4 @@ label.btn { text-align: center; cursor: pointer; }
 .leyenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 .leyenda i.mes { background: #7cc4a0; } .leyenda i.temporada { background: var(--azul); } .leyenda i.anio { background: #8fb9e6; }
 .barra-relleno.anterior { background: #1d3f7a; }     /* temporada anterior: azul oscuro */
+.modulo.combustible { border-left-color: #d9790a; }

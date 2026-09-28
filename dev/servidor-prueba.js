@@ -4,7 +4,7 @@
 //
 //   node dev/servidor-prueba.js [puerto]
 //
-// Usuarios de prueba: PIN 1111 = Enrique (administra todo), 2222 = Osmar, 3333 = Ver
+// HOY=AAAA-MM-DD simula la fecha del script. Usuarios de prueba: PIN 1111 = Enrique (administra todo), 2222 = Osmar, 3333 = Ver
 // (solo mira stock y lluvias).
 // GET /_hojas -> muestra el contenido de las hojas simuladas (JSON).
 const http = require('http');
@@ -132,6 +132,12 @@ const contexto = {
   },
   console,
 };
+// HOY=2026-10-02 simula esa fecha en el script (para probar lo que arranca más adelante).
+if (process.env.HOY) {
+  const RealDate = Date;
+  const falsa = new RealDate(process.env.HOY + 'T12:00:00-03:00').getTime();
+  contexto.Date = class extends RealDate { constructor(...a) { if (a.length) super(...a); else super(falsa); } static now() { return falsa; } };
+}
 const propiedades = {};
 const pdfsGuardados = [];
 let cargaImportada = false;

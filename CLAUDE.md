@@ -124,6 +124,16 @@ renombrados "VIEJO - NO USAR…"; la conexión no puede editar el texto de un do
   lo importa solo en doGet y lo renombra "(importado)". Los datos no van al repo (es público).
 - El script necesita el permiso de Drive (scope drive): tras agregarlo, el dueño reautoriza abriendo /exec.
 
+## Tercer módulo: Combustible (desde 01/10/2026, reemplaza al de ZehirutApp)
+
+Mismo motor y mismo recorrido que Stock: los insumos Nafta y Diesel (litro) tienen Módulo = "Combustible"
+(columna nueva en Insumos) y los permisos son los de la columna Combustible de Usuarios. Consumo: Máquina
+(hoja Máquinas = Bienes de Uso de las facturas, filtradas por combustible; u "Otro destino" con texto),
+"¿Cuál?" si la máquina agrupa (Motos, Motosierras…), Trabajo (hoja Trabajos; obligatorio si "Pide
+trabajo" = tractores), Estancia opcional (columna Finca). Columnas nuevas en Movimientos: Máquina, Equipo,
+Trabajo, Finca. No se migró nada de ZehirutApp (arranca en cero el 01/10; stock inicial con Conteo).
+Configurar (insumos de Stock) no toca los de Combustible. Sin Excel propio (la app solo registra).
+
 ## Segundo módulo: Lluvias
 
 Una sola pantalla (sin pestañas): el día (‹ › entre días con lluvia; ambas estancias con barras),

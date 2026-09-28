@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.6.2';
+const VERSION = '1.7.0';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -43,6 +43,7 @@ function guardarTodo() {
 // Estado de pantalla (no se guarda, salvo lo que conviene recordar entre aperturas).
 const ui = {
   pantalla: 'inicio',
+  modStock: 'Stock',    // módulo que se está viendo con el recorrido de stock: Stock | Combustible
   vistaStock: 'lista',  // lista | ficha | form | sinFactura | config
   insumoVer: null,      // insumo de la ficha abierta
   movsVisibles: 15,
@@ -288,6 +289,7 @@ function movimientos() {
       const m = {
         id: op.id, fecha: op.fecha, tipo: op.clase, insumo: op.insumo, estancia: op.estancia || '', cantidad: op.cantidad, unidad: ins.unidad || '',
         kg: ins.kgUnidad ? op.cantidad * ins.kgUnidad : null, destino: op.destino || '', proveedor: op.proveedor || '',
+        maquina: op.maquina || '', equipo: op.equipo || '', trabajo: op.trabajo || '', finca: op.finca || '',
         remito: op.remito || '', factura: op.factura || '', nota: op.nota || '', usuario: op.usuario, anulado: false, ts: op.ts, pendiente: true,
       };
       lista.push(m);
@@ -309,6 +311,13 @@ const claveSaldo = (insumo, estancia) => (estancia ? insumo + '|' + estancia : i
 /** Insumo que se produce en la estancia (ej. Fardos): sus ingresos no llevan proveedor, remito ni factura. */
 const esPropio = (nombre) => !!(stockDatos().insumos.find((i) => i.nombre === nombre) || {}).propia;
 const esSinFactura = (m) => m.tipo === 'Ingreso' && !m.anulado && !m.factura && !esPropio(m.insumo);
+
+// Stock y Combustible usan el mismo recorrido; cada insumo dice a qué módulo pertenece.
+const moduloDe = (nombre) => (stockDatos().insumos.find((i) => i.nombre === nombre) || {}).modulo || 'Stock';
+const insumosMod = () => stockDatos().insumos.filter((i) => (i.modulo || 'Stock') === ui.modStock);
+const esCombustible = () => ui.modStock === 'Combustible';
+const COMBUSTIBLE_DESDE = '2026-10-01';
+const OTRO_DESTINO = 'OTRO';
 
 /** Saldo de cada insumo (y estancia): el que calculó Google, corregido con lo que está en la cola. */
 function saldos() {
@@ -462,7 +471,7 @@ function htmlInicio() {
   const mods = [];
   if (puede('Stock', 'VER')) {
     const s = saldos();
-    const ins = stockDatos().insumos.filter((i) => i.activo);
+    const ins = stockDatos().insumos.filter((i) => i.activo && (i.modulo || 'Stock') === 'Stock');
     const bajos = ins.filter((i) => i.minimo != null && (i.porEstancia ? ESTANCIAS.map(([e]) => claveSaldo(i.nombre, e)) : [i.nombre])
       .some((k) => s[k] && s[k].cantidad < i.minimo)).length;
     mods.push('<button class="modulo" data-a="ir" data-p="stock"><span class="ico">📦</span><span><b>Stock de insumos</b><small>' +
@@ -474,7 +483,12 @@ function htmlInicio() {
     mods.push('<button class="modulo lluvias" data-a="ir" data-p="lluvias"><span class="ico">🌧️</span><span><b>Lluvias</b><small>' +
       (ult ? 'Último registro: ' + fechaTxt(ult) : 'Registro de lluvias por sector') + '</small></span></button>');
   }
-  const pronto = ['Combustible', 'Facturas', 'Fondo fijo'].filter((m) => puede(m, 'VER'));
+  if (puede('Combustible', 'VER')) {
+    const s = saldos();
+    const txt = ['Nafta', 'Diesel'].map((n) => n + ' ' + num((s[n] || {}).cantidad || 0, 0) + ' L').join(' · ');
+    mods.push('<button class="modulo combustible" data-a="ir" data-p="stock" data-m="Combustible"><span class="ico">⛽</span><span><b>Combustible</b><small>' + txt + '</small></span></button>');
+  }
+  const pronto = ['Facturas', 'Fondo fijo'].filter((m) => puede(m, 'VER'));
   pronto.forEach((m) => {
     mods.push('<div class="modulo pronto"><span class="ico">' + ({ Combustible: '⛽', Facturas: '🧾', 'Fondo fijo': '💵' }[m]) +
       '</span><span><b>' + m + '</b><small>Próximamente (por ahora en ZehirutApp)</small></span></div>');
@@ -497,9 +511,9 @@ function htmlStock() {
   const i = ui.insumoVer && stockDatos().insumos.find((x) => x.nombre === ui.insumoVer);
   if ((ui.vistaStock === 'ficha' || ui.vistaStock === 'form') && !i) ui.vistaStock = 'lista';
   if (ui.vistaStock === 'form' && !(ui.form && ui.form.clase)) ui.vistaStock = 'ficha';
-  if ((ui.vistaStock === 'config' || ui.vistaStock === 'tapfeed') && !sesion.configura) ui.vistaStock = 'lista';
+  if ((ui.vistaStock === 'config' || ui.vistaStock === 'tapfeed') && (!sesion.configura || esCombustible())) ui.vistaStock = 'lista';
   const vistas = {
-    lista: ['Stock de insumos', htmlSaldo],
+    lista: [esCombustible() ? 'Combustible' : 'Stock de insumos', htmlSaldo],
     ficha: [ui.insumoVer, () => htmlFicha(ui.insumoVer)],
     form: [ui.form ? (ui.form.corrige ? 'Corregir ' + ui.form.clase.toLowerCase() : ui.form.clase) + ' · ' + ui.form.insumo : '', htmlCargar],
     sinFactura: ['Ingresos sin factura', htmlSinFactura],
@@ -539,8 +553,8 @@ function infoInsumo(i, s, c7, estancia) {
 function htmlSaldo() {
   const s = saldos();
   const c7 = consumo7();
-  const ins = stockDatos().insumos.filter((i) => i.activo || (s[i.nombre] && s[i.nombre].cantidad));
-  const sinFactura = movimientos().filter(esSinFactura).length;
+  const ins = insumosMod().filter((i) => i.activo || (s[i.nombre] && s[i.nombre].cantidad));
+  const sinFactura = movimientos().filter((m) => esSinFactura(m) && moduloDe(m.insumo) === ui.modStock).length;
   return (sinFactura ? '<button class="aviso amarillo aviso-btn" data-a="vista" data-v="sinFactura">🧾 Hay <b>' + sinFactura +
     (sinFactura === 1 ? ' ingreso' : ' ingresos') + ' sin factura</b>. Tocá para verlos.</button>' : '') +
     (ins.length ? '<div class="saldos">' + ins.map((i) => {
@@ -566,7 +580,7 @@ function htmlSaldo() {
         (!n.x.ultimoConteo ? '<br><span class="chip">Sin conteo inicial</span>' : '') +
         '</div></button>';
     }).join('') + '</div>' : '<p class="vacio">Todavía no hay insumos cargados.</p>') +
-    (sesion.configura ? '<div class="pie-stock"><button class="btn sec chico" data-a="vista" data-v="tapfeed">📄 Subir informe Tapfeed</button>' +
+    (sesion.configura && !esCombustible() ? '<div class="pie-stock"><button class="btn sec chico" data-a="vista" data-v="tapfeed">📄 Subir informe Tapfeed</button>' +
       '<button class="btn sec chico" data-a="vista" data-v="config">⚙ Configurar insumos y corrales</button></div>' : '');
 }
 
@@ -593,9 +607,9 @@ function htmlFicha(nombre) {
   const c7 = consumo7();
   const movs = movimientos().filter((m) => m.insumo === nombre);
   const botones = [];
-  if (puede('Stock', 'CARGAR') && i.activo) {
+  if (puede(ui.modStock, 'CARGAR') && i.activo) {
     botones.push(['Consumo', 'consumo', '⬆ Consumo'], ['Ingreso', 'ingreso', '⬇ Ingreso']);
-    if (puede('Stock', 'ADMINISTRAR')) botones.push(['Conteo', 'conteo', '✔ Conteo']);
+    if (puede(ui.modStock, 'ADMINISTRAR')) botones.push(['Conteo', 'conteo', '✔ Conteo']);
   }
   let cajas;
   if (i.porEstancia) {
@@ -622,7 +636,7 @@ function htmlFicha(nombre) {
 }
 
 function htmlSinFactura() {
-  const movs = movimientos().filter(esSinFactura);
+  const movs = movimientos().filter((m) => esSinFactura(m) && moduloDe(m.insumo) === ui.modStock);
   if (!movs.length) return '<p class="vacio">No hay ingresos sin factura. 👍</p>';
   return '<div class="form"><div class="aviso">Tocá un ingreso para asociarle la factura cuando llegue.</div>' +
     movs.map((m) => htmlMov(m)).join('') + '</div>';
@@ -630,7 +644,9 @@ function htmlSinFactura() {
 
 function nuevoForm(clase, insumo) {
   const prev = ui.form || {};
-  return { clase, insumo, estancia: '', fecha: prev.fecha || hoyISO(), cantidad: '', destino: '', proveedor: '', remito: '', factura: '', nota: '' };
+  const fecha = prev.fecha || hoyISO();
+  return { clase, insumo, estancia: '', fecha: esCombustible() && fecha < COMBUSTIBLE_DESDE ? hoyISO() : fecha, cantidad: '', destino: '',
+    proveedor: '', remito: '', factura: '', nota: '', maquina: '', equipo: '', trabajo: '', finca: '' };
 }
 
 /** Formulario de un solo tipo de carga para el insumo de la ficha (ya elegidos). */
@@ -654,14 +670,17 @@ function htmlCargar() {
   h += '<div class="campo"><span class="etq">Fecha</span><div class="fecha-fila">' +
     '<button class="nav" data-a="fecha" data-d="-1" aria-label="Día anterior">‹</button>' +
     '<label class="fecha">' + fechaTxt(f.fecha, true) + (rel ? '<span class="hoy">' + rel + '</span>' : '') +
-    '<input type="date" id="f-fecha" value="' + f.fecha + '" max="' + hoyISO() + '"></label>' +
+    '<input type="date" id="f-fecha" value="' + f.fecha + '" max="' + hoyISO() + '"' + (esCombustible() ? ' min="' + COMBUSTIBLE_DESDE + '"' : '') + '></label>' +
     '<button class="nav" data-a="fecha" data-d="1" aria-label="Día siguiente"' + (f.fecha >= hoyISO() ? ' disabled' : '') + '>›</button></div></div>';
+  if (esCombustible() && hoyISO() < COMBUSTIBLE_DESDE) h += '<div class="aviso amarillo">El registro de combustible arranca el 1° de octubre.</div>';
   h += '<div class="campo"><span class="etq">' + (f.clase === 'Conteo' ? 'Cantidad contada' : 'Cantidad') + ' <small>(en ' + esc(unidadTxt(ins.unidad, 2)) + ')</small></span>' +
     '<div class="cantidad"><button data-a="mas" data-d="-1" aria-label="Menos">−</button>' +
     '<input id="f-cantidad" inputmode="decimal" autocomplete="off" value="' + esc(f.cantidad) + '" placeholder="0">' +
     '<button data-a="mas" data-d="1" aria-label="Más">+</button></div>' +
     '<div class="equivale" id="f-equivale">' + equivale() + '</div></div>';
-  if (f.clase === 'Consumo') {
+  if (f.clase === 'Consumo' && esCombustible()) {
+    h += htmlCamposMaquina(f, s);
+  } else if (f.clase === 'Consumo') {
     const dest = s.destinos.filter((d) => d.activo);
     h += '<div class="campo"><label for="f-destino">Destino <small>(opcional)</small></label><select class="txt grande" id="f-destino">' +
       '<option value="">Sin destino</option>' +
@@ -682,6 +701,32 @@ function htmlCargar() {
   return h;
 }
 
+/** Consumo de combustible: a qué máquina (de las que usan ese combustible) u otro destino, el
+ *  equipo (Motos, Motosierras...), el trabajo (obligatorio en tractores) y la estancia. */
+function htmlCamposMaquina(f, s) {
+  const maqs = (s.maquinas || []).filter((q) => !q.combustible || q.combustible === f.insumo);
+  const q = maqs.find((x) => x.codigo === f.maquina);
+  let h = '<div class="campo"><label for="f-maquina">Máquina</label><select class="txt grande" id="f-maquina">' +
+    '<option value="">Elegí la máquina…</option>' +
+    maqs.map((x) => '<option value="' + esc(x.codigo) + '"' + (f.maquina === x.codigo ? ' selected' : '') + '>' + esc(x.nombre) + '</option>').join('') +
+    '<option value="' + OTRO_DESTINO + '"' + (f.maquina === OTRO_DESTINO ? ' selected' : '') + '>Otro destino (taller, entrega, contratista…)</option></select></div>';
+  if (f.maquina === OTRO_DESTINO) {
+    h += '<div class="campo"><label for="f-destinoTxt">¿A dónde fue?</label><input class="txt" id="f-destinoTxt" value="' + esc(f.destino) + '"></div>';
+  }
+  if (q && q.agrupa) {
+    h += '<div class="campo"><label for="f-equipo">¿Cuál? <small>(opcional)</small></label><input class="txt" id="f-equipo" list="lista-equipos" value="' + esc(f.equipo) + '" autocomplete="off">' +
+      '<datalist id="lista-equipos">' + (q.equipos || []).map((e) => '<option value="' + esc(e) + '">').join('') + '</datalist></div>';
+  }
+  if (q) {
+    h += '<div class="campo"><label for="f-trabajo">Trabajo ' + (q.pideTrabajo ? '' : '<small>(opcional)</small>') + '</label>' +
+      '<input class="txt" id="f-trabajo" list="lista-trabajos" value="' + esc(f.trabajo) + '" autocomplete="off">' +
+      '<datalist id="lista-trabajos">' + (s.trabajos || []).map((t) => '<option value="' + esc(t) + '">').join('') + '</datalist></div>';
+  }
+  h += '<div class="campo"><span class="etq">Estancia <small>(opcional)</small></span><div class="segmento">' + ESTANCIAS.map(([e, nom]) =>
+    '<button class="neutro' + (f.finca === e ? ' activo' : '') + '" data-a="finca-comb" data-e="' + e + '">' + nom + '</button>').join('') + '</div></div>';
+  return h;
+}
+
 function equivale() {
   const f = ui.form;
   if (!f) return '';
@@ -695,10 +740,12 @@ function equivale() {
 function leerCamposForm() {
   const f = ui.form;
   if (!f || ui.vistaStock !== 'form') return;
-  ['cantidad', 'proveedor', 'remito', 'factura', 'nota', 'destino'].forEach((k) => {
+  ['cantidad', 'proveedor', 'remito', 'factura', 'nota', 'destino', 'maquina', 'equipo', 'trabajo'].forEach((k) => {
     const el = $('#f-' + k);
     if (el) f[k] = el.value;
   });
+  const otro = $('#f-destinoTxt');
+  if (otro) f.destino = otro.value;
 }
 
 async function guardarMov() {
@@ -709,6 +756,14 @@ async function guardarMov() {
   if (f.fecha > hoyISO()) { toast('La fecha no puede ser futura.', 3000); return; }
   const ins = stockDatos().insumos.find((i) => i.nombre === f.insumo);
   if (ins.porEstancia && !f.estancia) { toast('Elegí la estancia: La Prudencia o La Paciencia.', 3000); return; }
+  const comb = (ins.modulo || 'Stock') === 'Combustible';
+  if (comb && f.fecha < COMBUSTIBLE_DESDE) { toast('El registro de combustible arranca el 1° de octubre.', 3500); return; }
+  if (comb && f.clase === 'Consumo') {
+    const q = (stockDatos().maquinas || []).find((x) => x.codigo === f.maquina);
+    if (!f.maquina) { toast('Elegí la máquina.', 3000); return; }
+    if (f.maquina === OTRO_DESTINO && !String(f.destino).trim()) { toast('Escribí a dónde fue el combustible.', 3000); return; }
+    if (q && q.pideTrabajo && !String(f.trabajo).trim()) { toast('En los tractores hay que cargar el trabajo.', 3000); return; }
+  }
   // Cantidades que suelen ser un error de tipeo: se confirma antes de guardar.
   const saldo = (saldos()[claveSaldo(f.insumo, f.estancia)] || {}).cantidad || 0;
   if (f.clase === 'Consumo' && cantidad > saldo && saldo >= 0) {
@@ -721,7 +776,17 @@ async function guardarMov() {
   }
   const op = { tipo: 'mov', clase: f.clase, fecha: f.fecha, insumo: f.insumo, cantidad };
   if (ins.porEstancia) op.estancia = f.estancia;
-  if (f.clase === 'Consumo' && f.destino) op.destino = f.destino;
+  if (comb && f.clase === 'Consumo') {
+    op.maquina = f.maquina;
+    if (f.maquina === OTRO_DESTINO) op.destino = String(f.destino).trim();
+    else {
+      const q = (stockDatos().maquinas || []).find((x) => x.codigo === f.maquina) || {};
+      op.destino = q.nombre || '';
+      if (q.agrupa && String(f.equipo).trim()) op.equipo = String(f.equipo).trim();
+      if (String(f.trabajo).trim()) op.trabajo = String(f.trabajo).trim();
+    }
+    if (f.finca) op.finca = f.finca;
+  } else if (f.clase === 'Consumo' && f.destino) op.destino = f.destino;
   if (f.clase === 'Ingreso' && !ins.propia) { op.proveedor = f.proveedor.trim(); op.remito = f.remito.trim(); op.factura = f.factura.trim(); }
   if (f.nota.trim()) op.nota = f.nota.trim();
   if (f.corrige) {
@@ -750,7 +815,7 @@ function htmlMov(m, conFecha) {
   const ico = { Consumo: '⬆', Ingreso: '⬇', Conteo: '✔' }[m.tipo] || '•';
   const extra = [];
   if (m.estancia) extra.push('<span class="chip azul">' + esc(nombreEstancia(m.estancia).replace('La ', '')) + '</span>');
-  if (m.tipo === 'Consumo') extra.push(m.destino || 'sin destino');
+  if (m.tipo === 'Consumo') extra.push((m.destino || 'sin destino') + (m.equipo ? ' ' + m.equipo : '') + (m.trabajo ? ' · ' + m.trabajo : ''));
   if (m.tipo === 'Ingreso') {
     if (esPropio(m.insumo)) extra.push('producción propia');
     else {
@@ -775,20 +840,23 @@ async function verMov(id) {
   if (m.estancia) filas.push(['Estancia', nombreEstancia(m.estancia)]);
   filas.push(
     ['Cantidad', num(m.cantidad) + ' ' + unidadTxt(m.unidad, m.cantidad) + (m.kg != null && m.unidad !== 'kg' ? ' (' + num(m.kg) + ' kg)' : '')]);
-  if (m.tipo === 'Consumo') filas.push(['Destino', m.destino || 'Sin destino']);
+  if (m.tipo === 'Consumo') filas.push([m.maquina ? 'Máquina' : 'Destino', (m.destino || 'Sin destino') + (m.equipo ? ' (' + m.equipo + ')' : '')]);
+  if (m.trabajo) filas.push(['Trabajo', m.trabajo]);
+  if (m.finca) filas.push(['Estancia', nombreEstancia(m.finca)]);
   if (m.tipo === 'Ingreso' && !esPropio(m.insumo)) {
     filas.push(['Proveedor', m.proveedor || '—'], ['Remito', m.remito || '—'], ['Factura', m.factura || 'Sin factura']);
   }
   if (m.nota) filas.push(['Nota', m.nota]);
   filas.push(['Cargado por', m.usuario + (m.pendiente ? ' (sin enviar)' : '')]);
   if (m.anulado) filas.push(['Anulado', m.anuladoPor || 'sí']);
-  const admin = puede('Stock', 'ADMINISTRAR');
+  const mod = moduloDe(m.insumo);
+  const admin = puede(mod, 'ADMINISTRAR');
   // Quien carga corrige/anula lo suyo de los últimos 7 días; quien administra, cualquier cosa.
   // Un conteo solo lo corrige quien administra (es quien puede cargarlo).
-  const puedeAnular = !m.anulado && puede('Stock', 'CARGAR') &&
+  const puedeAnular = !m.anulado && puede(mod, 'CARGAR') &&
     (admin || (m.usuario === sesion.nombre && m.fecha >= sumarDias(hoyISO(), -7)));
   const puedeCorregir = puedeAnular && (m.tipo !== 'Conteo' || admin);
-  const puedeFactura = !m.anulado && m.tipo === 'Ingreso' && !esPropio(m.insumo) && puede('Stock', 'CARGAR');
+  const puedeFactura = !m.anulado && m.tipo === 'Ingreso' && !esPropio(m.insumo) && puede(mod, 'CARGAR');
   const acciones = [];
   if (puedeCorregir) acciones.push({ id: 'corregir', texto: '✏️ Corregir', cls: '' });
   if (puedeFactura) acciones.push({ id: 'factura', texto: m.factura ? '🧾 Cambiar factura' : '🧾 Asociar factura', cls: 'ingreso' });
@@ -805,9 +873,11 @@ async function verMov(id) {
       clase: m.tipo, insumo: m.insumo, estancia: m.estancia || '', fecha: m.fecha,
       cantidad: String(m.cantidad).replace('.', ','), destino: m.destino || '', proveedor: m.proveedor || '',
       remito: m.remito || '', factura: m.factura || '', nota: m.nota || '', corrige: m.id,
+      maquina: m.maquina || '', equipo: m.equipo || '', trabajo: m.trabajo || '', finca: m.finca || '',
     };
     ui.insumoVer = m.insumo;
     ui.pantalla = 'stock';
+    ui.modStock = mod;
     ui.vistaStock = 'form';
     render();
     window.scrollTo(0, 0);
@@ -1270,6 +1340,8 @@ function despuesDeRender() {
   });
   const tfa = $('#tf-archivo');
   if (tfa) tfa.addEventListener('change', () => { if (tfa.files[0]) tfLeer(tfa.files[0]); });
+  const fmaq = $('#f-maquina');
+  if (fmaq) fmaq.addEventListener('change', () => { leerCamposForm(); ui.form.maquina = fmaq.value; ui.form.equipo = ''; render(); });
   const fdes = $('#f-destino');
   if (fdes) fdes.addEventListener('change', () => { ui.form.destino = fdes.value; });
   const ff = $('#f-fecha');
@@ -1300,6 +1372,7 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'ir':
+      if (b.dataset.p === 'stock') ui.modStock = b.dataset.m || 'Stock';
       // La flecha de Stock vuelve un paso (formulario → ficha → tarjetas → inicio).
       if (ui.pantalla === 'stock' && b.dataset.p === 'inicio') { atrasStock(); break; }
       if (ui.pantalla === 'lluvias' && ui.vistaLluvia === 'cargar' && b.dataset.p === 'inicio') { ui.vistaLluvia = 'dia'; ui.lluvia = null; render(); break; }
@@ -1337,6 +1410,7 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'estancia': leerCamposForm(); ui.form.estancia = b.dataset.e; render(); break;
+    case 'finca-comb': leerCamposForm(); ui.form.finca = ui.form.finca === b.dataset.e ? '' : b.dataset.e; render(); break;
     case 'mas': {
       leerCamposForm();
       const n = leerNumero(ui.form.cantidad);
