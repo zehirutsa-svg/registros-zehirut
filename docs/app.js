@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.4.2';
+const VERSION = '1.5.0';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -46,6 +46,7 @@ const ui = {
   vistaStock: 'lista',  // lista | ficha | form | sinFactura | config
   insumoVer: null,      // insumo de la ficha abierta
   movsVisibles: 15,
+  tf: null,             // informe de Tapfeed en lectura / vista previa
   tabLluvias: 'cargar',
   pin: '',
   errorPin: '',
@@ -495,13 +496,14 @@ function htmlStock() {
   const i = ui.insumoVer && stockDatos().insumos.find((x) => x.nombre === ui.insumoVer);
   if ((ui.vistaStock === 'ficha' || ui.vistaStock === 'form') && !i) ui.vistaStock = 'lista';
   if (ui.vistaStock === 'form' && !(ui.form && ui.form.clase)) ui.vistaStock = 'ficha';
-  if (ui.vistaStock === 'config' && !sesion.configura) ui.vistaStock = 'lista';
+  if ((ui.vistaStock === 'config' || ui.vistaStock === 'tapfeed') && !sesion.configura) ui.vistaStock = 'lista';
   const vistas = {
     lista: ['Stock de insumos', htmlSaldo],
     ficha: [ui.insumoVer, () => htmlFicha(ui.insumoVer)],
     form: [ui.form ? (ui.form.corrige ? 'Corregir ' + ui.form.clase.toLowerCase() : ui.form.clase) + ' · ' + ui.form.insumo : '', htmlCargar],
     sinFactura: ['Ingresos sin factura', htmlSinFactura],
     config: ['Configurar', htmlConfig],
+    tapfeed: ['Informe Tapfeed', htmlTapfeed],
   };
   const [titulo, fn] = vistas[ui.vistaStock] || vistas.lista;
   return barra(titulo, true) + '<div class="contenido">' + fn() + '</div>';
@@ -512,7 +514,7 @@ function atrasStock() {
   leerCamposForm();
   const v = ui.vistaStock;
   if (v === 'form') ui.vistaStock = 'ficha';
-  else if (v === 'ficha' || v === 'sinFactura' || v === 'config') { ui.vistaStock = 'lista'; ui.insumoVer = null; ui.cfg = null; }
+  else if (v === 'ficha' || v === 'sinFactura' || v === 'config' || v === 'tapfeed') { ui.vistaStock = 'lista'; ui.insumoVer = null; ui.cfg = null; ui.tf = null; }
   else ui.pantalla = 'inicio';
   render();
   window.scrollTo(0, 0);
@@ -563,7 +565,8 @@ function htmlSaldo() {
         (!n.x.ultimoConteo ? '<br><span class="chip">Sin conteo inicial</span>' : '') +
         '</div></button>';
     }).join('') + '</div>' : '<p class="vacio">Todavía no hay insumos cargados.</p>') +
-    (sesion.configura ? '<div style="text-align:center;margin-top:22px"><button class="btn sec chico" data-a="vista" data-v="config">⚙ Configurar insumos y corrales</button></div>' : '');
+    (sesion.configura ? '<div class="pie-stock"><button class="btn sec chico" data-a="vista" data-v="tapfeed">📄 Subir informe Tapfeed</button>' +
+      '<button class="btn sec chico" data-a="vista" data-v="config">⚙ Configurar insumos y corrales</button></div>' : '');
 }
 
 /** Ficha de un insumo: saldo, cómo viene el consumo, botones para cargar y sus movimientos. */
@@ -827,6 +830,171 @@ async function verMov(id) {
   }
 }
 
+// ---------------------------------------------------------------- lector del PDF de Tapfeed
+// "Uso de ingredientes por grupo": se lee en el teléfono/PC con pdf.js (se baja solo la
+// primera vez que se usa). Arma las líneas del PDF juntando los textos que están a la misma
+// altura, y de ahí saca el período, cada corral (con sus cabezas) y los kg de cada ingrediente.
+const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+
+function cargarPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  return new Promise((ok, mal) => {
+    const s = document.createElement('script');
+    s.src = PDFJS + 'pdf.min.js';
+    s.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js'; ok(window.pdfjsLib); };
+    s.onerror = () => mal(new Error('no se pudo bajar el lector de PDF (¿hay señal?)'));
+    document.head.appendChild(s);
+  });
+}
+
+async function lineasPdf(buffer) {
+  const pdfjs = await cargarPdfJs();
+  const doc = await pdfjs.getDocument({ data: buffer }).promise;
+  const lineas = [];
+  for (let p = 1; p <= doc.numPages; p++) {
+    const contenido = await (await doc.getPage(p)).getTextContent();
+    const filas = [];
+    contenido.items.forEach((it) => {
+      if (!it.str.trim()) return;
+      const y = it.transform[5];
+      let f = filas.find((x) => Math.abs(x.y - y) < 2.5);
+      if (!f) { f = { y, items: [] }; filas.push(f); }
+      f.items.push({ x: it.transform[4], s: it.str.trim() });
+    });
+    filas.sort((a, b) => b.y - a.y).forEach((f) => lineas.push(f.items.sort((a, b) => a.x - b.x).map((i) => i.s).join(' ')));
+  }
+  return lineas;
+}
+
+const numTapfeed = (s) => Number(String(s).replace(/,/g, ''));
+
+/** { desde, hasta (AAAA-MM-DD), corrales: [{ nombre, cabezas, items: [{ nombre, kg, ms }] }], total: [...] } */
+function interpretarTapfeed(lineas) {
+  const r = { desde: '', hasta: '', corrales: [], total: [] };
+  let grupo = null;
+  lineas.forEach((l) => {
+    const p = l.match(/Desde (\d{2})\/(\d{2})\/(\d{4}) a (\d{2})\/(\d{2})\/(\d{4})/);
+    if (p) { r.desde = p[3] + '-' + p[2] + '-' + p[1]; r.hasta = p[6] + '-' + p[5] + '-' + p[4]; return; }
+    const g = l.match(/^(.+?) \((\d*)\)$/);
+    if (g) {
+      if (/^TOTAL$/i.test(g[1].trim())) grupo = { total: true };
+      else { grupo = { nombre: g[1].trim(), cabezas: Number(g[2]) || 0, items: [] }; r.corrales.push(grupo); }
+      return;
+    }
+    const i = l.match(/^(.+?)\s+(-?[\d,]+\.\d+)\s+(-?[\d,]+\.\d+)\s+Kg\b/);
+    if (!i || !grupo || /^Total$/i.test(i[1].trim())) return;
+    const item = { nombre: i[1].trim(), kg: numTapfeed(i[2]), ms: numTapfeed(i[3]) };
+    if (grupo.total) r.total.push(item); else grupo.items.push(item);
+  });
+  return r;
+}
+
+/** Problemas que impiden cargar el informe (lista vacía = está bien). */
+function problemasTapfeed(r) {
+  const p = [];
+  if (!r.desde) p.push('no se encontró el período ("Desde … a …"). ¿Es el informe "Uso de ingredientes por grupo"?');
+  else if (r.desde !== r.hasta) p.push('el informe abarca varios días (' + fechaTxt(r.desde) + ' a ' + fechaTxt(r.hasta) + '). Exportalo de a un día.');
+  if (!r.corrales.length) p.push('no se encontró ningún corral.');
+  if (!r.total.length) p.push('no se encontró el TOTAL del informe.');
+  // Control: la suma de los corrales tiene que dar el total de cada ingrediente.
+  r.total.forEach((t) => {
+    const suma = r.corrales.reduce((a, c) => a + c.items.filter((x) => x.nombre === t.nombre).reduce((b, x) => b + x.kg, 0), 0);
+    if (Math.abs(suma - t.kg) > 1) p.push('la suma de los corrales de ' + t.nombre + ' (' + num(suma) + ' kg) no da el total (' + num(t.kg) + ' kg).');
+  });
+  return p;
+}
+
+// ------ subir informe de Tapfeed (solo quien configura; necesita señal)
+// El PDF se lee acá (lector de arriba); se muestra lo encontrado y al confirmar va al script,
+// que registra un consumo por ingrediente (destino Confinamiento) y guarda el PDF en Drive.
+function htmlTapfeed() {
+  const tf = ui.tf;
+  const dias = (datos && datos.tapfeedDias) || [];
+  let h = '<div class="form">';
+  if (!tf || tf.estado === 'error') {
+    if (tf && tf.estado === 'error') {
+      h += '<div class="aviso rojo-fondo"><b>No se puede cargar este PDF:</b><ul>' + tf.problemas.map((p) => '<li>' + esc(p) + '</li>').join('') + '</ul></div>';
+    }
+    h += '<div class="aviso">Elegí el PDF <b>"Uso de ingredientes por grupo"</b> de Tapfeed, de <b>un solo día</b>.</div>' +
+      '<label class="btn">📄 Elegir PDF de Tapfeed<input type="file" id="tf-archivo" accept="application/pdf,.pdf" hidden></label>';
+    if (dias.length) {
+      const ultimo = dias[dias.length - 1];
+      const faltan = [];
+      for (let f = dias[0]; f < sumarDias(hoyISO(), -1); f = sumarDias(f, 1)) if (dias.indexOf(f) === -1) faltan.push(f);
+      h += '<div class="tarjeta" style="margin-top:16px"><b>Último día cargado:</b> ' + fechaTxt(ultimo, true) +
+        (faltan.length ? '<br><span class="rojo"><b>Faltan:</b> ' + faltan.map((f) => fechaTxt(f)).join(', ') + '</span>' : '') + '</div>';
+    }
+    return h + '</div>';
+  }
+  if (tf.estado === 'leyendo' || tf.estado === 'enviando') {
+    return h + '<p class="vacio">' + (tf.estado === 'leyendo' ? 'Leyendo el PDF…' : 'Cargando en Google…') + '</p></div>';
+  }
+  // Vista previa de lo que se va a registrar.
+  const ins = stockDatos().insumos;
+  const cabezas = tf.r.corrales.reduce((a, c) => a + c.cabezas, 0);
+  const ya = dias.indexOf(tf.r.desde) !== -1;
+  h += '<div class="tarjeta"><div style="font-size:20px;font-weight:800">' + fechaTxt(tf.r.desde, true) + '</div>' +
+    '<div style="color:var(--gris)">' + tf.r.corrales.length + ' corrales · ' + num(cabezas, 0) + ' cabezas · ' + esc(tf.archivo.name) + '</div>' +
+    '<table class="detalle" style="margin-top:10px">' + tf.r.total.map((t) => {
+      const i = ins.find((x) => x.tapfeed && x.tapfeed.toUpperCase() === t.nombre.toUpperCase());
+      const cant = i && i.kgUnidad && i.unidad !== 'kg' ? ' = ' + num(t.kg / i.kgUnidad, 1) + ' ' + unidadTxt(i.unidad, 2) : '';
+      return '<tr><td>' + esc(i ? i.nombre : t.nombre) + '</td><td><b>' + num(t.kg, 0) + ' kg</b>' + esc(cant) + '</td></tr>';
+    }).join('') + '</table></div>';
+  if (ya) h += '<div class="aviso amarillo">Ese día <b>ya está cargado</b>. Si confirmás, se reemplaza por este informe.</div>';
+  h += '<div class="acciones"><button class="btn" data-a="tfConfirmar">' + (ya ? 'Reemplazar' : 'Confirmar y cargar') + '</button>' +
+    '<button class="btn sec" data-a="tfOtro">Elegir otro PDF</button></div></div>';
+  return h;
+}
+
+async function tfLeer(archivo) {
+  ui.tf = { estado: 'leyendo', archivo };
+  render();
+  try {
+    const buffer = await archivo.arrayBuffer();
+    const r = interpretarTapfeed(await lineasPdf(buffer.slice(0)));
+    const problemas = problemasTapfeed(r);
+    const ins = stockDatos().insumos;
+    r.total.forEach((t) => {
+      if (!ins.some((i) => i.tapfeed && i.tapfeed.toUpperCase() === t.nombre.toUpperCase())) {
+        problemas.push('"' + t.nombre + '" no corresponde a ningún insumo: poné ese nombre en la columna "Nombre en Tapfeed" de la hoja Insumos.');
+      }
+    });
+    if (r.desde && r.desde > hoyISO()) problemas.push('la fecha del informe es futura.');
+    ui.tf = problemas.length ? { estado: 'error', problemas } : { estado: 'listo', archivo, r, buffer };
+  } catch (e) {
+    ui.tf = { estado: 'error', problemas: ['no se pudo leer el PDF: ' + ((e && e.message) || e)] };
+  }
+  render();
+}
+
+async function tfConfirmar() {
+  const tf = ui.tf;
+  if (!navigator.onLine) { toast('Sin señal: para cargar el informe hace falta señal.', 3500); return; }
+  const ya = ((datos && datos.tapfeedDias) || []).indexOf(tf.r.desde) !== -1;
+  ui.tf = Object.assign({}, tf, { estado: 'enviando' });
+  render();
+  try {
+    let bin = '';
+    const bytes = new Uint8Array(tf.buffer);
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    // Una sola vez, sin reintento: si el primero llegó y se perdió la respuesta, un reintento
+    // vería el día como ya cargado y confundiría.
+    const r = await llamarUnaVez({
+      accion: 'tapfeed', pin: sesion.pin, reemplazar: ya, nombreArchivo: tf.archivo.name, pdf: btoa(bin),
+      datos: { fecha: tf.r.desde, corrales: tf.r.corrales, total: tf.r.total },
+    });
+    if (!r.ok) throw new Error(r.error || 'error del servidor');
+    if (r.yaCargado) throw new Error('ese día ya estaba cargado');
+    ui.tf = null;
+    toast('✓ Tapfeed del ' + fechaTxt(r.fecha) + ' cargado (' + r.consumos + ' consumos)', 3500);
+    await sincronizar();
+  } catch (e) {
+    ui.tf = Object.assign({}, tf, { estado: 'listo' });
+    render();
+    cartel({ icono: '⚠️', titulo: 'No se pudo cargar', html: '<p>' + esc((e && e.message) || e) + '</p><p>Revisá "Último día cargado" antes de volver a intentar.</p>', si: 'Entendido', no: '' });
+  }
+}
+
 // ------ configurar insumos y destinos (solo quien administra Stock; necesita señal)
 function htmlConfig() {
   const s = stockDatos();
@@ -982,6 +1150,8 @@ function despuesDeRender() {
     const el = $('#f-' + k);
     if (el) el.addEventListener('input', () => { ui.form[k] = el.value; });
   });
+  const tfa = $('#tf-archivo');
+  if (tfa) tfa.addEventListener('change', () => { if (tfa.files[0]) tfLeer(tfa.files[0]); });
   const fdes = $('#f-destino');
   if (fdes) fdes.addEventListener('change', () => { ui.form.destino = fdes.value; });
   const ff = $('#f-fecha');
@@ -1032,6 +1202,8 @@ document.addEventListener('click', (e) => {
     case 'tabLluvias': ui.tabLluvias = b.dataset.t; render(); break;
     case 'verInsumo': ui.insumoVer = b.dataset.i; ui.vistaStock = 'ficha'; ui.movsVisibles = 15; render(); window.scrollTo(0, 0); break;
     case 'vista': ui.vistaStock = b.dataset.v; render(); window.scrollTo(0, 0); break;
+    case 'tfConfirmar': tfConfirmar(); break;
+    case 'tfOtro': ui.tf = null; render(); break;
     case 'masMovs': ui.movsVisibles = (ui.movsVisibles || 15) + 30; render(); break;
     case 'cargarDesde':
       ui.form = nuevoForm(b.dataset.c, ui.insumoVer);

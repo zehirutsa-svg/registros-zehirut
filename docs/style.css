@@ -288,3 +288,7 @@ select.txt.grande { font-size: 18px; font-weight: 600; padding: 15px 12px; backg
 @media (max-width: 400px) { .cajas-estancia .detalle td { display: block; border: 0; padding: 1px 0; } .cajas-estancia .detalle tr { display: block; padding: 4px 0; border-bottom: 1px solid var(--linea); } }
 .modal .acciones { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
 .btn.rojo-txt { color: var(--alerta); border-color: #f0c4c4; }
+.pie-stock { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 22px; }
+label.btn { text-align: center; cursor: pointer; }
+.aviso.rojo-fondo { background: var(--alerta-claro); color: #7a1414; }
+.aviso ul, .aviso.rojo-fondo ul { margin: 6px 0 0; padding-left: 20px; }

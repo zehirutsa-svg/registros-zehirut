@@ -12,6 +12,8 @@
  *   Insumos      — lista de insumos (se edita desde la app o a mano).
  *   Destinos     — corrales / destinos de los consumos (ídem).
  *   Registro     — todo lo que llegó de los teléfonos, con resultado. Solo se agrega.
+ *   Tapfeed      — detalle por corral de cada informe de Tapfeed cargado (consumo del
+ *                  confinamiento). De acá lee la tarea que arma el informe diario.
  * Lluvias se guarda en la planilla de siempre ("Registro de Lluvias Zehirut S.A."), la
  * misma que usa ZehirutApp, con el mismo formato: da igual desde cuál se cargue.
  *
@@ -23,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '4';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '5';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo'];
@@ -33,7 +35,9 @@ const NIVELES = { '': 0, 'VER': 1, 'PROPIAS': 2, 'CARGAR': 2, 'ADMINISTRAR': 3 }
 const COLS_USUARIOS = ['Nombre', 'PIN', 'Activo'].concat(MODULOS, ['Configurar']);
 // "Por estancia": el insumo lleva un stock separado para cada estancia (ej. Fardos).
 // "Producción propia": se produce en la estancia; sus ingresos no llevan proveedor, remito ni factura.
-const COLS_INSUMOS = ['Insumo', 'Unidad', 'Kg por unidad', 'Stock mínimo', 'Activo', 'Por estancia', 'Producción propia'];
+// "Nombre en Tapfeed": cómo aparece el insumo en el PDF de Tapfeed (ej. "Maiz Molido DGM 1,2").
+const COLS_INSUMOS = ['Insumo', 'Unidad', 'Kg por unidad', 'Stock mínimo', 'Activo', 'Por estancia', 'Producción propia', 'Nombre en Tapfeed'];
+const COLS_TAPFEED = ['Fecha', 'Corral', 'Cabezas', 'Insumo', 'Nombre en Tapfeed', 'Kg tal cual', 'Kg MS', 'Archivo', 'Cargado por', 'Recibido'];
 const COLS_DESTINOS = ['Destino', 'Activo'];
 const COLS_MOV = ['ID', 'Fecha', 'Tipo', 'Insumo', 'Cantidad', 'Unidad', 'Kg', 'Destino', 'Proveedor',
   'Remito', 'Factura', 'Nota', 'Cargado por', 'Hora en el teléfono', 'Recibido', 'Anulado', 'Anulado por / motivo', 'Marca de tiempo',
@@ -43,12 +47,14 @@ const TIPOS_MOV = ['Ingreso', 'Consumo', 'Conteo'];
 
 // Cargas iniciales (decididas con el usuario el 28/09/2026). Después se editan desde la app.
 const INSUMOS_INICIALES = [
-  ['Fardos', 'fardo', '', '', true, true, true],
-  ['Maíz molido', 'kg', 1, '', true, false, false],
-  ['Concentrado Desarrollo', 'bolsa', 40, '', true, false, false],
-  ['Balanceado Pre destete', 'bolsa', 40, '', true, false, false],
-  ['Suplemento E-PRO 35', 'bolsa', 40, '', true, false, false],
-  ['Concentrado Beef 1.000 M', 'bolsa', 40, '', true, false, false],
+  ['Fardos', 'fardo', '', '', true, true, true, ''],
+  ['Maíz molido', 'kg', 1, '', true, false, false, 'Maiz Molido DGM 1,2'],
+  ['Concentrado Desarrollo', 'bolsa', 40, '', true, false, false, 'Concentrado Desarrollo'],
+  ['Balanceado Pre destete', 'bolsa', 40, '', true, false, false, 'Balan Pre destete'],
+  ['Suplemento E-PRO 35', 'bolsa', 40, '', true, false, false, ''],
+  ['Concentrado Beef 1.000 M', 'bolsa', 40, '', true, false, false, ''],
+  ['Silo micropicado Gatton', 'kg', 1, '', true, false, false, 'Micropicado Gatton'],
+  ['Maíz quebrado', 'kg', 1, '', true, false, false, ''],
 ];
 const DESTINOS_INICIALES = ['AC D Norte', 'AC Torta Frente', 'AC Torta Fondo', 'AC B Norte Frente',
   'AC B Norte Fondo', 'AC B Medio Frente', 'AC B Medio Fondo', 'Confinamiento'];
@@ -62,6 +68,12 @@ const USUARIOS_INICIALES = [
 const LLUVIAS_PLANILLA_ID = '1DXk0c3HOAsjoPwmfZzqSCUEZ9ByAOL9XlkmRdEBT7Ds';
 const LLUVIAS_HOJA = 'Lluvias';
 const ESTANCIAS = ['LA PRUDENCIA', 'LA PACIENCIA'];
+
+// Carpeta "1 Tapfeed" (dentro de "Confinamiento ZEHIRUT"): ahí se guarda cada PDF subido.
+const TAPFEED_CARPETA = '1ZybVBnxzMW_9OixfT_ut9GuvKtQbagH1';
+// Carga inicial (una sola vez): archivo CSV en el Drive del dueño, fuera del repositorio porque
+// tiene datos de la empresa. Se importa solo y se renombra "(importado)".
+const CARGA_INICIAL = 'Registros Zehirut - carga inicial.csv';
 const SECTORES_POR_FINCA = {
   'LA PRUDENCIA': ['A', 'C', 'D', 'F'],
   'LA PACIENCIA': ['A', 'B', 'C', 'E', 'F'],
@@ -103,6 +115,7 @@ function configurar() {
   asegurarColumnaConfigurar_(usu);
   asegurarColumnasEstancia_(ins, mov);
   asegurarColumnaPropia_(ins);
+  asegurarTapfeed_(ss, ins);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
   [stock, mov, ins, des, usu, reg].forEach((h, i) => { ss.setActiveSheet(h); ss.moveActiveSheet(i + 1); });
@@ -165,6 +178,53 @@ function asegurarColumnaPropia_(ins) {
   ins.getRange(2, col, 200, 1).insertCheckboxes();
 }
 
+/** Versión 5: Tapfeed. Columna "Nombre en Tapfeed" en Insumos (con los nombres conocidos),
+ *  insumos nuevos (Silo micropicado Gatton, Maíz quebrado) y la hoja Tapfeed. */
+function asegurarTapfeed_(ss, ins) {
+  const col = COLS_INSUMOS.indexOf('Nombre en Tapfeed') + 1;
+  if (String(ins.getRange(1, col).getValue()) !== 'Nombre en Tapfeed') {
+    ins.getRange(1, col).setValue('Nombre en Tapfeed').setFontWeight('bold').setBackground('#eeeeee');
+  }
+  const n = ins.getLastRow();
+  const actuales = n > 1 ? ins.getRange(2, 1, n - 1, COLS_INSUMOS.length).getValues() : [];
+  actuales.forEach((f, i) => {
+    const ini = INSUMOS_INICIALES.find((x) => x[0] === String(f[0]).trim());
+    if (ini && ini[7] && !String(f[col - 1]).trim()) ins.getRange(i + 2, col).setValue(ini[7]);
+  });
+  const faltan = INSUMOS_INICIALES.filter((x) => !actuales.some((f) => String(f[0]).trim() === x[0]));
+  if (faltan.length) ins.getRange(ins.getLastRow() + 1, 1, faltan.length, COLS_INSUMOS.length).setValues(faltan);
+  hoja_(ss, 'Tapfeed', COLS_TAPFEED).getRange('A:A').setNumberFormat('@');
+}
+
+/** Importa una sola vez el CSV de carga inicial (ingresos y consumos anteriores a la app).
+ *  Formato: id;AAAA-MM-DD;Tipo;Insumo;Cantidad;Destino;Nota (con encabezado). */
+function importarCargaInicial_(ss) {
+  const archivos = DriveApp.getFilesByName(CARGA_INICIAL);
+  if (!archivos.hasNext()) return;
+  const archivo = archivos.next();
+  conLock_(() => {
+    const movs = leerMovimientos_(ss);
+    const insumos = {};
+    leerInsumos_(ss).forEach((i) => { insumos[i.nombre] = i; });
+    const ahora = new Date();
+    const filas = [];
+    archivo.getBlob().getDataAsString('UTF-8').split(/\r?\n/).slice(1).forEach((l) => {
+      const c = l.split(';');
+      if (c.length < 5 || !c[0] || movs.some((m) => m.id === c[0])) return;
+      const ins = insumos[c[3]];
+      if (!ins || !esFecha_(c[1]) || TIPOS_MOV.indexOf(c[2]) === -1) throw new Error('carga inicial: fila inválida: ' + l);
+      const cant = Number(c[4]);
+      filas.push([c[0], c[1], c[2], ins.nombre, cant, ins.unidad, ins.kgUnidad ? Math.round(cant * ins.kgUnidad * 100) / 100 : '',
+        c[5] || '', '', '', '', c[6] || '', 'Carga inicial', '', ahora, false, '', ahora.getTime() + filas.length, '']);
+    });
+    const sh = ss.getSheetByName('Movimientos');
+    if (filas.length) sh.getRange(sh.getLastRow() + 1, 1, filas.length, COLS_MOV.length).setValues(filas);
+    registrar_(ss, [[ahora, 'Carga inicial', 'Importar ' + CARGA_INICIAL, filas.length + ' movimientos', 'Aplicado', '']]);
+    reconstruirStock_(ss);
+  });
+  archivo.setName(CARGA_INICIAL.replace('.csv', ' (importado).csv'));
+}
+
 function hoja_(ss, nombre, encabezado) {
   let h = ss.getSheetByName(nombre);
   if (!h) h = ss.insertSheet(nombre);
@@ -184,6 +244,7 @@ function conLock_(fn) {
 // ---------------------------------------------------------------- web (lo que llama la app)
 function doGet() {
   asegurarConfigurado_();
+  importarCargaInicial_(SpreadsheetApp.getActive());
   const url = SpreadsheetApp.getActive().getUrl();
   return HtmlService.createHtmlOutput(
     '<div style="font-family:sans-serif;font-size:20px;padding:24px">' +
@@ -203,6 +264,7 @@ function doPost(e) {
       case 'guardar': return json_(guardar_(body));
       case 'datos': return json_(datos_(body));
       case 'catalogo': return json_(guardarCatalogo_(body));
+      case 'tapfeed': return json_(cargarTapfeed_(body));
       default: return json_({ ok: false, error: 'acción desconocida' });
     }
   } catch (err) {
@@ -312,6 +374,7 @@ function leerInsumos_(ss) {
       activo: f[4] === true || String(f[4]).toUpperCase() === 'TRUE',
       porEstancia: f[5] === true || String(f[5]).toUpperCase() === 'TRUE',
       propia: f[6] === true || String(f[6]).toUpperCase() === 'TRUE',
+      tapfeed: String(f[7] || '').trim(),
     }));
 }
 
@@ -346,10 +409,12 @@ function guardarCatalogo_(body) {
         vistos[nombre.toUpperCase()] = true;
         if (kg !== '' && !(kg > 0)) throw new Error('kg por unidad inválido en ' + nombre);
         if (minimo !== '' && !(minimo >= 0)) throw new Error('stock mínimo inválido en ' + nombre);
-        return [nombre, unidad, kg, minimo, x.activo !== false, x.porEstancia === true, x.propia === true];
+        // El nombre en Tapfeed no se edita desde la app: se conserva el de la hoja.
+        const antes = leerInsumos_(ss).find((i) => i.nombre.toUpperCase() === nombre.toUpperCase());
+        return [nombre, unidad, kg, minimo, x.activo !== false, x.porEstancia === true, x.propia === true, antes ? antes.tapfeed : ''];
       });
       leerInsumos_(ss).forEach((i) => {
-        if (usados[i.nombre] && !vistos[i.nombre.toUpperCase()]) filas.push([i.nombre, i.unidad, i.kgUnidad == null ? '' : i.kgUnidad, i.minimo == null ? '' : i.minimo, false, !!i.porEstancia, !!i.propia]);
+        if (usados[i.nombre] && !vistos[i.nombre.toUpperCase()]) filas.push([i.nombre, i.unidad, i.kgUnidad == null ? '' : i.kgUnidad, i.minimo == null ? '' : i.minimo, false, !!i.porEstancia, !!i.propia, i.tapfeed]);
       });
       sh = ss.getSheetByName('Insumos'); ancho = COLS_INSUMOS.length;
     } else if (body.tipo === 'destinos') {
@@ -725,6 +790,92 @@ function datos_(body) {
       proveedores: movs.map((m) => m.proveedor).filter((p, i, a) => p && a.indexOf(p) === i).sort(),
     };
   }
+  if (u.configura) r.tapfeedDias = diasTapfeed_(ss).filter((f) => f >= desde);
   if (nivel_(u, 'Lluvias') >= NIVELES.VER) r.lluvias = datosLluvias_(desde);
   return r;
+}
+
+// ---------------------------------------------------------------- Tapfeed (consumo del confinamiento)
+// El PDF "Uso de ingredientes por grupo" se lee en la app (pdf.js) y llega ya interpretado:
+// { fecha, corrales: [{ nombre, cabezas, items: [{ nombre, kg, ms }] }], total: [{ nombre, kg, ms }] }
+// más el PDF en base64 para guardarlo en "1 Tapfeed". Por cada ingrediente del total se registra
+// un consumo con destino Confinamiento; el detalle por corral va a la hoja Tapfeed.
+
+function diasTapfeed_(ss) {
+  const sh = ss.getSheetByName('Tapfeed');
+  const n = sh.getLastRow();
+  if (n < 2) return [];
+  const dias = {};
+  sh.getRange(2, 1, n - 1, 1).getValues().forEach((f) => { if (f[0]) dias[iso_(f[0])] = true; });
+  return Object.keys(dias).sort();
+}
+
+function cargarTapfeed_(body) {
+  const ss = SpreadsheetApp.getActive();
+  const u = usuarioDe_(ss, body.pin);
+  if (!u.configura) throw new Error('solo quien configura puede cargar informes de Tapfeed');
+  const d = body.datos || {};
+  const fecha = String(d.fecha || '');
+  const hoy = Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd');
+  if (!esFecha_(fecha) || fecha > hoy) throw new Error('fecha del informe inválida');
+  const total = Array.isArray(d.total) ? d.total : [];
+  const corrales = Array.isArray(d.corrales) ? d.corrales : [];
+  if (!total.length || !corrales.length) throw new Error('el informe no trae datos');
+  const porTapfeed = {};
+  leerInsumos_(ss).forEach((i) => { if (i.tapfeed) porTapfeed[i.tapfeed.toUpperCase()] = i; });
+  const desconocidos = total.filter((t) => !porTapfeed[String(t.nombre).trim().toUpperCase()]).map((t) => t.nombre);
+  if (desconocidos.length) {
+    throw new Error('no sé a qué insumo corresponde: ' + desconocidos.join(', ') + '. Poné ese nombre en la columna "Nombre en Tapfeed" de la hoja Insumos.');
+  }
+  return conLock_(() => {
+    const ya = diasTapfeed_(ss).indexOf(fecha) !== -1;
+    if (ya && !body.reemplazar) return { ok: true, yaCargado: true };
+    const ahora = new Date();
+    const movs = leerMovimientos_(ss);
+    const shM = ss.getSheetByName('Movimientos');
+    const shT = ss.getSheetByName('Tapfeed');
+    const log = [];
+    if (ya) {
+      // Reemplazo: se anulan los consumos de ese día y se saca su detalle.
+      movs.filter((m) => m.id.indexOf('TF-' + fecha + '-') === 0 && !m.anulado).forEach((m) => {
+        shM.getRange(m.fila, 16, 1, 2).setValues([[true, u.nombre + ': reemplazado por otro informe de Tapfeed']]);
+      });
+      const n = shT.getLastRow();
+      const quedan = shT.getRange(2, 1, n - 1, COLS_TAPFEED.length).getValues().filter((f) => iso_(f[0]) !== fecha);
+      shT.getRange(2, 1, n - 1, COLS_TAPFEED.length).clearContent();
+      if (quedan.length) shT.getRange(2, 1, quedan.length, COLS_TAPFEED.length).setValues(quedan);
+      log.push([ahora, u.nombre, 'Tapfeed', 'Reemplazo del ' + ddmmaaaa_(fecha), 'Aplicado', '']);
+    }
+    let url = '';
+    try {
+      const pdf = Utilities.newBlob(Utilities.base64Decode(String(body.pdf || '')), 'application/pdf',
+        texto_(body.nombreArchivo, 120) || ('Uso de ingredientes ' + fecha + '.pdf'));
+      url = DriveApp.getFolderById(TAPFEED_CARPETA).createFile(pdf).getUrl();
+    } catch (e) {
+      log.push([ahora, u.nombre, 'Tapfeed', 'No se pudo guardar el PDF: ' + e, 'Aviso', '']);
+    }
+    const sufijo = ya ? '-' + ahora.getTime() : '';
+    const filasMov = total.map((t, k) => {
+      const ins = porTapfeed[String(t.nombre).trim().toUpperCase()];
+      const kg = Math.round(Number(t.kg) * 100) / 100;
+      const cant = ins.kgUnidad && ins.unidad !== 'kg' ? Math.round((kg / ins.kgUnidad) * 1000) / 1000 : kg;
+      const id = 'TF-' + fecha + '-' + ins.nombre.replace(/[^A-Za-z0-9]+/g, '') + sufijo;
+      log.push([ahora, u.nombre, 'Tapfeed', 'Consumo ' + ins.nombre + ' ' + kg + ' kg (' + ddmmaaaa_(fecha) + ')', 'Aplicado', id]);
+      return [id, fecha, 'Consumo', ins.nombre, cant, ins.unidad, kg, 'Confinamiento', '', '', '', 'Tapfeed',
+        'Tapfeed (' + u.nombre + ')', '', ahora, false, '', ahora.getTime() + k, ''];
+    });
+    shM.getRange(shM.getLastRow() + 1, 1, filasMov.length, COLS_MOV.length).setValues(filasMov);
+    const filasT = [];
+    corrales.forEach((c) => {
+      (Array.isArray(c.items) ? c.items : []).forEach((it) => {
+        const ins = porTapfeed[String(it.nombre).trim().toUpperCase()];
+        filasT.push([fecha, texto_(c.nombre, 60), Number(c.cabezas) || '', ins ? ins.nombre : '', texto_(it.nombre, 60),
+          Number(it.kg) || 0, Number(it.ms) || 0, url, u.nombre, ahora]);
+      });
+    });
+    if (filasT.length) shT.getRange(shT.getLastRow() + 1, 1, filasT.length, COLS_TAPFEED.length).setValues(filasT);
+    registrar_(ss, log);
+    reconstruirStock_(ss);
+    return { ok: true, fecha, consumos: filasMov.length, archivo: url };
+  });
 }

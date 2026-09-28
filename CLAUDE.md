@@ -16,7 +16,8 @@ docs/                 la app (GitHub Pages publica esta carpeta)
   manifest.webmanifest, icons/    (block con espiral + marca ZEH + lápiz, fondo blanco)
 apps-script/          backend (Code.gs + appsscript.json), se sube con clasp
 .clasp.json           scriptId y parentId (Sheet "Registros Zehirut")
-dev/servidor-prueba.js  sirve docs/ y corre Code.gs con Sheets falsos (PIN 1111 Enrique, 2222 Osmar, 3333 solo ver)
+dev/servidor-prueba.js  sirve docs/ y corre Code.gs con Sheets falsos (PIN 1111 Enrique, 2222 Osmar, 3333 solo ver);
+                      CARGA_INICIAL=ruta.csv simula el CSV de carga inicial de Drive
 dev/generar-iconos.js regenera docs/icons/ (usa Chrome headless)
 dev/bocetos-logo.js   bocetos del logo (versiones 1-3; se eligió la 2)
 ```
@@ -62,7 +63,9 @@ Insumos (editables, se pueden agregar nuevos):
 | Suplemento E-PRO 35 | bolsa | 40 |
 | Concentrado Beef 1.000 M | bolsa | 40 |
 
-Silo micropicado: afuera por ahora (se agrega como insumo nuevo cuando el usuario quiera).
+Silo micropicado Gatton: se suma como insumo (kg) para la integración con Tapfeed (28/09).
+**PENDIENTE para más adelante (no complicar ahora):** su stock inicial está mal (hoy "estimado 3.000.000
+kg" en Datos base confinamiento) y en realidad son **varios silos**, no uno. Revisarlo con el usuario.
 
 Destinos (editables; los dados de baja no se borran):
 AC D Norte, AC Torta Frente, AC Torta Fondo, AC B Norte Frente, AC B Norte Fondo,
@@ -89,6 +92,28 @@ Hembras C6P: el usuario las agrega después (todavía no tienen ubicación).
 - **Destino opcional** en los consumos: lo importante es cuánto se usó por día (ej. "tantos
   fardos hoy" sin destino). Facilitar la carga por sobre el detalle.
 - Stock inicial y primeros consumos los carga el usuario (Enrique) cuando la app esté lista.
+
+## Tapfeed: consumo del confinamiento (decidido 28/09/2026)
+
+Reparto acordado: **la app solo registra** (no hace informes); **la tarea diaria de Claude solo hace
+informes** y debe leer TODO de la planilla de la app (hojas Stock, Movimientos, Tapfeed) en vez de
+"Stock inicial / Llegadas / Consumo fuera de confi" de "Datos base confinamiento" (de esa planilla
+solo sigue usando la hoja Corrales). Pendiente: reescribir el documento de instrucciones de la tarea
+("Instrucciones tarea diaria - Informe confinamiento", Drive id 1v_GFB4H5jcWXCOsyjtvnPMM_0GZ0mYEsV3bJwhBzJVs).
+
+- Botón "Subir informe Tapfeed" al pie de Stock (solo casilla Configurar). El PDF "Uso de ingredientes
+  por grupo" se lee EN LA APP con pdf.js (cdnjs, se baja al usarlo): período, corrales (cabezas) y kg
+  tal cual / MS por ingrediente; controla que la suma de corrales = TOTAL. **Solo informes de un día**
+  (uno de varios días se rechaza: no trae el detalle diario).
+- El script registra un Consumo por ingrediente del TOTAL (destino Confinamiento, "Cargado por"
+  = "Tapfeed (usuario)", ID `TF-AAAA-MM-DD-<insumo>`), guarda el detalle por corral en la hoja
+  **Tapfeed** y el PDF en la carpeta "1 Tapfeed" (Drive id 1ZybVBnxzMW_9OixfT_ut9GuvKtQbagH1).
+  Si el día ya estaba: la app avisa y "Reemplazar" anula los consumos anteriores del día.
+- Insumos ↔ Tapfeed por la columna "Nombre en Tapfeed" de la hoja Insumos (solo se edita en la hoja).
+- Carga inicial (ingresos 2025/2026 y consumo del 21/09, sin PDF: acumulado de la tarea menos los PDF
+  22–27): CSV "Registros Zehirut - carga inicial.csv" en la carpeta "Confinamiento ZEHIRUT"; el script
+  lo importa solo en doGet y lo renombra "(importado)". Los datos no van al repo (es público).
+- El script necesita el permiso de Drive (scope drive): tras agregarlo, el dueño reautoriza abriendo /exec.
 
 ## Segundo módulo: Lluvias
 

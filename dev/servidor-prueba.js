@@ -98,7 +98,7 @@ libroLluvias.getSheetByName('Lluvias').getRange(1, 1, 1, 7).setValues([['ID', 'F
 const validacion = { requireValueInList() { return this; }, setAllowInvalid() { return this; }, build() { return {}; } };
 const contexto = {
   SpreadsheetApp: { getActive: () => libro, openById: () => libroLluvias, newDataValidation: () => validacion },
-  Utilities: { formatDate },
+  Utilities: { formatDate, newBlob: (bytes, tipo, nombre) => ({ nombre, bytes }), base64Decode: (b) => Buffer.from(b, 'base64') },
   CacheService: {
     getScriptCache: () => ({
       get: (k) => (cache[k] && cache[k].hasta > Date.now() ? cache[k].v : null),
@@ -118,9 +118,21 @@ const contexto = {
     }),
   },
   HtmlService: { createHtmlOutput: (h) => ({ html: h, setTitle() { return this; } }) },
+  // Drive: el PDF de Tapfeed "se guarda" en memoria; la carga inicial se lee de la ruta que diga
+  // la variable CARGA_INICIAL (un CSV local, nunca en el repositorio).
+  DriveApp: {
+    getFolderById: () => ({ createFile: (b) => { pdfsGuardados.push(b.nombre); return { getUrl: () => 'https://drive.google.com/PRUEBA/' + encodeURIComponent(b.nombre) }; } }),
+    getFilesByName: () => {
+      const ruta = process.env.CARGA_INICIAL;
+      let dado = !(ruta && fs.existsSync(ruta) && !cargaImportada);
+      return { hasNext: () => !dado, next: () => { dado = true; return { getBlob: () => ({ getDataAsString: () => fs.readFileSync(ruta, 'utf8') }), setName: () => { cargaImportada = true; } }; } };
+    },
+  },
   console,
 };
 const propiedades = {};
+const pdfsGuardados = [];
+let cargaImportada = false;
 const cache = {};
 vm.createContext(contexto);
 const codigo = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'Code.gs'), 'utf8');
