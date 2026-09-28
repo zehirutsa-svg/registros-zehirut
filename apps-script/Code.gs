@@ -23,12 +23,14 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '1';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '2';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo'];
 const NIVELES = { '': 0, 'VER': 1, 'PROPIAS': 2, 'CARGAR': 2, 'ADMINISTRAR': 3 };
-const COLS_USUARIOS = ['Nombre', 'PIN', 'Activo'].concat(MODULOS);
+// "Configurar" (casilla): editar las listas de insumos y destinos. Aparte de los niveles
+// porque quien administra Stock (conteos, anular) no necesariamente arma las listas.
+const COLS_USUARIOS = ['Nombre', 'PIN', 'Activo'].concat(MODULOS, ['Configurar']);
 const COLS_INSUMOS = ['Insumo', 'Unidad', 'Kg por unidad', 'Stock mínimo', 'Activo'];
 const COLS_DESTINOS = ['Destino', 'Activo'];
 const COLS_MOV = ['ID', 'Fecha', 'Tipo', 'Insumo', 'Cantidad', 'Unidad', 'Kg', 'Destino', 'Proveedor',
@@ -49,8 +51,8 @@ const DESTINOS_INICIALES = ['AC D Norte', 'AC Torta Frente', 'AC Torta Fondo', '
   'AC B Norte Fondo', 'AC B Medio Frente', 'AC B Medio Fondo', 'Confinamiento'];
 // Los PIN se completan a mano en la hoja (los mismos que en ZehirutApp).
 const USUARIOS_INICIALES = [
-  ['Enrique Delfante', '', true, 'Administrar', 'Administrar', 'Administrar', 'Administrar', 'Administrar'],
-  ['Osmar Acosta', '', true, 'Administrar', 'Administrar', 'Propias', 'Cargar', 'Cargar'],
+  ['Enrique Delfante', '', true, 'Administrar', 'Administrar', 'Administrar', 'Administrar', 'Administrar', true],
+  ['Osmar Acosta', '', true, 'Administrar', 'Administrar', 'Propias', 'Cargar', 'Cargar', false],
 ];
 
 // Lluvias: la planilla de siempre (compartida con ZehirutApp, ver Lluvias.js de ese proyecto).
@@ -94,6 +96,7 @@ function configurar() {
     usu.getRange(2, 4, 200, MODULOS.length).setDataValidation(opciones);
     usu.getRange(2, 3, 200, 1).insertCheckboxes();
   }
+  asegurarColumnaConfigurar_(usu);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
   [stock, mov, ins, des, usu, reg].forEach((h, i) => { ss.setActiveSheet(h); ss.moveActiveSheet(i + 1); });
@@ -102,6 +105,24 @@ function configurar() {
   });
   reconstruirStock_(ss);
   ss.setActiveSheet(stock);
+}
+
+/** Versión 2: la columna "Configurar" en una hoja Usuarios ya existente. Queda tildada solo
+ *  para Enrique (el que decidió que la configuración sea solo suya, 28/09/2026). */
+function asegurarColumnaConfigurar_(usu) {
+  const ancho = usu.getLastColumn();
+  const enc = usu.getRange(1, 1, 1, ancho).getValues()[0].map(String);
+  let col = enc.indexOf('Configurar') + 1;
+  if (!col) {
+    col = ancho + 1;
+    usu.getRange(1, col).setValue('Configurar').setFontWeight('bold').setBackground('#eeeeee');
+    const n = usu.getLastRow();
+    if (n > 1) {
+      usu.getRange(2, col, n - 1, 1).setValues(usu.getRange(2, 1, n - 1, 1).getValues()
+        .map((f) => [String(f[0]).trim() === 'Enrique Delfante']));
+    }
+  }
+  usu.getRange(2, col, 200, 1).insertCheckboxes();
 }
 
 function hoja_(ss, nombre, encabezado) {
@@ -169,7 +190,9 @@ function leerUsuarios_(ss) {
       permisos[m] = i === -1 ? '' : String(f[i] || '').trim();
     });
     const activo = f[2] === true || /^(SI|SÍ|TRUE)$/i.test(String(f[2]).trim());
-    return { nombre: String(f[0]).trim(), pin: String(f[1]).trim(), activo, permisos };
+    const iConf = enc.indexOf('Configurar');
+    const configura = iConf !== -1 && (f[iConf] === true || /^(SI|SÍ|TRUE)$/i.test(String(f[iConf]).trim()));
+    return { nombre: String(f[0]).trim(), pin: String(f[1]).trim(), activo, permisos, configura };
   }).filter((u) => u.nombre && u.pin && u.activo);
 }
 
@@ -199,7 +222,7 @@ function exigir_(u, modulo, minimo) {
 }
 
 function publico_(u) {
-  return { nombre: u.nombre, permisos: u.permisos };
+  return { nombre: u.nombre, permisos: u.permisos, configura: !!u.configura };
 }
 
 function entrar_(body) {
@@ -259,12 +282,12 @@ function leerDestinos_(ss) {
     .map((f) => ({ nombre: String(f[0]).trim(), activo: f[1] === true || String(f[1]).toUpperCase() === 'TRUE' }));
 }
 
-/** Reemplaza la lista de insumos o de destinos (solo quien administra Stock). Nunca se borra
+/** Reemplaza la lista de insumos o de destinos (solo quien tiene tildado Configurar). Nunca se borra
  *  uno que tenga movimientos: se desactiva, para que el historial siga mostrando su nombre. */
 function guardarCatalogo_(body) {
   const ss = SpreadsheetApp.getActive();
   const u = usuarioDe_(ss, body.pin);
-  exigir_(u, 'Stock', 'ADMINISTRAR');
+  if (!u.configura) throw new Error('no tenés permiso para cambiar las listas de insumos y destinos');
   return conLock_(() => {
     const usados = {};
     leerMovimientos_(ss).forEach((m) => { usados[m.insumo] = true; usados['D:' + m.destino] = true; });

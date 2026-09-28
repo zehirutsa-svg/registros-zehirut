@@ -82,6 +82,7 @@ acceso total.
 ## Usuarios (inicio)
 
 - **Enrique Delfante**: todo.
+- **Configurar** (casilla en Usuarios): editar listas de insumos y destinos. Solo Enrique (pedido 28/09).
 - **Osmar Acosta**: todos los registros (stocks, lluvias, combustible, fondo fijo) con las mismas
   limitaciones que tiene en ZehirutApp para facturas (ver solo las propias, no eliminar).
 - PINs: nunca en el código (el repo de GitHub es público); viven en la planilla.

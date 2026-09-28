@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.1.0';
+const VERSION = '1.1.1';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -25,7 +25,7 @@ const guardado = {
   },
 };
 
-let sesion = guardado.leer('sesion', null);      // { pin, nombre, permisos }
+let sesion = guardado.leer('sesion', null);      // { pin, nombre, permisos, configura }
 let datos = guardado.leer('datos', null);        // última respuesta de "datos"
 let cola = guardado.leer('cola', []);            // cambios todavía no enviados
 let ultimaSync = guardado.leer('ultimaSync', 0);
@@ -210,6 +210,7 @@ async function sincronizar() {
     datos = d;
     sesion.nombre = d.usuario.nombre;
     sesion.permisos = d.usuario.permisos;
+    sesion.configura = !!d.usuario.configura;
     ultimaSync = Date.now();
     ui.errorSync = '';
     guardarTodo();
@@ -406,7 +407,7 @@ async function entrar() {
   try {
     const r = await llamar({ accion: 'entrar', pin: ui.pin });
     if (!r.usuario) { ui.errorPin = 'PIN incorrecto.'; ui.pin = ''; return; }
-    sesion = { pin: ui.pin, nombre: r.usuario.nombre, permisos: r.usuario.permisos };
+    sesion = { pin: ui.pin, nombre: r.usuario.nombre, permisos: r.usuario.permisos, configura: !!r.usuario.configura };
     datos = null; cola = []; ultimaSync = 0;
     ui.pin = ''; ui.pantalla = 'inicio';
     guardarTodo();
@@ -470,7 +471,7 @@ function htmlStock() {
   const lista = [['saldo', 'Saldo']];
   if (puede('Stock', 'CARGAR')) lista.push(['cargar', 'Cargar']);
   lista.push(['movs', 'Movimientos']);
-  if (puede('Stock', 'ADMINISTRAR')) lista.push(['config', 'Configurar']);
+  if (sesion.configura) lista.push(['config', 'Configurar']);
   if (!lista.some((t) => t[0] === ui.tabStock)) ui.tabStock = 'saldo';
   const cuerpo = ui.tabStock === 'saldo' && ui.insumoVer ? htmlFicha(ui.insumoVer)
     : { saldo: htmlSaldo, cargar: htmlCargar, movs: htmlMovimientos, config: htmlConfig }[ui.tabStock]();
