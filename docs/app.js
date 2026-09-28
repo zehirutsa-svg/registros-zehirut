@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.4.1';
+const VERSION = '1.4.2';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -481,8 +481,8 @@ function htmlInicio() {
     '<div class="contenido">' +
     '<div class="saludo">Hola, ' + esc(String(sesion.nombre).split(' ')[0]) + ' 👋</div>' +
     (mods.length ? '<div class="modulos">' + mods.join('') + '</div>' : '<p class="vacio">Tu usuario todavía no tiene acceso a ningún módulo.</p>') +
-    '<div class="pie"><span>Datos de Google: ' + haceCuanto(ultimaSync) + '</span>' +
-    '<button class="btn sec chico" data-a="sync">⟳ Actualizar</button>' +
+    // Sincronizar y ver el estado: solo desde el cartel de arriba a la derecha (no duplicar).
+    '<div class="pie">' +
     '<button class="btn sec chico" data-a="salir">Salir</button>' +
     '<span>v' + VERSION + ' · ' + esc(sesion.nombre) + '</span></div>' +
     '</div>';
@@ -1028,7 +1028,6 @@ document.addEventListener('click', (e) => {
       cartel({ icono: '📶', titulo: t.txt, html: msg, si: 'Sincronizar ahora', no: 'Cerrar' }).then((ok) => { if (ok) sincronizar(); });
       break;
     }
-    case 'sync': sincronizar(); break;
     case 'salir': salir(); break;
     case 'tabLluvias': ui.tabLluvias = b.dataset.t; render(); break;
     case 'verInsumo': ui.insumoVer = b.dataset.i; ui.vistaStock = 'ficha'; ui.movsVisibles = 15; render(); window.scrollTo(0, 0); break;

@@ -43,6 +43,12 @@ Cambiar el script: editar `apps-script/Code.gs` → `clasp push --force` →
 
 Publicar una versión nueva: cambiar `docs/`, subir `CACHE` en `sw.js` y `VERSION` en `app.js`, commit + push.
 
+## Regla de diseño (pedido del usuario, 28/09/2026)
+
+**UI limpias, simples, claras y amigables. Nunca dos botones o caminos para lo mismo.**
+Antes de agregar un botón, revisar que esa función no exista ya en otra parte de la pantalla.
+Ej.: sincronizar/estado solo desde el cartel de arriba a la derecha; cargar solo desde la ficha del insumo.
+
 ## Primer módulo: Stock de insumos (decisiones 2026-09-28)
 
 Insumos (editables, se pueden agregar nuevos):
