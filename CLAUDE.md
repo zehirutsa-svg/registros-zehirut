@@ -33,7 +33,9 @@ Probar local: `node dev/servidor-prueba.js 8766` → <http://localhost:8766> (`/
 
 Cambiar el script: editar `apps-script/Code.gs` → `clasp push --force` →
 `clasp update-deployment AKfycbwEt6SDljH5xaH489NjFkz87Ua_-nbIT4ovi21OJUyBBMM6JhR2MWKlP0zkwiMUlshjpg -d "..."`
-(actualizar ESA implementación: si se crea otra, cambia la URL). Ojo: `clasp create-script` pisa
+(actualizar ESA implementación: si se crea otra, cambia la URL).
+**Permisos nuevos (scopes):** abrir /exec NO alcanza si doGet no usa ese servicio. Hacer que el dueño abra el
+editor, elija la función autorizar() y toque Ejecutar (usa Sheets, Drive y UrlFetch). Ojo: `clasp create-script` pisa
 `appsscript.json`; si se vuelve a clonar, restaurarlo (zona Asunción, webapp anónima, scope spreadsheets).
 
 ## GitHub
