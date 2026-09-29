@@ -1261,3 +1261,13 @@ function exportarExcel_(body) {
     DriveApp.getFileById(tmp.getId()).setTrashed(true);
   }
 }
+
+// ---------------------------------------------------------------- permisos
+/** Ejecutar a mano desde el editor (elegir "autorizar" y tocar Ejecutar) cuando el script pida
+ *  un permiso nuevo: usa cada servicio una vez, así Google muestra el pedido de permisos. */
+function autorizar() {
+  SpreadsheetApp.getActive().getName();
+  DriveApp.getRootFolder().getName();
+  UrlFetchApp.fetch('https://www.google.com', { muteHttpExceptions: true });
+  return 'Permisos OK';
+}
