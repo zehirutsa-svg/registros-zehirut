@@ -111,7 +111,10 @@ button { cursor: pointer; }
 .pie { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; color: var(--gris); font-size: 14px; }
 
 /* ---------------------------------------------------------------- tarjetas de saldo */
-.saldos { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 10px; }
+.saldos { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); grid-auto-rows: 1fr; gap: 10px; }
+/* Todas las tarjetas del mismo alto, con el contenido arriba y el nombre en dos renglones fijos. */
+button.saldo { display: flex; flex-direction: column; justify-content: flex-start; }
+.saldos .saldo h3 { min-height: 2.5em; }
 .saldo {
   background: var(--papel); border-radius: var(--radio); box-shadow: var(--sombra); padding: 14px 16px;
   border-top: 6px solid var(--verde); text-align: left; border-left: 0; border-right: 0; border-bottom: 0;
