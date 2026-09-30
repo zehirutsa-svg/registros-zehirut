@@ -134,6 +134,9 @@ const contexto = {
       deleteProperty: (k) => { delete propiedades[k]; },
     }),
   },
+  // ZehirutApp (biblioteca de Facturas y Fondo fijo), simulado en memoria.
+  ZA: require('./za-prueba.js')(),
+  CalendarApp: { getCalendarById: () => null },
   HtmlService: { createHtmlOutput: (h) => ({ html: h, setTitle() { return this; } }) },
   // Drive: el PDF de Tapfeed "se guarda" en memoria; la carga inicial se lee de la ruta que diga
   // la variable CARGA_INICIAL (un CSV local, nunca en el repositorio).

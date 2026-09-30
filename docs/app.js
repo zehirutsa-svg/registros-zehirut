@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.8.0';
+const VERSION = '1.9.0';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -49,6 +49,8 @@ const ui = {
   movsVisibles: 15,
   tf: null,             // informe de Tapfeed en lectura / vista previa
   excel: null,          // período elegido para bajar el Excel
+  fac: null,            // pantallas de Facturas (facturas.js)
+  ff: null,             // pantallas de Fondo fijo (facturas.js)
   vistaLluvia: 'dia',   // dia | cargar
   lluviaDia: null,      // día que se muestra en Lluvias
   pin: '',
@@ -318,6 +320,8 @@ const moduloDe = (nombre) => (stockDatos().insumos.find((i) => i.nombre === nomb
 const insumosMod = () => stockDatos().insumos.filter((i) => (i.modulo || 'Stock') === ui.modStock);
 const esCombustible = () => ui.modStock === 'Combustible';
 const COMBUSTIBLE_DESDE = '2026-10-01';
+// Facturas y Fondo fijo en prueba: solo los ve quien configura (lo decide el script, FACTURAS_BETA).
+const FACTURAS_PRUEBA = true;
 const OTRO_DESTINO = 'OTRO';
 
 /** Saldo de cada insumo (y estancia): el que calculó Google, corregido con lo que está en la cola. */
@@ -378,7 +382,7 @@ function render() {
     app.innerHTML = barra('Registros Zehirut', false) + '<div class="contenido"><p class="vacio">Bajando los datos de Google…</p></div>';
     return;
   }
-  const pantallas = { inicio: htmlInicio, stock: htmlStock, lluvias: htmlLluvias };
+  const pantallas = { inicio: htmlInicio, stock: htmlStock, lluvias: htmlLluvias, facturas: htmlFacturas, fondofijo: htmlFondoFijo };
   app.innerHTML = (pantallas[ui.pantalla] || htmlInicio)();
   despuesDeRender();
 }
@@ -489,7 +493,14 @@ function htmlInicio() {
     const txt = ['Nafta', 'Diesel'].map((n) => n + ' ' + num((s[n] || {}).cantidad || 0, 0) + ' L').join(' · ');
     mods.push('<button class="modulo combustible" data-a="ir" data-p="stock" data-m="Combustible"><span class="ico">⛽</span><span><b>Combustible</b><small>' + txt + '</small></span></button>');
   }
-  const pronto = ['Facturas', 'Fondo fijo'].filter((m) => puede(m, 'VER'));
+  const za = datos && datos.za && datos.za.ok ? datos.za : null;
+  if (za && (za.puedeFacturas || za.puedeVerFacturas)) {
+    mods.push('<button class="modulo facturas" data-a="ir" data-p="facturas"><span class="ico">🧾</span><span><b>Facturas</b><small>Cargar y ver comprobantes' + (FACTURAS_PRUEBA ? ' · <span class="chip naranja">en prueba</span>' : '') + '</small></span></button>');
+  }
+  if (za && za.puedeFondoFijo) {
+    mods.push('<button class="modulo fondofijo" data-a="ir" data-p="fondofijo"><span class="ico">💵</span><span><b>Fondo fijo</b><small>Caja chica' + (FACTURAS_PRUEBA ? ' · <span class="chip naranja">en prueba</span>' : '') + '</small></span></button>');
+  }
+  const pronto = ['Facturas', 'Fondo fijo'].filter((m) => puede(m, 'VER') && !za);
   pronto.forEach((m) => {
     mods.push('<div class="modulo pronto"><span class="ico">' + ({ Combustible: '⛽', Facturas: '🧾', 'Fondo fijo': '💵' }[m]) +
       '</span><span><b>' + m + '</b><small>Próximamente (por ahora en ZehirutApp)</small></span></div>');
@@ -1374,6 +1385,7 @@ function guardarLluvia() {
 
 // ---------------------------------------------------------------- eventos
 function despuesDeRender() {
+  if (ui.pantalla === 'facturas' || ui.pantalla === 'fondofijo') despuesDeRenderFac();
   const cant = $('#f-cantidad');
   if (cant) cant.addEventListener('input', () => { ui.form.cantidad = cant.value; $('#f-equivale').textContent = equivale(); });
   ['proveedor', 'remito', 'factura', 'nota'].forEach((k) => {
@@ -1417,6 +1429,10 @@ document.addEventListener('click', (e) => {
       if (b.dataset.p === 'stock') ui.modStock = b.dataset.m || 'Stock';
       // La flecha de Stock vuelve un paso (formulario → ficha → tarjetas → inicio).
       if (ui.pantalla === 'stock' && b.dataset.p === 'inicio') { atrasStock(); break; }
+      if (ui.pantalla === 'facturas' && b.dataset.p === 'inicio' && atrasFacturas()) break;
+      if (ui.pantalla === 'fondofijo' && b.dataset.p === 'inicio' && atrasFondoFijo()) break;
+      if (b.dataset.p === 'facturas') { ui.fac = null; }
+      if (b.dataset.p === 'fondofijo') { ui.ff = null; }
       if (ui.pantalla === 'lluvias' && ui.vistaLluvia === 'cargar' && b.dataset.p === 'inicio') { ui.vistaLluvia = 'dia'; ui.lluvia = null; render(); break; }
       ui.pantalla = b.dataset.p;
       ui.cfg = null;
@@ -1438,6 +1454,8 @@ document.addEventListener('click', (e) => {
     case 'vista': ui.vistaStock = b.dataset.v; render(); window.scrollTo(0, 0); break;
     case 'tfConfirmar': tfConfirmar(); break;
     case 'bajarExcel': bajarExcel(); break;
+    case 'fac': accionFac(b); break;
+    case 'ff': accionFF(b); break;
     case 'tfOtro': ui.tf = null; render(); break;
     case 'masMovs': ui.movsVisibles = (ui.movsVisibles || 15) + 30; render(); break;
     case 'cargarDesde':

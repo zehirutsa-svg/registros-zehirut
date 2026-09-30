@@ -351,6 +351,7 @@ function doPost(e) {
       case 'catalogo': return json_(guardarCatalogo_(body));
       case 'tapfeed': return json_(cargarTapfeed_(body));
       case 'excel': return json_(exportarExcel_(body));
+      case 'za': return json_(zehirut_(body));
       default: return json_({ ok: false, error: 'acción desconocida' });
     }
   } catch (err) {
@@ -930,6 +931,9 @@ function datos_(body) {
     }
   }
   if (u.configura) r.tapfeedDias = diasTapfeed_(ss).filter((f) => f >= desde);
+  if (facturasVisibles_(u)) {
+    try { r.za = ZA.iniciarSesion(body.pin); } catch (e) { r.za = { ok: false, error: String(e.message || e) }; }
+  }
   if (nivel_(u, 'Lluvias') >= NIVELES.VER) r.lluvias = datosLluvias_(desde);
   return r;
 }
@@ -1275,5 +1279,44 @@ function autorizar() {
   SpreadsheetApp.getActive().getName();
   DriveApp.getRootFolder().getName();
   UrlFetchApp.fetch('https://www.google.com', { muteHttpExceptions: true });
+  CalendarApp.getCalendarById('zehirutsa@gmail.com');
+  ZA.iniciarSesion('0000');   // la biblioteca de ZehirutApp
   return 'Permisos OK';
+}
+
+// ---------------------------------------------------------------- Facturas y Fondo fijo (ZehirutApp)
+// Se usan las MISMAS funciones de ZehirutApp, que está agregado como biblioteca ("ZA", ver
+// appsscript.json): misma planilla de Facturas, mismas carpetas de Drive, misma clave de Gemini y
+// mismos permisos (hoja Usuarios de ZehirutApp, con el mismo PIN). Las dos apps conviven y dan lo
+// mismo porque es el mismo código. Al publicar una versión nueva de ZehirutApp, subir "version" de
+// la biblioteca en appsscript.json.
+//
+// Mientras se prueba (FACTURAS_BETA), solo lo ve quien tiene tildado Configurar; los demás siguen
+// cargando en ZehirutApp.
+const FACTURAS_BETA = true;
+
+// Funciones de ZehirutApp que la app puede usar. En los argumentos, "__PIN__" se reemplaza por el
+// PIN de la sesión (cada función lo espera en una posición distinta).
+const ZA_PERMITIDAS = {
+  iniciarSesion: 1, procesarFactura: 1, descartarArchivo: 1, guardarFactura: 1, guardarAnticipo: 1,
+  guardarPagoSinFactura: 1, listarFacturas: 1, obtenerDetalleFactura: 1, eliminarFactura: 1,
+  marcarCargadoAlbor: 1, actualizarFactura: 1, descargarArchivoAdjunto: 1, exportarFacturasExcel: 1,
+  buscarAnticiposPendientes: 1, vincularAnticipoManual: 1, listarFacturasMismoProveedor: 1,
+  procesarComprobanteAsociado: 1, obtenerResumenFondoFijo: 1, registrarFondeoFondoFijo: 1,
+  eliminarFondeoFondoFijo: 1, exportarFondoFijoExcel: 1,
+};
+
+function facturasVisibles_(u) {
+  return FACTURAS_BETA ? !!u.configura : (nivel_(u, 'Facturas') >= NIVELES.VER || nivel_(u, 'Fondo fijo') >= NIVELES.VER);
+}
+
+function zehirut_(body) {
+  const ss = SpreadsheetApp.getActive();
+  const u = usuarioDe_(ss, body.pin);
+  if (!facturasVisibles_(u)) throw new Error('Facturas y Fondo fijo todavía no están habilitados para tu usuario');
+  const fn = String(body.fn || '');
+  if (!ZA_PERMITIDAS[fn] || typeof ZA[fn] !== 'function') throw new Error('función no permitida: ' + fn);
+  const args = (Array.isArray(body.args) ? body.args : []).map((a) => (a === '__PIN__' ? String(body.pin) : a));
+  // Lo que devuelve ZehirutApp viaja como JSON (las fechas ya vienen como texto).
+  return { ok: true, resultado: ZA[fn].apply(null, args) };
 }

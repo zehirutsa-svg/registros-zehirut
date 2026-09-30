@@ -320,3 +320,32 @@ label.btn { text-align: center; cursor: pointer; }
 .leyenda i.mes { background: #7cc4a0; } .leyenda i.temporada { background: var(--azul); } .leyenda i.anio { background: #8fb9e6; }
 .barra-relleno.anterior { background: #1d3f7a; }     /* temporada anterior: azul oscuro */
 .modulo.combustible { border-left-color: #d9790a; }
+/* ---------------------------------------------------------------- facturas y fondo fijo */
+.modulo.facturas { border-left-color: #6b4fa0; }
+.modulo.fondofijo { border-left-color: var(--verde); }
+.opciones-grandes { display: grid; gap: 12px; }
+.elegir-archivo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.elegir-archivo .btn { font-size: 16px; padding: 14px 8px; }
+.archivo-elegido { grid-column: 1 / -1; font-weight: 600; font-size: 15px; }
+.archivo-elegido img { display: block; max-width: 100%; max-height: 220px; margin-top: 8px; border-radius: 10px; border: 1px solid var(--linea); }
+.vista-factura { display: block; max-width: 100%; max-height: 320px; margin: 0 auto 10px; border-radius: 12px; }
+.subt { margin: 4px 0 8px; font-size: 16px; }
+.fila-monto { display: grid; grid-template-columns: 96px 1fr; gap: 8px; }
+.fila4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 6px; }
+.fila4 .txt { padding: 9px 6px; font-size: 15px; }
+.item-edit { padding: 10px 0; border-bottom: 1px solid var(--linea); }
+.item-edit .btn { margin-top: 6px; }
+.item-det { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--linea); }
+.item-det small { color: var(--gris); }
+.copiar { border: 0; background: transparent; font-size: 18px; padding: 4px 6px; }
+.detalle.copiable td:last-child { width: 36px; text-align: right; }
+.cab-factura { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.cab-factura small { color: var(--gris); }
+.monto-grande { font-size: 22px; font-weight: 800; white-space: nowrap; }
+.monto-grande small { font-size: 14px; color: var(--gris); }
+.check-linea { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; font-size: 15px; }
+.check-linea input { width: 22px; height: 22px; flex-shrink: 0; }
+.albor-check { margin-top: 8px; font-weight: 700; }
+.tarjeta.albor { background: #ecfdf3; }
+.mov.albor { background: #f3fbf6; }
+.chip.verde { background: var(--verde-claro); color: var(--verde); }
