@@ -1279,8 +1279,7 @@ function autorizar() {
   SpreadsheetApp.getActive().getName();
   DriveApp.getRootFolder().getName();
   UrlFetchApp.fetch('https://www.google.com', { muteHttpExceptions: true });
-  CalendarApp.getCalendarById('zehirutsa@gmail.com');
-  ZA.iniciarSesion('0000');   // la biblioteca de ZehirutApp
+  try { ZA.iniciarSesion('0000'); } catch (e) { /* PIN falso: solo carga la biblioteca de ZehirutApp */ }
   return 'Permisos OK';
 }
 
