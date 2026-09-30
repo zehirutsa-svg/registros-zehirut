@@ -1,5 +1,5 @@
 // Genera los íconos de la app (docs/icons/) a partir del diseño elegido: block con espiral,
-// marca a fuego de ZEHIRUT en la hoja y lápiz amarillo, fondo blanco (sesión 2026-09-28).
+// marca a fuego de ZEHIRUT en la hoja y lápiz amarillo, fondo blanco (sesión 2026-09-28). Tapa verde inglés desde 30/09
 // Uso: node dev/generar-iconos.js   (necesita Chrome instalado para pasar el SVG a PNG)
 const fs = require('fs'), path = require('path'), { execFileSync } = require('child_process');
 const raiz = path.join(__dirname, '..'), destino = path.join(raiz, 'docs', 'icons');
@@ -15,7 +15,7 @@ const defs = `<defs>
 <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f4f4"/><stop offset=".5" stop-color="#b9bec4"/><stop offset="1" stop-color="#7d848c"/></linearGradient>
 <linearGradient id="eraser" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb3c1"/><stop offset="1" stop-color="#e8637f"/></linearGradient>
 <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffdf3"/><stop offset="1" stop-color="#f3ecd4"/></linearGradient>
-<linearGradient id="red" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9463b"/><stop offset="1" stop-color="#a3261f"/></linearGradient>
+<linearGradient id="red" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f6b47"/><stop offset="1" stop-color="#1a3d2a"/></linearGradient>
 <filter id="sh" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000" flood-opacity=".35"/></filter>
 </defs>`;
 
