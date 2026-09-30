@@ -41,6 +41,10 @@ class Rango {
     return out;
   }
   setValues(v) {
+    // Igual que Google: las filas tienen que tener exactamente el tamaño del rango.
+    if (v.length !== this.nf || v.some((fila) => fila.length !== this.nc)) {
+      throw new Error('El número de columnas de los datos no coincide con el del intervalo. Los datos tienen ' + (v.find((fila) => fila.length !== this.nc) || v[0] || []).length + ' y el intervalo, ' + this.nc + '.');
+    }
     v.forEach((fila, i) => fila.forEach((x, j) => {
       const r = this.f - 1 + i;
       this.h.celdas[r] = this.h.celdas[r] || [];
@@ -48,7 +52,8 @@ class Rango {
     }));
     return this;
   }
-  setValue(x) { return this.setValues([[x]]); }
+  // Como en Google: en un rango de varias celdas, setValue pone el mismo valor en todas.
+  setValue(x) { return this.setValues(Array.from({ length: this.nf }, () => new Array(this.nc).fill(x))); }
   getValue() { return this.getValues()[0][0]; }
   clearContent() {
     for (let i = 0; i < this.nf; i++) {
@@ -71,7 +76,14 @@ class Hoja {
   getLastRow() { this.recortar(); return this.celdas.length; }
   getLastColumn() { return Math.max(0, ...this.celdas.map((f) => (f || []).length)); }
   getRange(f, c, nf, nc) {
-    if (typeof f === 'string') return new Rango(this, 1, 1, 1, 1);  // 'A:B' solo se usa para dar formato
+    if (typeof f === 'string') {
+      // 'A2:H2' como en Google; 'A:B' (columnas enteras) solo se usa para dar formato.
+      const col = (l) => l.split('').reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
+      const m = f.match(/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/);
+      if (!m) return new Rango(this, 1, 1, 1, 1);
+      const f1 = Number(m[2]), c1 = col(m[1]);
+      return new Rango(this, f1, c1, m[4] ? Number(m[4]) - f1 + 1 : 1, m[3] ? col(m[3]) - c1 + 1 : 1);
+    }
     return new Rango(this, f, c, nf || 1, nc || 1);
   }
   getDataRange() { return new Rango(this, 1, 1, this.getLastRow(), this.getLastColumn()); }

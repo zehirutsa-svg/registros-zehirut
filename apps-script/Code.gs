@@ -258,7 +258,7 @@ function importarCargaInicial_(ss) {
         c[5] || '', '', '', '', c[6] || '', 'Carga inicial', '', ahora, false, '', ahora.getTime() + filas.length, '']);
     });
     const sh = ss.getSheetByName('Movimientos');
-    if (filas.length) sh.getRange(sh.getLastRow() + 1, 1, filas.length, COLS_MOV.length).setValues(filas);
+    if (filas.length) sh.getRange(sh.getLastRow() + 1, 1, filas.length, COLS_MOV.length).setValues(filas.map(filaMov_));
     registrar_(ss, [[ahora, 'Carga inicial', 'Importar ' + CARGA_INICIAL, filas.length + ' movimientos', 'Aplicado', '']]);
     reconstruirStock_(ss);
     publicarDatosInforme_(ss);
@@ -534,6 +534,12 @@ function guardarCatalogo_(body) {
 }
 
 // ---------------------------------------------------------------- movimientos y stock
+/** Completa una fila de Movimientos hasta el ancho de la hoja: si se agregan columnas, las que
+ *  armaban filas más cortas siguen andando (la carga de Tapfeed se rompió así al sumar Combustible). */
+function filaMov_(f) {
+  return f.length >= COLS_MOV.length ? f : f.concat(new Array(COLS_MOV.length - f.length).fill(''));
+}
+
 function leerMovimientos_(ss) {
   const sh = ss.getSheetByName('Movimientos');
   const n = sh.getLastRow();
@@ -732,7 +738,7 @@ function guardar_(body) {
       }
     });
 
-    if (nuevas.length) shM.getRange(shM.getLastRow() + 1, 1, nuevas.length, COLS_MOV.length).setValues(nuevas);
+    if (nuevas.length) shM.getRange(shM.getLastRow() + 1, 1, nuevas.length, COLS_MOV.length).setValues(nuevas.map(filaMov_));
     if (lluvias.length) guardarLluvias_(lluvias, u.nombre);
     registrar_(ss, log);
     if (tocoStock) { reconstruirStock_(ss); publicarDatosInforme_(ss); }
@@ -997,7 +1003,7 @@ function cargarTapfeed_(body) {
       return [id, fecha, 'Consumo', ins.nombre, cant, ins.unidad, kg, 'Confinamiento', '', '', '', 'Tapfeed',
         'Tapfeed (' + u.nombre + ')', '', ahora, false, '', ahora.getTime() + k, ''];
     });
-    shM.getRange(shM.getLastRow() + 1, 1, filasMov.length, COLS_MOV.length).setValues(filasMov);
+    shM.getRange(shM.getLastRow() + 1, 1, filasMov.length, COLS_MOV.length).setValues(filasMov.map(filaMov_));
     const filasT = [];
     corrales.forEach((c) => {
       (Array.isArray(c.items) ? c.items : []).forEach((it) => {
