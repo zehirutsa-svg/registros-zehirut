@@ -7,7 +7,7 @@
 // máquina. Permisos: los de Combustible. Se guarda en la cola como todo lo demás (anda sin señal).
 'use strict';
 
-const hor = { vista: 'lista', codigo: null, form: null, excel: null };
+const hor = { vista: 'lista', codigo: null, form: null, excel: null, cfg: null };
 
 function horDatos() {
   return (datos && datos.horometro) || { maquinas: [], trabajos: [], unidadesNegocio: ['CRÍA', 'RECRÍA'], ultimo: {}, partes: [] };
@@ -60,7 +60,9 @@ function htmlHorometro() {
     maquina: [q ? q.nombre : '', htmlHorMaquina],
     form: [hor.form && hor.form.corrige ? 'Corregir parte' : 'Parte de horómetro', htmlHorForm],
     excel: ['Bajar Excel', htmlHorExcel],
+    trabajos: ['Configurar trabajos', htmlHorTrabajos],
   };
+  if (hor.vista === 'trabajos' && !sesion.configura) hor.vista = 'lista';
   const [titulo, fn] = vistas[hor.vista] || vistas.lista;
   return barra(titulo, true) + '<div class="contenido">' + fn(q) + '</div>';
 }
@@ -69,7 +71,7 @@ function htmlHorometro() {
 function atrasHorometro() {
   leerCamposHor();
   if (hor.vista === 'form') hor.vista = 'maquina';
-  else if (hor.vista === 'maquina' || hor.vista === 'excel') { hor.vista = 'lista'; hor.codigo = null; }
+  else if (hor.vista === 'maquina' || hor.vista === 'excel' || hor.vista === 'trabajos') { hor.vista = 'lista'; hor.codigo = null; hor.cfg = null; }
   else return false;
   render();
   window.scrollTo(0, 0);
@@ -87,7 +89,39 @@ function htmlHorLista() {
       '<span class="val"><b>' + (u ? num(u.fin, 1) : '—') + '</b> h' +
       '<small>' + (m.horas ? 'este mes ' + num(m.horas, 1) + ' h' + (m.lh ? ' · ' + num(m.lh, 1) + ' l/h' : '') : 'sin horas este mes') + '</small></span></button>';
   }).join('') + '</div>' +
-    '<div class="pie-stock"><button class="btn sec chico" data-a="hor" data-h="excel">📥 Bajar Excel</button></div>';
+    '<div class="pie-stock"><button class="btn sec chico" data-a="hor" data-h="excel">📥 Bajar Excel</button>' +
+    (sesion.configura ? '<button class="btn sec chico" data-a="hor" data-h="trabajos">⚙ Configurar trabajos</button>' : '') + '</div>';
+}
+
+/** Lista de trabajos (la misma de Combustible): solo quien tiene Configurar la edita. Sacar un
+ *  trabajo no cambia lo ya cargado; solo deja de aparecer en el desplegable. */
+function htmlHorTrabajos() {
+  if (!hor.cfg) hor.cfg = horDatos().trabajos.slice();
+  return '<div class="form"><div class="aviso">Esta lista es el desplegable de <b>Horómetro</b> y de <b>Combustible</b>; nadie puede escribir otro trabajo a mano. ' +
+    'Sacar uno no cambia lo ya cargado. Los cambios necesitan señal.</div><div class="tarjeta">' +
+    hor.cfg.map((t, n) => '<div class="item-cfg"><input class="txt" data-trab="' + n + '" value="' + esc(t) + '">' +
+      '<button class="btn sec chico rojo-txt" data-a="hor" data-h="trabQuitar" data-n="' + n + '" aria-label="Quitar">✕</button></div>').join('') +
+    '<button class="btn sec chico" data-a="hor" data-h="trabAgregar" style="margin-top:10px">+ Agregar trabajo</button> ' +
+    '<button class="btn chico" data-a="hor" data-h="trabGuardar" style="margin-top:10px">Guardar trabajos</button></div></div>';
+}
+
+async function guardarTrabajos() {
+  if (!navigator.onLine) { toast('Sin señal: los cambios de la lista necesitan señal.', 3500); return; }
+  const lista = hor.cfg.map((t) => String(t).trim()).filter(Boolean);
+  if (!lista.length) { toast('La lista no puede quedar vacía.', 3000); return; }
+  try {
+    toast('Guardando…', 10000);
+    await llamar({ accion: 'catalogo', pin: sesion.pin, tipo: 'trabajos', lista });
+    if (datos && datos.horometro) datos.horometro.trabajos = lista;
+    if (datos && datos.stock) datos.stock.trabajos = lista;
+    hor.cfg = null;
+    hor.vista = 'lista';
+    render();
+    toast('✓ Lista de trabajos guardada');
+    sincronizar();
+  } catch (e) {
+    toast('No se pudo guardar: ' + ((e && e.message) || e), 5000);
+  }
 }
 
 function htmlHorMaquina(q) {
@@ -292,6 +326,10 @@ function accionHor(b) {
   const h = b.dataset.h;
   if (h === 'maquina') { hor.codigo = b.dataset.c; hor.vista = 'maquina'; hor.visibles = 15; render(); window.scrollTo(0, 0); }
   else if (h === 'excel') { hor.vista = 'excel'; render(); }
+  else if (h === 'trabajos') { hor.cfg = null; hor.vista = 'trabajos'; render(); window.scrollTo(0, 0); }
+  else if (h === 'trabAgregar') { hor.cfg.push(''); render(); const els = document.querySelectorAll('[data-trab]'); els[els.length - 1].focus(); }
+  else if (h === 'trabQuitar') { hor.cfg.splice(Number(b.dataset.n), 1); render(); }
+  else if (h === 'trabGuardar') guardarTrabajos();
   else if (h === 'nuevo') { hor.form = nuevoParte(hor.codigo); hor.vista = 'form'; render(); window.scrollTo(0, 0); }
   else if (h === 'mas') { hor.visibles = (hor.visibles || 15) + 30; render(); }
   else if (h === 'ver') verParte(b.dataset.id);
@@ -318,6 +356,8 @@ function despuesDeRenderHor() {
     if (el) el.addEventListener('input', () => { hor.form[k] = el.value; $('#h-horas').innerHTML = htmlHorasCalc(); });
   });
   ['cantidad', 'nota'].forEach((k) => { const el = $('#h-' + k); if (el) el.addEventListener('input', () => { hor.form[k] = el.value; }); });
+  document.querySelectorAll('[data-trab]').forEach((el) => el.addEventListener('input', () => { hor.cfg[Number(el.dataset.trab)] = el.value; }));
   const tr = $('#h-trabajo');
+
   if (tr) tr.addEventListener('change', () => { hor.form.trabajo = tr.value; });
 }

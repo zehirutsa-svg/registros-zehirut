@@ -7,7 +7,8 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.13.0';
+const VERSION = '1.14.0';
+
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -817,9 +818,13 @@ function htmlCamposMaquina(f, s) {
       '<datalist id="lista-equipos">' + (q.equipos || []).map((e) => '<option value="' + esc(e) + '">').join('') + '</datalist></div>';
   }
   if (q) {
+    // Solo de la lista (la edita quien tiene Configurar, desde Horómetro). Si se corrige un
+    // movimiento con un trabajo que ya no está, se muestra igual para no perderlo.
+    const lista = (s.trabajos || []).slice();
+    if (f.trabajo && lista.indexOf(f.trabajo) === -1) lista.unshift(f.trabajo);
     h += '<div class="campo"><label for="f-trabajo">Trabajo ' + (q.pideTrabajo ? '' : '<small>(opcional)</small>') + '</label>' +
-      '<input class="txt" id="f-trabajo" list="lista-trabajos" value="' + esc(f.trabajo) + '" autocomplete="off">' +
-      '<datalist id="lista-trabajos">' + (s.trabajos || []).map((t) => '<option value="' + esc(t) + '">').join('') + '</datalist></div>';
+      '<select class="txt grande" id="f-trabajo"><option value="">' + (q.pideTrabajo ? 'Elegí el trabajo…' : 'Sin trabajo') + '</option>' +
+      lista.map((t) => '<option' + (f.trabajo === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</select></div>';
   }
   h += '<div class="campo"><span class="etq">Estancia <small>(opcional)</small></span><div class="segmento">' + ESTANCIAS.map(([e, nom]) =>
     '<button class="neutro' + (f.finca === e ? ' activo' : '') + '" data-a="finca-comb" data-e="' + e + '">' + nom + '</button>').join('') + '</div></div>';

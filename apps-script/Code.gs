@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '8';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '9';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
@@ -111,7 +111,8 @@ const UNIDAD_NEGOCIO_SANIDAD = 'PATRIMONIAL';
 
 // Lista depurada por el usuario el 30/09/2026 (una sola para Combustible y Horómetro).
 const TRABAJOS_INICIALES = ['Caminería', 'Trabajos varios con traila', 'Trabajos varios con niveladora', 'Cargada de corral',
-  'Acarreo de fardos', 'Acarreos varios', 'Fumigación', 'Generador (energía)', 'Bombeo', 'Aviación', 'Uso general', 'Trabajos de carpida'];
+  'Acarreo de fardos', 'Acarreos varios', 'Fumigación', 'Generador (energía)', 'Bombeo', 'Aviación', 'Uso general', 'Trabajos de carpida',
+  'Recorrida'];
 // Carpeta "1 Tapfeed" (dentro de "Confinamiento ZEHIRUT"): ahí se guarda cada PDF subido.
 const TAPFEED_CARPETA = '1ZybVBnxzMW_9OixfT_ut9GuvKtQbagH1';
 // Carga inicial (una sola vez): archivo CSV en el Drive del dueño, fuera del repositorio porque
@@ -169,6 +170,7 @@ function configurar() {
   asegurarCombustible_(ss, ins, mov);
   asegurarSanidad_(ss, ins, usu);
   asegurarHorometro_(ss);
+  asegurarRecorrida_(ss);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
   [stock, mov, ins, des, usu, reg].forEach((h, i) => { ss.setActiveSheet(h); ss.moveActiveSheet(i + 1); });
@@ -526,7 +528,7 @@ function leerDestinos_(ss) {
 function guardarCatalogo_(body) {
   const ss = SpreadsheetApp.getActive();
   const u = usuarioDe_(ss, body.pin);
-  if (!u.configura) throw new Error('no tenés permiso para cambiar las listas de insumos y destinos');
+  if (!u.configura) throw new Error('no tenés permiso para cambiar las listas (insumos, destinos, trabajos)');
   return conLock_(() => {
     const usados = {};
     leerMovimientos_(ss).forEach((m) => { usados[m.insumo] = true; usados['D:' + m.destino] = true; });
@@ -569,7 +571,20 @@ function guardarCatalogo_(body) {
         } else if (usados[i.nombre] && !vistos[i.nombre.toUpperCase()]) filas.push(filaDe(i, false));
       });
       sh = ss.getSheetByName('Insumos'); ancho = COLS_INSUMOS.length;
+    } else if (body.tipo === 'trabajos') {
+      // Lista de trabajos (Combustible y Horómetro). Sacar uno no toca lo ya cargado: solo deja de
+      // aparecer en el desplegable.
+      const vistos = {};
+      filas = (Array.isArray(body.lista) ? body.lista : []).map((x) => {
+        const nombre = texto_(x, 60);
+        if (!nombre) throw new Error('hay un trabajo sin nombre');
+        if (vistos[nombre.toUpperCase()]) throw new Error('el trabajo "' + nombre + '" está repetido');
+        vistos[nombre.toUpperCase()] = true;
+        return [nombre];
+      });
+      sh = ss.getSheetByName('Trabajos'); ancho = 1;
     } else if (body.tipo === 'destinos') {
+
       const vistos = {};
       filas = (Array.isArray(body.lista) ? body.lista : []).map((x) => {
         const nombre = texto_(x.nombre, 60);
@@ -764,7 +779,8 @@ function guardar_(body) {
       try {
         if (op.tipo === 'mov') {
           exigir_(u, moduloDe(texto_(op.insumo, 60)), 'CARGAR');
-          const m = validarMov_(op, u, insumos, destinos, hoy, maquinas);
+          trabajos = trabajos || leerTrabajos_(ss);
+          const m = validarMov_(op, u, insumos, destinos, hoy, maquinas, trabajos);
           const fila = [id, m.fecha, m.tipo, m.insumo, m.cantidad, m.unidad, m.kg == null ? '' : m.kg, m.destino,
             m.proveedor, m.remito, m.factura, m.nota, u.nombre, horaTel, ahora, false, '', ts, m.estancia,
             m.maquina, m.equipo, m.trabajo, m.finca];
@@ -862,7 +878,7 @@ function marcarNuevaAnulada_(nuevas, id, quien, motivo) {
   nuevas.forEach((f) => { if (f[0] === id) { f[15] = true; f[16] = quien + (motivo ? ': ' + motivo : ''); } });
 }
 
-function validarMov_(op, u, insumos, destinos, hoy, maquinas) {
+function validarMov_(op, u, insumos, destinos, hoy, maquinas, trabajos) {
   const tipo = TIPOS_MOV.indexOf(op.clase) === -1 ? null : op.clase;
   if (!tipo) throw new Error('tipo de movimiento inválido');
   const fecha = String(op.fecha || '');
@@ -892,6 +908,8 @@ function validarMov_(op, u, insumos, destinos, hoy, maquinas) {
       destino = q.nombre;
       if (q.agrupa) equipo = texto_(op.equipo, 60);
       trabajo = texto_(op.trabajo, 60);
+      // Solo de la lista (hoja Trabajos, la edita quien tiene Configurar): nada escrito a mano.
+      if (trabajo && (trabajos || []).indexOf(trabajo) === -1) throw new Error('el trabajo "' + trabajo + '" no está en la lista');
       if (q.pideTrabajo && !trabajo) throw new Error('en los tractores hay que cargar el trabajo que se hizo');
     }
     finca = ESTANCIAS.indexOf(String(op.finca || '')) !== -1 ? String(op.finca) : '';

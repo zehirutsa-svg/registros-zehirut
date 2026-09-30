@@ -175,3 +175,11 @@ function exportarHorasExcel_(u, body) {
     DriveApp.getFileById(tmp.getId()).setTrashed(true);
   }
 }
+
+/** Versión 9: "Recorrida" en la lista de trabajos (faltaba; motos y camionetas), una sola vez. */
+function asegurarRecorrida_(ss) {
+  if (props_().getProperty('TRABAJOS_RECORRIDA')) return;
+  const tra = ss.getSheetByName('Trabajos');
+  if (leerTrabajos_(ss).indexOf('Recorrida') === -1) tra.getRange(tra.getLastRow() + 1, 1).setValue('Recorrida');
+  props_().setProperty('TRABAJOS_RECORRIDA', '1');
+}
