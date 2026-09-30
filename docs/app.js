@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.16.1';
+const VERSION = '1.16.2';
 
 
 const DIAS_HISTORIAL = 60;
@@ -17,7 +17,8 @@ const NIVELES = { '': 0, VER: 1, PROPIAS: 2, CARGAR: 2, ADMINISTRAR: 3 };
 const PLURAL = { bolsa: 'bolsas', fardo: 'fardos', litro: 'litros', unidad: 'unidades', kg: 'kg', frasco: 'frascos', 'bidón': 'bidones', caja: 'cajas', pajuela: 'pajuelas' };
 const UNIDADES = ['bolsa', 'kg', 'fardo', 'litro', 'unidad'];
 // Sanidad: tres stocks separados (cada producto es de un rubro) y sus unidades de depósito.
-const RUBROS_SANIDAD = [['Medicamentos', '🧴'], ['Insumos IATF', '🪡'], ['Semen', '🧬']];
+// Íconos propios (docs/icons): no hay emoji de frasco de vacuna ni de pistola de inseminación.
+const RUBROS_SANIDAD = [['Medicamentos', '<img src="icons/vacuna.svg" alt="">'], ['Insumos IATF', '<img src="icons/iatf.svg" alt="">'], ['Semen', '🧬']];
 const UNIDADES_SAN = ['frasco', 'bidón', 'caja', 'unidad', 'pajuela'];
 // Insumos "por estancia" (ej. Fardos) llevan un stock separado en cada una.
 const ESTANCIAS = [['LA PRUDENCIA', 'La Prudencia'], ['LA PACIENCIA', 'La Paciencia']];

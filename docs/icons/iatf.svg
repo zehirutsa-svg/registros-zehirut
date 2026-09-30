@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="4 4 56 56">
+  <!-- Pistola de inseminación (aplicador) con la vaina: en diagonal, anillo y émbolo abajo a la izquierda -->
+  <g transform="rotate(-45 32 32)">
+    <!-- vaina plástica (se ve más allá del cañón) -->
+    <rect x="44" y="30" width="18" height="4" rx="2" fill="#dcecf2" stroke="#7fa3b2" stroke-width="1"/>
+    <!-- cañón metálico -->
+    <rect x="14" y="29" width="33" height="6" rx="2" fill="#aeb6bd"/>
+    <rect x="14" y="29" width="33" height="2.2" rx="1.1" fill="#d5dbe0"/>
+    <!-- anillo de traba (virola) -->
+    <rect x="40" y="27.5" width="4" height="9" rx="1.2" fill="#1f4a33"/>
+    <!-- cuerpo / empuñadura -->
+    <rect x="6" y="27" width="10" height="10" rx="2" fill="#6e4526"/>
+    <!-- émbolo con anillo para el dedo -->
+    <rect x="1" y="30.5" width="6" height="3" fill="#8a949c"/>
+    <circle cx="1.5" cy="32" r="4" fill="none" stroke="#6e4526" stroke-width="2.5"/>
+  </g>
+</svg>
