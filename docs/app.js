@@ -7,13 +7,16 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.10.4';
+const VERSION = '1.11.0';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
 const NIVELES = { '': 0, VER: 1, PROPIAS: 2, CARGAR: 2, ADMINISTRAR: 3 };
-const PLURAL = { bolsa: 'bolsas', fardo: 'fardos', litro: 'litros', unidad: 'unidades', kg: 'kg' };
+const PLURAL = { bolsa: 'bolsas', fardo: 'fardos', litro: 'litros', unidad: 'unidades', kg: 'kg', frasco: 'frascos', 'bidón': 'bidones', caja: 'cajas', pajuela: 'pajuelas' };
 const UNIDADES = ['bolsa', 'kg', 'fardo', 'litro', 'unidad'];
+// Sanidad: tres stocks separados (cada producto es de un rubro) y sus unidades de depósito.
+const RUBROS_SANIDAD = [['Medicamentos', '💊'], ['Insumos IATF', '🧪'], ['Semen', '🧬']];
+const UNIDADES_SAN = ['frasco', 'bidón', 'caja', 'unidad', 'pajuela'];
 // Insumos "por estancia" (ej. Fardos) llevan un stock separado en cada una.
 const ESTANCIAS = [['LA PRUDENCIA', 'La Prudencia'], ['LA PACIENCIA', 'La Paciencia']];
 const nombreEstancia = (e) => (ESTANCIAS.find((x) => x[0] === e) || [e, e])[1];
@@ -43,7 +46,8 @@ function guardarTodo() {
 // Estado de pantalla (no se guarda, salvo lo que conviene recordar entre aperturas).
 const ui = {
   pantalla: 'inicio',
-  modStock: 'Stock',    // módulo que se está viendo con el recorrido de stock: Stock | Combustible
+  modStock: 'Stock',    // módulo que se está viendo con el recorrido de stock: Stock | Combustible | Sanidad
+  rubro: null,          // en Sanidad: Medicamentos | Insumos IATF | Semen
   vistaStock: 'lista',  // lista | ficha | form | sinFactura | config
   insumoVer: null,      // insumo de la ficha abierta
   movsVisibles: 15,
@@ -318,8 +322,15 @@ const esSinFactura = (m) => m.tipo === 'Ingreso' && !m.anulado && !m.factura && 
 
 // Stock y Combustible usan el mismo recorrido; cada insumo dice a qué módulo pertenece.
 const moduloDe = (nombre) => (stockDatos().insumos.find((i) => i.nombre === nombre) || {}).modulo || 'Stock';
-const insumosMod = () => stockDatos().insumos.filter((i) => (i.modulo || 'Stock') === ui.modStock);
 const esCombustible = () => ui.modStock === 'Combustible';
+const esSanidad = () => ui.modStock === 'Sanidad';
+// Lo que se ve en pantalla: los insumos del módulo (en Sanidad, solo los del rubro abierto).
+const insumosMod = () => stockDatos().insumos.filter((i) => (i.modulo || 'Stock') === ui.modStock && (!esSanidad() || i.rubro === ui.rubro));
+const enVista = (nombre) => insumosMod().some((i) => i.nombre === nombre);
+// Sanidad se cuenta en frascos con un decimal (medio frasco usado); lo demás, en unidades enteras.
+const decimales = (i) => ((i.modulo || 'Stock') === 'Sanidad' ? 1 : 0);
+/** Lo que hay adentro de un saldo de Sanidad, ej. "4.250 ml" (frascos) o "300 un" (cajas). */
+const contenidoTxt = (i, cant) => (i.contenido ? num(cant * i.contenido, 0) + ' ' + i.unidadContenido : '');
 const COMBUSTIBLE_DESDE = '2026-10-01';
 // Facturas y Fondo fijo en prueba: solo los ve quien configura (lo decide el script, FACTURAS_BETA).
 const FACTURAS_PRUEBA = true;
@@ -493,6 +504,16 @@ function tarjetasModulos() {
     const txt = ['Nafta', 'Diesel'].map((n) => n + ' ' + num((s[n] || {}).cantidad || 0, 0) + ' L').join(' · ');
     g.stocks.push(tarjeta('combustible', 'data-p="stock" data-m="Combustible"', '⛽', 'Combustible', txt));
   }
+  if (puede('Sanidad', 'VER')) {
+    // Un stock por rubro (medicamentos, insumos de IATF, semen): cada uno con su tarjeta.
+    const s = saldos();
+    RUBROS_SANIDAD.forEach(([r, ico]) => {
+      const ins = stockDatos().insumos.filter((i) => i.activo && i.modulo === 'Sanidad' && i.rubro === r);
+      const bajosR = ins.filter((i) => i.minimo != null && s[i.nombre] && s[i.nombre].cantidad < i.minimo).length;
+      g.stocks.push(tarjeta('sanidad', 'data-p="stock" data-m="Sanidad" data-r="' + esc(r) + '"', ico, r,
+        ins.length + ' productos' + (bajosR ? ' · <span class="chip alerta">' + bajosR + ' bajo mínimo</span>' : '')));
+    });
+  }
   const za = datos && datos.za && datos.za.ok ? datos.za : null;
   if (za && (za.puedeFacturas || za.puedeVerFacturas)) g.comprobantes.push(tarjeta('facturas', 'data-p="facturas"', '🧾', 'Facturas', 'Cargar y ver facturas' + prueba));
   if (za && za.puedeFondoFijo) g.comprobantes.push(tarjeta('fondofijo', 'data-p="fondofijo"', '💵', 'Fondo fijo', 'Caja chica' + prueba));
@@ -511,7 +532,7 @@ function tarjetasModulos() {
 }
 
 const GRUPOS = {
-  stocks: { titulo: 'Stocks', ico: '📦', sub: 'Insumos · Combustible' },
+  stocks: { titulo: 'Stocks', ico: '📦', sub: 'Insumos · Combustible · Sanidad' },
   comprobantes: { titulo: 'Comprobantes', ico: '🗂️', sub: 'Facturas · Fondo fijo' },
 };
 
@@ -552,9 +573,10 @@ function htmlStock() {
   const i = ui.insumoVer && stockDatos().insumos.find((x) => x.nombre === ui.insumoVer);
   if ((ui.vistaStock === 'ficha' || ui.vistaStock === 'form') && !i) ui.vistaStock = 'lista';
   if (ui.vistaStock === 'form' && !(ui.form && ui.form.clase)) ui.vistaStock = 'ficha';
-  if ((ui.vistaStock === 'config' || ui.vistaStock === 'tapfeed') && (!sesion.configura || esCombustible())) ui.vistaStock = 'lista';
+  if ((ui.vistaStock === 'config' && (!sesion.configura || esCombustible())) ||
+    (ui.vistaStock === 'tapfeed' && (!sesion.configura || ui.modStock !== 'Stock'))) ui.vistaStock = 'lista';
   const vistas = {
-    lista: [esCombustible() ? 'Combustible' : 'Stock de insumos', htmlSaldo],
+    lista: [esSanidad() ? ui.rubro : esCombustible() ? 'Combustible' : 'Stock de insumos', htmlSaldo],
     ficha: [ui.insumoVer, () => htmlFicha(ui.insumoVer)],
     form: [ui.form ? (ui.form.corrige ? 'Corregir ' + ui.form.clase.toLowerCase() : ui.form.clase) + ' · ' + ui.form.insumo : '', htmlCargar],
     sinFactura: ['Ingresos sin factura', htmlSinFactura],
@@ -588,7 +610,7 @@ function infoInsumo(i, s, c7, estancia) {
     x, prom, bajo,
     dias: prom && x.cantidad > 0 ? Math.floor(x.cantidad / prom) : null,
     cls: x.cantidad < 0 ? 'negativo' : bajo ? 'bajo' : (!x.ultimoConteo && !x.cantidad ? 'sin' : ''),
-    kg: i.kgUnidad && i.unidad !== 'kg' ? num(x.cantidad * i.kgUnidad, 0) + ' kg' : '',
+    kg: i.contenido ? contenidoTxt(i, x.cantidad) : i.kgUnidad && i.unidad !== 'kg' ? num(x.cantidad * i.kgUnidad, 0) + ' kg' : '',
   };
 }
 
@@ -596,10 +618,10 @@ function htmlSaldo() {
   const s = saldos();
   const c7 = consumo7();
   const ins = insumosMod().filter((i) => i.activo || (s[i.nombre] && s[i.nombre].cantidad));
-  const sinFactura = movimientos().filter((m) => esSinFactura(m) && moduloDe(m.insumo) === ui.modStock).length;
+  const sinFactura = movimientos().filter((m) => esSinFactura(m) && enVista(m.insumo)).length;
   return (sinFactura ? '<button class="aviso amarillo aviso-btn" data-a="vista" data-v="sinFactura">🧾 Hay <b>' + sinFactura +
     (sinFactura === 1 ? ' ingreso' : ' ingresos') + ' sin factura</b>. Tocá para verlos.</button>' : '') +
-    (ins.length ? '<div class="saldos">' + ins.map((i) => {
+    (esSanidad() ? htmlListaSanidad(ins, s, c7) : ins.length ? '<div class="saldos">' + ins.map((i) => {
       if (i.porEstancia) {
         // Un renglón por estancia, con su propio saldo.
         const partes = ESTANCIAS.map(([e, nom]) => ({ nom, n: infoInsumo(i, s, c7, e) }));
@@ -623,9 +645,25 @@ function htmlSaldo() {
         '</div></button>';
     }).join('') + '</div>' : '<p class="vacio">Todavía no hay insumos cargados.</p>') +
     '<div class="pie-stock"><button class="btn sec chico" data-a="vista" data-v="excel">📥 Bajar Excel</button>' +
-    (sesion.configura && !esCombustible() ? '<button class="btn sec chico" data-a="vista" data-v="tapfeed">📄 Subir informe TAP Feed</button>' +
-      '<button class="btn sec chico" data-a="vista" data-v="config">⚙ Configurar insumos y corrales</button>' : '') + '</div>';
+    (sesion.configura && ui.modStock === 'Stock' ? '<button class="btn sec chico" data-a="vista" data-v="tapfeed">📄 Subir informe TAP Feed</button>' +
+      '<button class="btn sec chico" data-a="vista" data-v="config">⚙ Configurar insumos y corrales</button>' : '') +
+    (sesion.configura && esSanidad() ? '<button class="btn sec chico" data-a="vista" data-v="config">⚙ Configurar productos</button>' : '') + '</div>';
 }
+
+/** Sanidad: son muchos productos, así que va en lista (no en tarjetas), con un buscador. */
+function htmlListaSanidad(ins, s, c7) {
+  if (!ins.length) return '<p class="vacio">Todavía no hay productos en ' + esc(ui.rubro) + '.</p>';
+  return '<input class="txt buscar" id="buscar-san" type="search" placeholder="🔍 Buscar producto…" autocomplete="off">' +
+    '<div class="lista-san">' + ins.map((i) => {
+      const n = infoInsumo(i, s, c7);
+      return '<button class="fila-san ' + n.cls + '" data-a="verInsumo" data-i="' + esc(i.nombre) + '" data-buscar="' + esc(i.nombre.toUpperCase()) + '">' +
+        '<span class="nom">' + esc(i.nombre) + (n.x.pendiente ? ' <span class="chip pend">sin enviar</span>' : '') +
+        (n.bajo ? ' <span class="chip alerta">bajo mínimo</span>' : '') + (!n.x.ultimoConteo ? ' <span class="chip">sin conteo</span>' : '') + '</span>' +
+        '<span class="val"><b class="' + (n.x.cantidad < 0 ? 'rojo' : '') + '">' + num(n.x.cantidad, 1) + '</b> ' + esc(unidadTxt(i.unidad, n.x.cantidad)) +
+        (n.kg && n.x.cantidad ? '<small>' + esc(n.kg) + '</small>' : '') + '</span></button>';
+    }).join('') + '</div><p class="vacio oculto" id="buscar-nada">No hay productos con ese nombre.</p>';
+}
+
 
 /** Ficha de un insumo: saldo, cómo viene el consumo, botones para cargar y sus movimientos. */
 /** Caja con el saldo grande y sus datos (una por estancia si el insumo va por estancia). */
@@ -638,7 +676,7 @@ function cajaSaldo(i, n, titulo) {
     i.minimo != null ? ['Stock mínimo', num(i.minimo) + ' ' + unidadTxt(i.unidad, i.minimo)] : null,
   ].filter(Boolean);
   return '<div class="saldo ' + n.cls + '">' + (titulo ? '<h3>' + esc(titulo) + '</h3>' : '') +
-    '<div class="cant">' + num(n.x.cantidad, 0) + '<small>' + esc(unidadTxt(i.unidad, n.x.cantidad)) + '</small>' +
+    '<div class="cant">' + num(n.x.cantidad, decimales(i)) + '<small>' + esc(unidadTxt(i.unidad, n.x.cantidad)) + '</small>' +
     (n.x.pendiente ? ' <span class="chip pend">sin enviar</span>' : '') + '</div>' +
     (n.bajo ? '<span class="chip alerta">Bajo el mínimo</span> ' : '') + (n.x.cantidad < 0 ? '<span class="chip alerta">Saldo negativo: falta un ingreso o un conteo</span>' : '') +
     '<table class="detalle" style="margin-top:8px">' + datosFicha.map(([a, b]) => '<tr><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table></div>';
@@ -679,7 +717,7 @@ function htmlFicha(nombre) {
 }
 
 function htmlSinFactura() {
-  const movs = movimientos().filter((m) => esSinFactura(m) && moduloDe(m.insumo) === ui.modStock);
+  const movs = movimientos().filter((m) => esSinFactura(m) && enVista(m.insumo));
   if (!movs.length) return '<p class="vacio">No hay ingresos sin factura. 👍</p>';
   return '<div class="form"><div class="aviso">Tocá un ingreso para asociarle la factura cuando llegue.</div>' +
     movs.map((m) => htmlMov(m)).join('') + '</div>';
@@ -716,14 +754,15 @@ function htmlCargar() {
     '<input type="date" id="f-fecha" value="' + f.fecha + '" max="' + hoyISO() + '"' + (esCombustible() ? ' min="' + COMBUSTIBLE_DESDE + '"' : '') + '></label>' +
     '<button class="nav" data-a="fecha" data-d="1" aria-label="Día siguiente"' + (f.fecha >= hoyISO() ? ' disabled' : '') + '>›</button></div></div>';
   if (esCombustible() && hoyISO() < COMBUSTIBLE_DESDE) h += '<div class="aviso amarillo">El registro de combustible arranca el 1° de octubre.</div>';
-  h += '<div class="campo"><span class="etq">' + (f.clase === 'Conteo' ? 'Cantidad contada' : 'Cantidad') + ' <small>(en ' + esc(unidadTxt(ins.unidad, 2)) + ')</small></span>' +
+  h += '<div class="campo"><span class="etq">' + (f.clase === 'Conteo' ? 'Cantidad contada' : 'Cantidad') + ' <small>(en ' + esc(unidadTxt(ins.unidad, 2)) +
+    (ins.contenido ? '; un frasco empezado va con coma, ej. 3,5' : '') + ')</small></span>' +
     '<div class="cantidad"><button data-a="mas" data-d="-1" aria-label="Menos">−</button>' +
     '<input id="f-cantidad" inputmode="decimal" autocomplete="off" value="' + esc(f.cantidad) + '" placeholder="0">' +
     '<button data-a="mas" data-d="1" aria-label="Más">+</button></div>' +
     '<div class="equivale" id="f-equivale">' + equivale() + '</div></div>';
   if (f.clase === 'Consumo' && esCombustible()) {
     h += htmlCamposMaquina(f, s);
-  } else if (f.clase === 'Consumo') {
+  } else if (f.clase === 'Consumo' && !esSanidad()) {
     const dest = s.destinos.filter((d) => d.activo);
     h += '<div class="campo"><label for="f-destino">Destino <small>(opcional)</small></label><select class="txt grande" id="f-destino">' +
       '<option value="">Sin destino</option>' +
@@ -776,6 +815,7 @@ function equivale() {
   const ins = stockDatos().insumos.find((i) => i.nombre === f.insumo);
   const n = leerNumero(f.cantidad);
   if (!ins || !isFinite(n)) return '';
+  if (ins.contenido) return '= ' + contenidoTxt(ins, n);
   if (ins.kgUnidad && ins.unidad !== 'kg') return '= ' + num(n * ins.kgUnidad) + ' kg';
   return '';
 }
@@ -858,7 +898,8 @@ function htmlMov(m, conFecha) {
   const ico = { Consumo: '⬆', Ingreso: '⬇', Conteo: '✔' }[m.tipo] || '•';
   const extra = [];
   if (m.estancia) extra.push('<span class="chip azul">' + esc(nombreEstancia(m.estancia).replace('La ', '')) + '</span>');
-  if (m.tipo === 'Consumo') extra.push((m.destino || 'sin destino') + (m.equipo ? ' ' + m.equipo : '') + (m.trabajo ? ' · ' + m.trabajo : ''));
+  if (m.tipo === 'Consumo' && moduloDe(m.insumo) === 'Sanidad') { if (m.nota) extra.push(m.nota); }
+  else if (m.tipo === 'Consumo') extra.push((m.destino || 'sin destino') + (m.equipo ? ' ' + m.equipo : '') + (m.trabajo ? ' · ' + m.trabajo : ''));
   if (m.tipo === 'Ingreso') {
     if (esPropio(m.insumo)) extra.push('producción propia');
     else {
@@ -877,13 +918,16 @@ function htmlMov(m, conFecha) {
 async function verMov(id) {
   const m = movimientos().find((x) => x.id === id);
   if (!m) return;
+  const insM = stockDatos().insumos.find((i) => i.nombre === m.insumo) || {};
+  const san = insM.modulo === 'Sanidad';
   const filas = [
-    ['Tipo', m.tipo], ['Fecha', fechaTxt(m.fecha, true)], ['Insumo', m.insumo],
+    ['Tipo', m.tipo], ['Fecha', fechaTxt(m.fecha, true)], [san ? 'Producto' : 'Insumo', m.insumo],
   ];
   if (m.estancia) filas.push(['Estancia', nombreEstancia(m.estancia)]);
   filas.push(
-    ['Cantidad', num(m.cantidad) + ' ' + unidadTxt(m.unidad, m.cantidad) + (m.kg != null && m.unidad !== 'kg' ? ' (' + num(m.kg) + ' kg)' : '')]);
-  if (m.tipo === 'Consumo') filas.push([m.maquina ? 'Máquina' : 'Destino', (m.destino || 'Sin destino') + (m.equipo ? ' (' + m.equipo + ')' : '')]);
+    ['Cantidad', num(m.cantidad) + ' ' + unidadTxt(m.unidad, m.cantidad) + (insM.contenido ? ' (' + contenidoTxt(insM, m.cantidad) + ')'
+      : m.kg != null && m.unidad !== 'kg' ? ' (' + num(m.kg) + ' kg)' : '')]);
+  if (m.tipo === 'Consumo' && !san) filas.push([m.maquina ? 'Máquina' : 'Destino', (m.destino || 'Sin destino') + (m.equipo ? ' (' + m.equipo + ')' : '')]);
   if (m.trabajo) filas.push(['Trabajo', m.trabajo]);
   if (m.finca) filas.push(['Estancia', nombreEstancia(m.finca)]);
   if (m.tipo === 'Ingreso' && !esPropio(m.insumo)) {
@@ -921,6 +965,7 @@ async function verMov(id) {
     ui.insumoVer = m.insumo;
     ui.pantalla = 'stock';
     ui.modStock = mod;
+    if (san) ui.rubro = insM.rubro;
     ui.vistaStock = 'form';
     render();
     window.scrollTo(0, 0);
@@ -1114,8 +1159,10 @@ function htmlExcel() {
   if (!ui.excel) ui.excel = { desde: hoyISO().slice(0, 8) + '01', hasta: hoyISO() };
   const e = ui.excel;
   const min = esCombustible() ? ' min="' + COMBUSTIBLE_DESDE + '"' : '';
-  return '<div class="form"><div class="aviso">Baja todo lo registrado en el período: un <b>Resumen</b>, una hoja por ' +
-    (esCombustible() ? 'combustible' : 'insumo') + ' (saldo con fórmula) y la tabla de <b>Movimientos</b> con el código del bien de uso (para Albor).</div>' +
+  return '<div class="form"><div class="aviso">' + (esSanidad()
+    ? 'Baja lo registrado de <b>' + esc(ui.rubro) + '</b> en el período: un <b>Resumen</b> (saldo de cada producto) y la tabla de <b>Movimientos</b>, todo con la unidad de negocio PATRIMONIAL.'
+    : 'Baja todo lo registrado en el período: un <b>Resumen</b>, una hoja por ' +
+    (esCombustible() ? 'combustible' : 'insumo') + ' (saldo con fórmula) y la tabla de <b>Movimientos</b> con el código del bien de uso (para Albor).') + '</div>' +
     '<div class="fila2"><div class="campo"><label for="x-desde">Desde</label><input class="txt" type="date" id="x-desde" value="' + e.desde + '"' + min + ' max="' + hoyISO() + '"></div>' +
     '<div class="campo"><label for="x-hasta">Hasta</label><input class="txt" type="date" id="x-hasta" value="' + e.hasta + '"' + min + ' max="' + hoyISO() + '"></div></div>' +
     '<button class="btn" data-a="bajarExcel"' + (e.bajando ? ' disabled' : '') + '>' + (e.bajando ? 'Armando el Excel…' : '📥 Bajar Excel') + '</button></div>';
@@ -1130,7 +1177,7 @@ async function bajarExcel() {
   e.bajando = true;
   render();
   try {
-    const r = await llamar({ accion: 'excel', pin: sesion.pin, modulo: ui.modStock, desde: e.desde, hasta: e.hasta });
+    const r = await llamar({ accion: 'excel', pin: sesion.pin, modulo: ui.modStock, rubro: ui.rubro, desde: e.desde, hasta: e.hasta });
     const bin = atob(r.base64);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
@@ -1150,6 +1197,7 @@ async function bajarExcel() {
 
 // ------ configurar insumos y destinos (solo quien administra Stock; necesita señal)
 function htmlConfig() {
+  if (esSanidad()) return htmlConfigSanidad();
   const s = stockDatos();
   // Solo los insumos de Stock: Nafta y Diesel son de Combustible y el script los conserva aparte.
   if (!ui.cfg) ui.cfg = { insumos: s.insumos.filter((i) => (i.modulo || 'Stock') === 'Stock').map((i) => Object.assign({}, i)), destinos: s.destinos.map((d) => Object.assign({}, d)) };
@@ -1176,10 +1224,44 @@ function htmlConfig() {
     '</div>';
 }
 
+/** Productos de un rubro de Sanidad: nombre, en qué se guarda (frasco, caja…), cuánto trae y el mínimo. */
+function htmlConfigSanidad() {
+  if (!ui.cfg) ui.cfg = { insumos: insumosMod().map((i) => Object.assign({}, i)) };
+  const c = ui.cfg;
+  const campo = (i, n, k, etq, extra) => '<div><span class="mini-etq">' + etq + '</span><input class="txt" data-cfg="insumos" data-n="' + n + '" data-k="' + k + '" value="' +
+    esc(i[k] == null ? '' : i[k]) + '"' + (extra || '') + '></div>';
+  const opciones = (i, n, k, lista, etq) => '<div><span class="mini-etq">' + etq + '</span><select class="txt" data-cfg="insumos" data-n="' + n + '" data-k="' + k + '">' +
+    lista.map((u) => '<option ' + (i[k] === u ? 'selected' : '') + '>' + esc(u) + '</option>').join('') + '</select></div>';
+  return '<div class="form">' +
+    '<div class="aviso">Los cambios necesitan señal. <b>Contenido</b>: lo que trae cada unidad (frasco de 500 ml, caja de 100 un); vacío si se cuenta de a uno (jeringas, pajuelas). ' +
+    'Un producto con movimientos no se borra: se desactiva. Para pasarlo a otro stock, cambiá el <b>Stock</b>.</div>' +
+    '<div class="tarjeta"><h3 style="margin-top:0">' + esc(ui.rubro) + '</h3>' +
+    c.insumos.map((i, n) => '<div class="item-cfg"><div class="grilla">' +
+      '<div class="ancho"><span class="mini-etq">Producto</span><input class="txt" data-cfg="insumos" data-n="' + n + '" data-k="nombre" value="' + esc(i.nombre) + '"></div>' +
+      opciones(i, n, 'unidad', UNIDADES_SAN, 'Se guarda en') +
+      campo(i, n, 'contenido', 'Contenido', ' inputmode="decimal"') +
+      opciones(i, n, 'unidadContenido', ['ml', 'un'], 'ml / un') +
+      campo(i, n, 'minimo', 'Stock mínimo', ' inputmode="decimal"') +
+      opciones(i, n, 'rubro', RUBROS_SANIDAD.map((r) => r[0]), 'Stock') +
+      '</div><label class="interruptor"><input type="checkbox" data-cfg="insumos" data-n="' + n + '" data-k="activo" ' + (i.activo ? 'checked' : '') + '> Activo</label></div>').join('') +
+    '<button class="btn sec chico" data-a="cfgAgregar" data-cfg="insumos" style="margin-top:10px">+ Agregar producto</button> ' +
+    '<button class="btn chico" data-a="cfgGuardar" data-cfg="insumos" style="margin-top:10px">Guardar productos</button></div></div>';
+}
+
 async function cfgGuardar(tipo) {
   if (!navigator.onLine) { toast('Sin señal: los cambios de la lista necesitan señal.', 3500); return; }
   let lista;
-  if (tipo === 'insumos') {
+  if (tipo === 'insumos' && esSanidad()) {
+    lista = ui.cfg.insumos.filter((i) => String(i.nombre).trim()).map((i) => {
+      const cont = i.contenido === '' || i.contenido == null ? '' : leerNumero(i.contenido);
+      return {
+        nombre: String(i.nombre).trim(), unidad: i.unidad || 'frasco', contenido: cont, unidadContenido: cont === '' ? '' : (i.unidadContenido || 'ml'),
+        minimo: i.minimo === '' || i.minimo == null ? '' : leerNumero(i.minimo), activo: !!i.activo, rubro: i.rubro || ui.rubro,
+      };
+    });
+    const malo = lista.find((i) => (i.contenido !== '' && !(i.contenido > 0)) || (i.minimo !== '' && !(i.minimo >= 0)));
+    if (malo) { toast('Revisá los números de ' + malo.nombre + '.', 3500); return; }
+  } else if (tipo === 'insumos') {
     lista = ui.cfg.insumos.filter((i) => String(i.nombre).trim()).map((i) => ({
       nombre: String(i.nombre).trim(), unidad: i.unidad,
       kgUnidad: i.unidad === 'kg' ? 1 : (i.kgUnidad === '' || i.kgUnidad == null ? '' : leerNumero(i.kgUnidad)),
@@ -1192,10 +1274,14 @@ async function cfgGuardar(tipo) {
   }
   try {
     toast('Guardando…', 10000);
-    await llamar({ accion: 'catalogo', pin: sesion.pin, tipo, lista });
+    await llamar({ accion: 'catalogo', pin: sesion.pin, tipo, lista, modulo: ui.modStock, rubro: ui.rubro });
     // Se ve enseguida: la lista guardada se aplica acá y los datos completos bajan después.
     const s = datos && datos.stock;
-    if (s && tipo === 'insumos') {
+    if (s && tipo === 'insumos' && esSanidad()) {
+      const vistos = new Set(lista.map((i) => i.nombre.toUpperCase()));
+      s.insumos = s.insumos.filter((i) => !(i.modulo === 'Sanidad' && i.rubro === ui.rubro) && !vistos.has(i.nombre.toUpperCase()))
+        .concat(lista.map((i) => Object.assign({}, i, { modulo: 'Sanidad', kgUnidad: null, contenido: i.contenido === '' ? null : i.contenido, minimo: i.minimo === '' ? null : i.minimo })));
+    } else if (s && tipo === 'insumos') {
       const antes = {};
       s.insumos.forEach((i) => { antes[i.nombre.toUpperCase()] = i; });
       s.insumos = lista.map((i) => Object.assign({ tapfeed: (antes[i.nombre.toUpperCase()] || {}).tapfeed || '' }, i, { kgUnidad: i.kgUnidad === '' ? null : i.kgUnidad, minimo: i.minimo === '' ? null : i.minimo, modulo: 'Stock' }))
@@ -1431,7 +1517,22 @@ function despuesDeRender() {
     const el = $('#f-' + k);
     if (el) el.addEventListener('input', () => { ui.form[k] = el.value; });
   });
+  // Buscador de Sanidad: filtra la lista sin volver a dibujar la pantalla (no pierde el teclado).
+  const bus = $('#buscar-san');
+  if (bus) {
+    bus.addEventListener('input', () => {
+      const q = bus.value.trim().toUpperCase();
+      let visibles = 0;
+      document.querySelectorAll('.fila-san').forEach((el) => {
+        const ok = !q || el.dataset.buscar.indexOf(q) !== -1;
+        el.classList.toggle('oculto', !ok);
+        if (ok) visibles++;
+      });
+      $('#buscar-nada').classList.toggle('oculto', visibles > 0);
+    });
+  }
   const tfa = $('#tf-archivo');
+
   if (tfa) tfa.addEventListener('change', () => { if (tfa.files[0]) tfLeer(tfa.files[0]); });
   const fmaq = $('#f-maquina');
   if (fmaq) fmaq.addEventListener('change', () => { leerCamposForm(); ui.form.maquina = fmaq.value; ui.form.equipo = ''; render(); });
@@ -1465,7 +1566,7 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'ir':
-      if (b.dataset.p === 'stock') ui.modStock = b.dataset.m || 'Stock';
+      if (b.dataset.p === 'stock') { ui.modStock = b.dataset.m || 'Stock'; ui.rubro = b.dataset.r || null; ui.excel = null; }
       // La flecha de Stock vuelve un paso (formulario → ficha → tarjetas → inicio).
       if (ui.pantalla === 'stock' && b.dataset.p === 'inicio') { atrasStock(); break; }
       if (ui.pantalla === 'facturas' && b.dataset.p === 'inicio' && atrasFacturas()) break;
@@ -1525,7 +1626,8 @@ document.addEventListener('click', (e) => {
     case 'guardarMov': guardarMov(); break;
     case 'verMov': verMov(b.dataset.id); break;
     case 'cfgAgregar':
-      if (b.dataset.cfg === 'insumos') ui.cfg.insumos.push({ nombre: '', unidad: 'bolsa', kgUnidad: 40, minimo: '', activo: true });
+      if (b.dataset.cfg === 'insumos' && esSanidad()) ui.cfg.insumos.push({ nombre: '', unidad: 'frasco', contenido: '', unidadContenido: 'ml', minimo: '', activo: true, rubro: ui.rubro });
+      else if (b.dataset.cfg === 'insumos') ui.cfg.insumos.push({ nombre: '', unidad: 'bolsa', kgUnidad: 40, minimo: '', activo: true });
       else ui.cfg.destinos.push({ nombre: '', activo: true });
       render();
       break;

@@ -136,7 +136,28 @@ trabajo" = tractores), Estancia opcional (columna Finca). Columnas nuevas en Mov
 Trabajo, Finca. No se migró nada de ZehirutApp (arranca en cero el 01/10; stock inicial con Conteo).
 Configurar (insumos de Stock) no toca los de Combustible. Sin Excel propio (la app solo registra).
 
-## Excel (Stock y Combustible)
+## Cuarto módulo: Sanidad (armado 30/09/2026, sin stock inicial todavía)
+
+Stock del depósito sanitario (uno solo, sin estancia). **Tres stocks separados** = columna "Rubro" de Insumos:
+Medicamentos, Insumos IATF (hormonas, dispositivos, aplicador, vainas, guante de tacto) y Semen (pajuelas).
+Cada uno es una tarjeta en Stocks; permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
+- Mismo motor que Stock (Módulo = "Sanidad"). Cada presentación es un producto distinto (CIDENTAL 250 ml ≠
+  500 ml). Columnas "Contenido por unidad" + "Unidad del contenido" (frasco de 500 ml, caja de 100 un):
+  el saldo se guarda en frascos **con decimales** y se muestra también en ml/un. Sin destinos (corrales).
+- Lista inicial: `apps-script/Sanidad.gs` (PRODUCTOS_SANIDAD, 98 productos de la hoja INVENTARIO de la
+  planilla "Inventario y stock de medicamentos"), se agrega una sola vez (esquema 7). Después se edita
+  desde la app: "⚙ Configurar productos" (por rubro; cambiar "Stock" pasa un producto a otro rubro).
+- Pantalla: lista compacta con buscador (no tarjetas: son casi cien). Excel por rubro: Resumen +
+  Movimientos, con Unidad de negocio **PATRIMONIAL** (decisión del contador), sin hoja por producto.
+- **Pendiente (fase 2):** los consumos por animal vienen de la app de la estancia
+  (`Proyectos Claude\estancia-app`, sanidad_eventos/sanidad_aplicaciones, dosis en ml/lts/un).
+  Plan: Registros es dueño de la lista de productos (estancia-app la baja para su desplegable, sin
+  "+ Nuevo…"); estancia-app publica totales día × producto de 30 días (con clave) y Registros los lee
+  cada hora como Consumo con ID `SAN-AAAA-MM-DD-<producto>`, reescribiendo la ventana (correcciones).
+- **Más adelante (verlo aparte):** descontar semen y hormonas al cargar un Servicio de IATF.
+- Arranque: cuando el usuario actualice su planilla, se carga el stock inicial como Conteo.
+
+## Excel (Stock y Combustible; Sanidad ver arriba)
 
 Bajar lo registrado NO es un reporte (aclarado por el usuario 28/09): botón "📥 Bajar Excel" al pie de las
 tarjetas (todos los que ven el módulo), período desde/hasta. exportarExcel_: Resumen (saldo inicial,
@@ -166,7 +187,8 @@ acceso total.
   hoja Usuarios de ZehirutApp. Lo que se carga acá aparece en ZehirutApp y al revés.
 - El cliente llama `accion:"za"` con `fn` + `args`; el script solo deja pasar las funciones de
   `ZA_PERMITIDAS` y reemplaza `"__PIN__"` por el PIN de la sesión. UI en `docs/facturas.js`.
-- **Prueba**: `FACTURAS_BETA = true` (Code.gs) → solo quien tiene "Configurar" ve los módulos;
+- **Prueba**: `FACTURAS_BETA = true` (Code.gs) → solo quien tiene "Configurar" o está en
+  `FACTURAS_PROBADORES` (hoy Osmar, desde 30/09) ve los módulos;
   `FACTURAS_PRUEBA = true` (app.js) → chip "en prueba". Para abrir a todos: ambos en false, dar
   permisos Facturas / Fondo fijo en Usuarios y recién ahí apagar esos módulos en ZehirutApp.
 - **Cada vez que ZehirutApp publica versión nueva** que toque facturas/FF: subir el número de versión

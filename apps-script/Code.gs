@@ -25,10 +25,10 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '6';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '7';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
-const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo'];
+const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
 const NIVELES = { '': 0, 'VER': 1, 'PROPIAS': 2, 'CARGAR': 2, 'ADMINISTRAR': 3 };
 // "Configurar" (casilla): editar las listas de insumos y destinos. Aparte de los niveles
 // porque quien administra Stock (conteos, anular) no necesariamente arma las listas.
@@ -36,8 +36,11 @@ const COLS_USUARIOS = ['Nombre', 'PIN', 'Activo'].concat(MODULOS, ['Configurar']
 // "Por estancia": el insumo lleva un stock separado para cada estancia (ej. Fardos).
 // "Producción propia": se produce en la estancia; sus ingresos no llevan proveedor, remito ni factura.
 // "Nombre en Tapfeed": cómo aparece el insumo en el PDF de Tapfeed (ej. "Maiz Molido DGM 1,2").
-// "Módulo": en qué módulo de la app aparece el insumo (Stock o Combustible); los permisos son los de ese módulo.
-const COLS_INSUMOS = ['Insumo', 'Unidad', 'Kg por unidad', 'Stock mínimo', 'Activo', 'Por estancia', 'Producción propia', 'Nombre en Tapfeed', 'Módulo'];
+// "Módulo": en qué módulo de la app aparece el insumo (Stock, Combustible o Sanidad); los permisos son los de ese módulo.
+// "Rubro" (solo Sanidad): Medicamentos, Insumos IATF o Semen, cada uno con su propio stock.
+// "Contenido por unidad" / "Unidad del contenido" (solo Sanidad): ej. frasco de 500 ml, caja de 100 un.
+const COLS_INSUMOS = ['Insumo', 'Unidad', 'Kg por unidad', 'Stock mínimo', 'Activo', 'Por estancia', 'Producción propia', 'Nombre en Tapfeed', 'Módulo',
+  'Rubro', 'Contenido por unidad', 'Unidad del contenido'];
 const COLS_TAPFEED = ['Fecha', 'Corral', 'Cabezas', 'Insumo', 'Nombre en Tapfeed', 'Kg tal cual', 'Kg MS', 'Archivo', 'Cargado por', 'Recibido'];
 const COLS_DESTINOS = ['Destino', 'Activo'];
 const COLS_MOV = ['ID', 'Fecha', 'Tipo', 'Insumo', 'Cantidad', 'Unidad', 'Kg', 'Destino', 'Proveedor',
@@ -48,23 +51,23 @@ const TIPOS_MOV = ['Ingreso', 'Consumo', 'Conteo'];
 
 // Cargas iniciales (decididas con el usuario el 28/09/2026). Después se editan desde la app.
 const INSUMOS_INICIALES = [
-  ['Fardos', 'fardo', '', '', true, true, true, '', 'Stock'],
-  ['Maíz molido', 'kg', 1, '', true, false, false, 'Maiz Molido DGM 1,2', 'Stock'],
-  ['Concentrado Desarrollo', 'bolsa', 40, '', true, false, false, 'Concentrado Desarrollo', 'Stock'],
-  ['Balanceado Pre destete', 'bolsa', 40, '', true, false, false, 'Balan Pre destete', 'Stock'],
-  ['Suplemento E-PRO 35', 'bolsa', 40, '', true, false, false, '', 'Stock'],
-  ['Concentrado Beef 1.000 M', 'bolsa', 40, '', true, false, false, '', 'Stock'],
-  ['Silo micropicado Gatton', 'kg', 1, '', true, false, false, 'Micropicado Gatton', 'Stock'],
-  ['Maíz quebrado', 'kg', 1, '', true, false, false, '', 'Stock'],
-  ['Nafta', 'litro', '', '', true, false, false, '', 'Combustible'],
-  ['Diesel', 'litro', '', '', true, false, false, '', 'Combustible'],
+  ['Fardos', 'fardo', '', '', true, true, true, '', 'Stock', '', '', ''],
+  ['Maíz molido', 'kg', 1, '', true, false, false, 'Maiz Molido DGM 1,2', 'Stock', '', '', ''],
+  ['Concentrado Desarrollo', 'bolsa', 40, '', true, false, false, 'Concentrado Desarrollo', 'Stock', '', '', ''],
+  ['Balanceado Pre destete', 'bolsa', 40, '', true, false, false, 'Balan Pre destete', 'Stock', '', '', ''],
+  ['Suplemento E-PRO 35', 'bolsa', 40, '', true, false, false, '', 'Stock', '', '', ''],
+  ['Concentrado Beef 1.000 M', 'bolsa', 40, '', true, false, false, '', 'Stock', '', '', ''],
+  ['Silo micropicado Gatton', 'kg', 1, '', true, false, false, 'Micropicado Gatton', 'Stock', '', '', ''],
+  ['Maíz quebrado', 'kg', 1, '', true, false, false, '', 'Stock', '', '', ''],
+  ['Nafta', 'litro', '', '', true, false, false, '', 'Combustible', '', '', ''],
+  ['Diesel', 'litro', '', '', true, false, false, '', 'Combustible', '', '', ''],
 ];
 const DESTINOS_INICIALES = ['AC D Norte', 'AC Torta Frente', 'AC Torta Fondo', 'AC B Norte Frente',
   'AC B Norte Fondo', 'AC B Medio Frente', 'AC B Medio Fondo', 'Confinamiento'];
 // Los PIN se completan a mano en la hoja (los mismos que en ZehirutApp).
 const USUARIOS_INICIALES = [
-  ['Enrique Delfante', '', true, 'Administrar', 'Administrar', 'Administrar', 'Administrar', 'Administrar', true],
-  ['Osmar Acosta', '', true, 'Administrar', 'Administrar', 'Propias', 'Cargar', 'Cargar', false],
+  ['Enrique Delfante', '', true, 'Administrar', 'Administrar', 'Administrar', 'Administrar', 'Administrar', 'Administrar', true],
+  ['Osmar Acosta', '', true, 'Administrar', 'Administrar', 'Propias', 'Cargar', 'Cargar', '', false],
 ];
 
 // Lluvias: la planilla de siempre (compartida con ZehirutApp, ver Lluvias.js de ese proyecto).
@@ -98,6 +101,13 @@ const MAQUINAS_INICIALES = [
   ['HM-Fum', 'Mochilas Fumigadoras', 'Nafta', false, false, '', true],
   ['INF-Tc', 'Tanque Combustible (Estático)', 'Diesel', false, false, '', true],
 ];
+// ---- Sanidad (medicamentos, insumos de IATF y semen). La sanidad se aplica por animal en la app de
+// la estancia (app.laprudencia.com.py); acá se lleva el stock del depósito (uno solo). La lista
+// inicial de productos (PRODUCTOS_SANIDAD, en Sanidad.gs) sale de la planilla "Inventario y stock de
+// medicamentos" (30/09/2026). Todo va a la unidad de negocio PATRIMONIAL (decisión del contador).
+const RUBROS_SANIDAD = ['Medicamentos', 'Insumos IATF', 'Semen'];
+const UNIDAD_NEGOCIO_SANIDAD = 'PATRIMONIAL';
+
 const TRABAJOS_INICIALES = ['Recorrida', 'Cargada de caminos', 'Traila', 'Plaina', 'Acarreo de fardos', 'Acarreo de postes',
   'Fumigación', 'Bombeo', 'Generador', 'Asierraje', 'Corpida', 'Limpieza', 'Taller'];
 
@@ -156,6 +166,7 @@ function configurar() {
   asegurarColumnaPropia_(ins);
   asegurarTapfeed_(ss, ins);
   asegurarCombustible_(ss, ins, mov);
+  asegurarSanidad_(ss, ins, usu);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
   [stock, mov, ins, des, usu, reg].forEach((h, i) => { ss.setActiveSheet(h); ss.moveActiveSheet(i + 1); });
@@ -289,6 +300,33 @@ function asegurarCombustible_(ss, ins, mov) {
   maq.getRange(2, 7, 200, 1).insertCheckboxes();
   const tra = hoja_(ss, 'Trabajos', ['Trabajo']);
   if (tra.getLastRow() < 2) tra.getRange(2, 1, TRABAJOS_INICIALES.length, 1).setValues(TRABAJOS_INICIALES.map((t) => [t]));
+}
+
+/** Versión 7: Sanidad. Columnas Rubro / Contenido por unidad / Unidad del contenido en Insumos, la
+ *  lista inicial de productos (PRODUCTOS_SANIDAD, una sola vez) y la columna Sanidad en Usuarios
+ *  (Administrar solo para Enrique; a los demás se les da el permiso a mano en la hoja). */
+function asegurarSanidad_(ss, ins, usu) {
+  ['Rubro', 'Contenido por unidad', 'Unidad del contenido'].forEach((t) => {
+    const c = COLS_INSUMOS.indexOf(t) + 1;
+    if (String(ins.getRange(1, c).getValue()) !== t) ins.getRange(1, c).setValue(t).setFontWeight('bold').setBackground('#eeeeee');
+  });
+  if (!leerInsumos_(ss).some((i) => i.modulo === 'Sanidad')) {
+    const filas = PRODUCTOS_SANIDAD.map((p) => [p[0], p[2], '', '', true, false, false, '', 'Sanidad', p[1], p[3], p[4]]);
+    ins.getRange(ins.getLastRow() + 1, 1, filas.length, COLS_INSUMOS.length).setValues(filas);
+  }
+  const ancho = usu.getLastColumn();
+  const enc = usu.getRange(1, 1, 1, ancho).getValues()[0].map(String);
+  if (enc.indexOf('Sanidad') === -1) {
+    const col = ancho + 1;
+    usu.getRange(1, col).setValue('Sanidad').setFontWeight('bold').setBackground('#eeeeee');
+    const n = usu.getLastRow();
+    if (n > 1) {
+      usu.getRange(2, col, n - 1, 1).setValues(usu.getRange(2, 1, n - 1, 1).getValues()
+        .map((f) => [String(f[0]).trim() === 'Enrique Delfante' ? 'Administrar' : '']));
+    }
+    usu.getRange(2, col, 200, 1).setDataValidation(SpreadsheetApp.newDataValidation()
+      .requireValueInList(['Administrar', 'Cargar', 'Ver'], true).setAllowInvalid(false).build());
+  }
 }
 
 function leerMaquinas_(ss) {
@@ -463,6 +501,9 @@ function leerInsumos_(ss) {
       propia: f[6] === true || String(f[6]).toUpperCase() === 'TRUE',
       tapfeed: String(f[7] || '').trim(),
       modulo: String(f[8] || '').trim() || 'Stock',
+      rubro: String(f[9] || '').trim(),
+      contenido: f[10] === '' || f[10] == null ? null : Number(f[10]),
+      unidadContenido: String(f[11] || '').trim(),
     }));
 }
 
@@ -486,6 +527,11 @@ function guardarCatalogo_(body) {
     leerMovimientos_(ss).forEach((m) => { usados[m.insumo] = true; usados['D:' + m.destino] = true; });
     let filas, sh, ancho;
     if (body.tipo === 'insumos') {
+      // Se edita la lista de un módulo (Stock o Sanidad); en Sanidad, la de un rubro. Lo demás queda igual.
+      const modulo = body.modulo === 'Sanidad' ? 'Sanidad' : 'Stock';
+      const rubro = modulo === 'Sanidad' ? String(body.rubro || '') : '';
+      if (modulo === 'Sanidad' && RUBROS_SANIDAD.indexOf(rubro) === -1) throw new Error('rubro inválido');
+      const enAlcance = (i) => i.modulo === modulo && (modulo !== 'Sanidad' || i.rubro === rubro);
       const vistos = {};
       const previos = leerInsumos_(ss);   // una sola lectura de la hoja (antes se leía una vez por insumo)
       filas = (Array.isArray(body.lista) ? body.lista : []).map((x) => {
@@ -500,12 +546,20 @@ function guardarCatalogo_(body) {
         if (minimo !== '' && !(minimo >= 0)) throw new Error('stock mínimo inválido en ' + nombre);
         // El nombre en Tapfeed no se edita desde la app: se conserva el de la hoja.
         const antes = previos.find((i) => i.nombre.toUpperCase() === nombre.toUpperCase());
-        return [nombre, unidad, kg, minimo, x.activo !== false, x.porEstancia === true, x.propia === true, antes ? antes.tapfeed : '', 'Stock'];
+        if (modulo === 'Sanidad') {
+          const r = RUBROS_SANIDAD.indexOf(x.rubro) === -1 ? rubro : x.rubro;
+          const cont = x.contenido === '' || x.contenido == null ? '' : Number(x.contenido);
+          if (cont !== '' && !(cont > 0)) throw new Error('contenido inválido en ' + nombre);
+          const uc = cont === '' ? '' : (x.unidadContenido === 'un' ? 'un' : 'ml');
+          return [nombre, unidad, '', minimo, x.activo !== false, false, false, '', 'Sanidad', r, cont, uc];
+        }
+        return [nombre, unidad, kg, minimo, x.activo !== false, x.porEstancia === true, x.propia === true, antes ? antes.tapfeed : '', 'Stock', '', '', ''];
       });
-      const filaDe = (i, activo) => [i.nombre, i.unidad, i.kgUnidad == null ? '' : i.kgUnidad, i.minimo == null ? '' : i.minimo, activo, !!i.porEstancia, !!i.propia, i.tapfeed, i.modulo];
+      const filaDe = (i, activo) => [i.nombre, i.unidad, i.kgUnidad == null ? '' : i.kgUnidad, i.minimo == null ? '' : i.minimo, activo, !!i.porEstancia, !!i.propia, i.tapfeed, i.modulo,
+        i.rubro, i.contenido == null ? '' : i.contenido, i.unidadContenido];
       previos.forEach((i) => {
-        if (i.modulo !== 'Stock') {
-          if (vistos[i.nombre.toUpperCase()]) throw new Error('"' + i.nombre + '" ya existe en el módulo ' + i.modulo);
+        if (!enAlcance(i)) {
+          if (vistos[i.nombre.toUpperCase()]) throw new Error('"' + i.nombre + '" ya existe en ' + (i.modulo === 'Sanidad' ? i.rubro : 'el módulo ' + i.modulo));
           filas.push(filaDe(i, i.activo));
         } else if (usados[i.nombre] && !vistos[i.nombre.toUpperCase()]) filas.push(filaDe(i, false));
       });
@@ -616,7 +670,8 @@ function reconstruirStock_(ss, movs) {
     const k = claveStock_(m.insumo, m.estancia);
     if (!m.anulado && m.tipo === 'Consumo' && m.fecha >= desde7 && m.fecha <= hoy) consumo7[k] = (consumo7[k] || 0) + m.cantidad;
   });
-  const valores = [['Insumo', 'Stock', 'Unidad', 'Stock en kg', 'Consumo últimos 7 días', 'Promedio por día', 'Alcanza para (días)', 'Stock mínimo', 'Último conteo', 'Último movimiento']];
+  // "Equivale a": en kg (bolsas), o en ml / unidades sueltas en Sanidad (frascos, cajas).
+  const valores = [['Insumo', 'Stock', 'Unidad', 'Equivale a', 'Consumo últimos 7 días', 'Promedio por día', 'Alcanza para (días)', 'Stock mínimo', 'Último conteo', 'Último movimiento']];
   const fondos = [valores[0].map(() => '#eeeeee')];
   insumos.forEach((i) => {
     // Un renglón por estancia si el insumo lleva stock por estancia (más uno "sin estancia"
@@ -631,7 +686,9 @@ function reconstruirStock_(ss, movs) {
       const bajo = i.minimo != null && x.cantidad < i.minimo;
       valores.push([
         i.nombre + (i.porEstancia ? ' – ' + (x.estancia ? nombreEstancia_(x.estancia) : 'sin estancia') : ''),
-        x.cantidad, i.unidad, i.kgUnidad ? x.cantidad * i.kgUnidad : (i.unidad === 'kg' ? x.cantidad : ''),
+        x.cantidad, i.unidad, i.contenido ? Math.round(x.cantidad * i.contenido) + ' ' + i.unidadContenido
+          : i.kgUnidad ? x.cantidad * i.kgUnidad : (i.unidad === 'kg' ? x.cantidad : ''),
+
         c7, prom, prom > 0 ? Math.floor(x.cantidad / prom) : '', i.minimo == null ? '' : i.minimo,
         x.ultimoConteo ? ddmmaaaa_(x.ultimoConteo) : '', x.ultimo ? ddmmaaaa_(x.ultimo) : '',
       ]);
@@ -783,7 +840,8 @@ function validarMov_(op, u, insumos, destinos, hoy, maquinas) {
   if (!isFinite(cantidad) || cantidad < 0 || (tipo !== 'Conteo' && cantidad === 0)) throw new Error('cantidad inválida');
   const estancia = ins.porEstancia ? String(op.estancia || '') : '';
   if (ins.porEstancia && ESTANCIAS.indexOf(estancia) === -1) throw new Error('falta elegir la estancia (' + ins.nombre + ' lleva stock por estancia)');
-  let destino = tipo === 'Consumo' ? texto_(op.destino, 60) : '';
+  // Sanidad no usa destinos (corrales): el detalle por animal queda en la app de la estancia.
+  let destino = tipo === 'Consumo' && ins.modulo !== 'Sanidad' ? texto_(op.destino, 60) : '';
   let maquina = '', equipo = '', trabajo = '', finca = '';
   if (comb && tipo === 'Consumo') {
     // Combustible: el consumo va a una máquina (o a otro destino escrito a mano).
@@ -905,7 +963,7 @@ function datos_(body) {
   const u = usuarioDe_(ss, body.pin);
   const desde = esFecha_(body.desde) ? body.desde : '0000-00-00';
   const r = { ok: true, usuario: publico_(u) };
-  const mods = ['Stock', 'Combustible'].filter((m) => nivel_(u, m) >= NIVELES.VER);
+  const mods = ['Stock', 'Combustible', 'Sanidad'].filter((m) => nivel_(u, m) >= NIVELES.VER);
   if (mods.length) {
     const insumos = leerInsumos_(ss).filter((i) => mods.indexOf(i.modulo) !== -1);
     const deModulo = {};
@@ -1123,7 +1181,9 @@ function publicarDatosInforme_(ss) {
     const stock = [['Insumo', 'Estancia', 'Saldo', 'Unidad', 'Saldo kg']];
     Object.keys(saldos).map((k) => saldos[k]).forEach((x) => {
       const i = porNombre[x.insumo];
-      if (!i || !i.activo) return;
+      // Solo los insumos de Stock: la tarea lee ~100 filas por hoja y Sanidad son casi cien productos.
+      if (!i || !i.activo || i.modulo !== 'Stock') return;
+
       stock.push([x.insumo, x.estancia ? nombreEstancia_(x.estancia) : '', Math.round(x.cantidad * 100) / 100, i.unidad, i.kgUnidad || i.unidad === 'kg' ? r0(kgDe(x.insumo, x.cantidad)) : '']);
     });
 
@@ -1158,21 +1218,25 @@ function publicarDatosInforme_(ss) {
 function exportarExcel_(body) {
   const ss = SpreadsheetApp.getActive();
   const u = usuarioDe_(ss, body.pin);
-  const modulo = body.modulo === 'Combustible' ? 'Combustible' : 'Stock';
+  const modulo = ['Combustible', 'Sanidad'].indexOf(body.modulo) !== -1 ? body.modulo : 'Stock';
   exigir_(u, modulo, 'VER');
+  // Sanidad: un Excel por rubro (Medicamentos, Insumos IATF, Semen), como la planilla de siempre:
+  // Resumen + Movimientos, sin una hoja por producto (son casi cien).
+  const san = modulo === 'Sanidad';
+  const rubro = san ? (RUBROS_SANIDAD.indexOf(body.rubro) !== -1 ? body.rubro : RUBROS_SANIDAD[0]) : '';
   const hoy = Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd');
   const desde = esFecha_(body.desde) ? body.desde : hoy.slice(0, 8) + '01';
   const hasta = esFecha_(body.hasta) ? body.hasta : hoy;
   if (hasta < desde) throw new Error('la fecha "hasta" es anterior a "desde"');
 
-  const insumos = leerInsumos_(ss).filter((i) => i.modulo === modulo);
+  const insumos = leerInsumos_(ss).filter((i) => i.modulo === modulo && (!san || i.rubro === rubro));
   const porNombre = {};
   insumos.forEach((i) => { porNombre[i.nombre] = i; });
   const movs = leerMovimientos_(ss).filter((m) => !m.anulado && porNombre[m.insumo])
     .sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.ts - b.ts));
   const maquinas = {};
   leerMaquinas_(ss).forEach((q) => { maquinas[q.codigo] = q; });
-  const kgDe = (ins, c) => (ins.kgUnidad ? c * ins.kgUnidad : (ins.unidad === 'kg' ? c : ''));
+  const kgDe = (ins, c) => (ins.contenido ? Math.round(c * ins.contenido * 100) / 100 : ins.kgUnidad ? c * ins.kgUnidad : (ins.unidad === 'kg' ? c : ''));
   const aDate = (iso) => { const p = iso.split('-'); return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])); };
 
   // Cuentas por insumo (y estancia): saldo al empezar, y las filas del período. Un conteo entra
@@ -1186,8 +1250,11 @@ function exportarExcel_(body) {
     if (i.porEstancia) ESTANCIAS.forEach((e) => cuenta({ insumo: i.nombre, estancia: e }));
     else cuenta({ insumo: i.nombre, estancia: '' });
   });
-  const plana = [['Fecha', 'Insumo', 'Estancia', 'Tipo', 'Cantidad', 'Unidad', 'Kg', 'Destino', 'Cód. bien de uso', 'Equipo', 'Trabajo',
-    'Finca', 'Proveedor', 'Remito', 'Factura', 'Nota', 'Cargado por']];
+  const plana = san
+    ? [['Fecha', 'Producto', 'Rubro', 'Tipo', 'Cantidad', 'Unidad', 'Equivale a', 'Unidad del contenido', 'Unidad de negocio',
+      'Proveedor', 'Remito', 'Factura', 'Nota', 'Cargado por']]
+    : [['Fecha', 'Insumo', 'Estancia', 'Tipo', 'Cantidad', 'Unidad', 'Kg', 'Destino', 'Cód. bien de uso', 'Equipo', 'Trabajo',
+      'Finca', 'Proveedor', 'Remito', 'Factura', 'Nota', 'Cargado por']];
   movs.forEach((m) => {
     if (m.fecha > hasta) return;
     const c = cuenta(m);
@@ -1206,11 +1273,18 @@ function exportarExcel_(body) {
     const destino = m.tipo === 'Consumo' ? (m.destino || '') + (m.equipo ? ' - ' + m.equipo : '')
       : m.tipo === 'Ingreso' ? (m.proveedor || 'Ingreso') + (m.factura ? ' (Fact. ' + m.factura + ')' : '') : esInicial ? 'Stock inicial' : 'Ajuste por conteo (' + m.cantidad + ')';
     c.filas.push([aDate(m.fecha), destino, codigo, m.trabajo || (m.tipo === 'Consumo' ? '' : esInicial ? 'Stock inicial' : m.tipo), m.finca ? nombreEstancia_(m.finca) : '', sale || '', entra || '']);
-    plana.push([aDate(m.fecha), m.insumo, m.estancia ? nombreEstancia_(m.estancia) : '', m.tipo, m.cantidad, m.unidad, m.kg == null ? '' : m.kg,
-      m.destino, codigo, m.equipo, m.trabajo, m.finca ? nombreEstancia_(m.finca) : '', m.proveedor, m.remito, m.factura, m.nota, m.usuario]);
+    if (san) {
+      const i = porNombre[m.insumo];
+      plana.push([aDate(m.fecha), m.insumo, rubro, m.tipo, m.cantidad, m.unidad, i.contenido ? kgDe(i, m.cantidad) : '', i.unidadContenido,
+        UNIDAD_NEGOCIO_SANIDAD, m.proveedor, m.remito, m.factura, m.nota, m.usuario]);
+    } else {
+      plana.push([aDate(m.fecha), m.insumo, m.estancia ? nombreEstancia_(m.estancia) : '', m.tipo, m.cantidad, m.unidad, m.kg == null ? '' : m.kg,
+        m.destino, codigo, m.equipo, m.trabajo, m.finca ? nombreEstancia_(m.finca) : '', m.proveedor, m.remito, m.factura, m.nota, m.usuario]);
+    }
   });
 
-  const nombre = (modulo === 'Combustible' ? 'Combustible' : 'Stock insumos') + ' ' + ddmmaaaa_(desde).replace(/\//g, '-') + ' al ' + ddmmaaaa_(hasta).replace(/\//g, '-');
+  const titulo = san ? 'Sanidad ' + rubro : modulo === 'Combustible' ? 'Combustible' : 'Stock insumos';
+  const nombre = titulo + ' ' + ddmmaaaa_(desde).replace(/\//g, '-') + ' al ' + ddmmaaaa_(hasta).replace(/\//g, '-');
   const tmp = SpreadsheetApp.create(nombre);
   try {
     tmp.setSpreadsheetTimeZone(ZONA);
@@ -1218,21 +1292,29 @@ function exportarExcel_(body) {
     // Resumen
     const res = tmp.getSheets()[0];
     res.setName('Resumen');
-    const filasRes = [['Insumo', 'Estancia', 'Unidad', 'Saldo al ' + ddmmaaaa_(desde), 'Entradas', 'Salidas', 'Saldo al ' + ddmmaaaa_(hasta), 'Saldo final kg']];
+    const filasRes = san
+      ? [['Producto', 'Unidad', 'Contenido', 'Saldo al ' + ddmmaaaa_(desde), 'Entradas', 'Salidas', 'Saldo al ' + ddmmaaaa_(hasta), 'Saldo final en ml / un', 'Unidad de negocio']]
+      : [['Insumo', 'Estancia', 'Unidad', 'Saldo al ' + ddmmaaaa_(desde), 'Entradas', 'Salidas', 'Saldo al ' + ddmmaaaa_(hasta), 'Saldo final kg']];
     lista.forEach((c) => {
       const i = porNombre[c.insumo];
       const fin = c.inicial + c.entradas - c.salidas;
-      filasRes.push([c.insumo, c.estancia ? nombreEstancia_(c.estancia) : '', i.unidad, c.inicial, c.entradas, c.salidas, fin, kgDe(i, fin)]);
+      if (san) {
+        filasRes.push([c.insumo, i.unidad, i.contenido ? i.contenido + ' ' + i.unidadContenido : '', c.inicial, c.entradas, c.salidas, fin,
+          i.contenido ? kgDe(i, fin) : '', UNIDAD_NEGOCIO_SANIDAD]);
+      } else {
+        filasRes.push([c.insumo, c.estancia ? nombreEstancia_(c.estancia) : '', i.unidad, c.inicial, c.entradas, c.salidas, fin, kgDe(i, fin)]);
+      }
     });
-    res.getRange(1, 1).setValue((modulo === 'Combustible' ? 'COMBUSTIBLE' : 'STOCK DE INSUMOS') + ' – del ' + ddmmaaaa_(desde) + ' al ' + ddmmaaaa_(hasta))
-      .setFontSize(14).setFontWeight('bold');
+    res.getRange(1, 1).setValue((san ? 'SANIDAD – ' + rubro.toUpperCase() : modulo === 'Combustible' ? 'COMBUSTIBLE' : 'STOCK DE INSUMOS') +
+      ' – del ' + ddmmaaaa_(desde) + ' al ' + ddmmaaaa_(hasta)).setFontSize(14).setFontWeight('bold');
     res.getRange(3, 1, filasRes.length, filasRes[0].length).setValues(filasRes).setBorder(true, true, true, true, true, true);
     res.getRange(3, 1, 1, filasRes[0].length).setFontWeight('bold').setBackground('#eeeeee');
     if (filasRes.length > 1) res.getRange(4, 4, filasRes.length - 1, 5).setNumberFormat('#,##0.##;-#,##0.##;"-"');
     res.autoResizeColumns(1, filasRes[0].length);
 
     // Una hoja por insumo (formato de las planillas de siempre, con el saldo como fórmula).
-    lista.forEach((c) => {
+    if (!san) lista.forEach((c) => {
+
       const i = porNombre[c.insumo];
       const h = tmp.insertSheet((c.insumo + (c.estancia ? ' ' + nombreEstancia_(c.estancia) : '')).slice(0, 90));
       const unidad = String(i.unidad).toUpperCase();
@@ -1291,9 +1373,11 @@ function autorizar() {
 // mismo porque es el mismo código. Al publicar una versión nueva de ZehirutApp, subir "version" de
 // la biblioteca en appsscript.json.
 //
-// Mientras se prueba (FACTURAS_BETA), solo lo ve quien tiene tildado Configurar; los demás siguen
-// cargando en ZehirutApp.
+// Mientras se prueba (FACTURAS_BETA), solo lo ve quien tiene tildado Configurar o está en
+// FACTURAS_PROBADORES; los demás siguen cargando en ZehirutApp. Lo que puede hacer cada uno lo
+// deciden igual los permisos de ZehirutApp (Osmar: solo las suyas, sin eliminar).
 const FACTURAS_BETA = true;
+const FACTURAS_PROBADORES = ['Osmar Acosta'];
 
 // Funciones de ZehirutApp que la app puede usar. En los argumentos, "__PIN__" se reemplaza por el
 // PIN de la sesión (cada función lo espera en una posición distinta).
@@ -1307,7 +1391,7 @@ const ZA_PERMITIDAS = {
 };
 
 function facturasVisibles_(u) {
-  return FACTURAS_BETA ? !!u.configura : (nivel_(u, 'Facturas') >= NIVELES.VER || nivel_(u, 'Fondo fijo') >= NIVELES.VER);
+  return FACTURAS_BETA ? (!!u.configura || FACTURAS_PROBADORES.includes(u.nombre)) : (nivel_(u, 'Facturas') >= NIVELES.VER || nivel_(u, 'Fondo fijo') >= NIVELES.VER);
 }
 
 /** Sesión de ZehirutApp (qué puede hacer en Facturas / Fondo fijo), guardada 10 minutos para que

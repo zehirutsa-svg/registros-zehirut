@@ -163,7 +163,10 @@ let ultimoExcel = null;
 let cargaImportada = false;
 const cache = {};
 vm.createContext(contexto);
-const codigo = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'Code.gs'), 'utf8');
+// Todos los .gs, como en Apps Script (comparten el mismo espacio de nombres).
+const carpetaGs = path.join(__dirname, '..', 'apps-script');
+const codigo = fs.readdirSync(carpetaGs).filter((f) => f.endsWith('.gs')).sort()
+  .map((f) => fs.readFileSync(path.join(carpetaGs, f), 'utf8')).join('\n');
 vm.runInContext(codigo + '\nthis.__api = { doPost, doGet };', contexto);
 const api = contexto.__api;
 api.doGet();   // primera apertura: prepara la planilla

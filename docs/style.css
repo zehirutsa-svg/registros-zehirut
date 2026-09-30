@@ -359,3 +359,19 @@ label.btn { text-align: center; cursor: pointer; }
 .tarjeta.albor { background: #ecfdf3; }
 .mov.albor { background: #f3fbf6; }
 .chip.verde { background: var(--verde-claro); color: var(--verde); }
+
+/* ---------------------------------------------------------------- Sanidad (lista con buscador) */
+.modulo.sanidad { border-left-color: var(--verde); }
+.buscar { margin-bottom: 10px; }
+.lista-san { display: flex; flex-direction: column; gap: 6px; }
+.fila-san {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; font: inherit; color: inherit;
+  background: var(--papel); border: 0; border-left: 6px solid var(--verde); border-radius: 12px; box-shadow: var(--sombra); padding: 12px 14px;
+}
+.fila-san.sin { border-left-color: var(--linea); }
+.fila-san.bajo, .fila-san.negativo { border-left-color: var(--alerta); background: #fff7f6; }
+.fila-san .nom { flex: 1; min-width: 0; font-weight: 700; }
+.fila-san .val { text-align: right; white-space: nowrap; }
+.fila-san .val b { font-size: 19px; }
+.fila-san .val small { display: block; color: var(--gris); font-size: 13px; }
+.item-cfg .grilla .ancho { grid-column: 1 / -1; }
