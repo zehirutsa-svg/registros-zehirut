@@ -136,6 +136,24 @@ trabajo" = tractores), Estancia opcional (columna Finca). Columnas nuevas en Mov
 Trabajo, Finca. No se migró nada de ZehirutApp (arranca en cero el 01/10; stock inicial con Conteo).
 Configurar (insumos de Stock) no toca los de Combustible. Sin Excel propio (la app solo registra).
 
+## Horómetro (partes de tractores y generadores, 30/09/2026)
+
+Tarjeta en Stocks debajo de Combustible; permisos = columna Combustible. Código: `apps-script/Horometro.gs` +
+`docs/horometro.js` (mismo recorrido que Stock: lista de máquinas → ficha → formulario). Hoja **Horómetro**.
+- Parte: fecha, máquina, trabajo (hoja Trabajos, lista cerrada), cantidad opcional en **ha o km**, unidad de
+  negocio **CRÍA / RECRÍA**, horómetro inicio y final; horas = final − inicio (se ven al tipear). El inicio
+  viene con el final del último parte de esa máquina; si no coincide (horas sin parte o superposición) o
+  pasa de 24 h, pide confirmar. Corregir = anular + nuevo (mismas reglas que Movimientos).
+- Máquinas: columna "Horómetro" de la hoja Máquinas (tractores Valtra, Massey, LS; generadores Caterpillar
+  y Yanmar 1/2/3). No mueve stock: el control es litros ÷ horas con lo cargado en Combustible a la misma
+  máquina (ficha: horas del mes por unidad de negocio, litros del mes, l/h).
+- Trabajos (lista depurada por el usuario, única para Combustible y Horómetro): Caminería, Trabajos varios
+  con traila, Trabajos varios con niveladora, Cargada de corral, Acarreo de fardos, Acarreos varios,
+  Fumigación, Generador (energía), Bombeo, Aviación, Uso general, Trabajos de carpida. En Combustible el
+  trabajo sigue aceptando texto libre (ej. Recorrida en camionetas).
+- Excel: Resumen (horas por unidad de negocio, litros, l/h por máquina) + una hoja por máquina con el
+  formato de "Hora Tractor" de la planilla de rendición.
+
 ## Cuarto módulo: Sanidad (armado 30/09/2026, sin stock inicial todavía)
 
 Stock del depósito sanitario (uno solo, sin estancia). **Tres stocks separados** = columna "Rubro" de Insumos:

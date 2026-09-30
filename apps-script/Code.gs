@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '7';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '8';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
@@ -80,26 +80,27 @@ const ESTANCIAS = ['LA PRUDENCIA', 'LA PACIENCIA'];
 // editan en la hoja Máquinas. Trabajo obligatorio solo donde "Pide trabajo" (los tractores).
 const COMBUSTIBLE_DESDE = '2026-10-01';
 const OTRO_DESTINO = 'OTRO';
-const COLS_MAQUINAS = ['Código', 'Nombre', 'Combustible', 'Pide trabajo', 'Agrupa', 'Equipos (separados por coma)', 'Activo'];
+// "Horómetro": la máquina lleva partes de horómetro (tractores y generadores, ver Horometro.gs).
+const COLS_MAQUINAS = ['Código', 'Nombre', 'Combustible', 'Pide trabajo', 'Agrupa', 'Equipos (separados por coma)', 'Activo', 'Horómetro'];
 const MAQUINAS_INICIALES = [
-  ['TRAC-Val', 'Tractor Valtra BM110', 'Diesel', true, false, '', true],
-  ['TRAC-Mas', 'Tractor Massey 291', 'Diesel', true, false, '', true],
-  ['TRAC-LS', 'Tractor LS Plus100', 'Diesel', true, false, '', true],
-  ['CAM-1', 'Camioneta Toyota Hilux 2022', 'Diesel', false, false, '', true],
-  ['CAM-2', 'Camioneta Isuzu D-Max 2019', 'Diesel', false, false, '', true],
-  ['CAM-3', 'Camioneta Isuzu D-Max 2023', 'Diesel', false, false, '', true],
-  ['CAM-4', 'Camioneta Mazda BT-50 2027', 'Diesel', false, false, '', true],
-  ['GEN-Cat', 'Generador Caterpillar', 'Diesel', false, false, '', true],
-  ['GEN-Yan 1', 'Generador Yanmar 1', 'Diesel', false, false, '', true],
-  ['GEN-Yan 2', 'Generador Yanmar 2', 'Diesel', false, false, '', true],
-  ['GEN-Yan 3', 'Generador Yanmar 3', 'Diesel', false, false, '', true],
-  ['GEN-Lifan', 'Generador Lifan', 'Diesel', false, false, '', true],
-  ['MOTO', 'Motos', 'Nafta', false, true, 'Yamaha, Honda, Moto carro, Kenton', true],
-  ['HM-Ms', 'Motosierras', 'Nafta', false, true, '', true],
-  ['HM-Mb', 'Motobombas', 'Nafta', false, true, '', true],
-  ['HM-Des', 'Desmalezadoras Husqvarna', 'Nafta', false, true, '', true],
-  ['HM-Fum', 'Mochilas Fumigadoras', 'Nafta', false, false, '', true],
-  ['INF-Tc', 'Tanque Combustible (Estático)', 'Diesel', false, false, '', true],
+  ['TRAC-Val', 'Tractor Valtra BM110', 'Diesel', true, false, '', true, true],
+  ['TRAC-Mas', 'Tractor Massey 291', 'Diesel', true, false, '', true, true],
+  ['TRAC-LS', 'Tractor LS Plus100', 'Diesel', true, false, '', true, true],
+  ['CAM-1', 'Camioneta Toyota Hilux 2022', 'Diesel', false, false, '', true, false],
+  ['CAM-2', 'Camioneta Isuzu D-Max 2019', 'Diesel', false, false, '', true, false],
+  ['CAM-3', 'Camioneta Isuzu D-Max 2023', 'Diesel', false, false, '', true, false],
+  ['CAM-4', 'Camioneta Mazda BT-50 2027', 'Diesel', false, false, '', true, false],
+  ['GEN-Cat', 'Generador Caterpillar', 'Diesel', false, false, '', true, true],
+  ['GEN-Yan 1', 'Generador Yanmar 1', 'Diesel', false, false, '', true, true],
+  ['GEN-Yan 2', 'Generador Yanmar 2', 'Diesel', false, false, '', true, true],
+  ['GEN-Yan 3', 'Generador Yanmar 3', 'Diesel', false, false, '', true, true],
+  ['GEN-Lifan', 'Generador Lifan', 'Diesel', false, false, '', true, false],
+  ['MOTO', 'Motos', 'Nafta', false, true, 'Yamaha, Honda, Moto carro, Kenton', true, false],
+  ['HM-Ms', 'Motosierras', 'Nafta', false, true, '', true, false],
+  ['HM-Mb', 'Motobombas', 'Nafta', false, true, '', true, false],
+  ['HM-Des', 'Desmalezadoras Husqvarna', 'Nafta', false, true, '', true, false],
+  ['HM-Fum', 'Mochilas Fumigadoras', 'Nafta', false, false, '', true, false],
+  ['INF-Tc', 'Tanque Combustible (Estático)', 'Diesel', false, false, '', true, false],
 ];
 // ---- Sanidad (medicamentos, insumos de IATF y semen). La sanidad se aplica por animal en la app de
 // la estancia (app.laprudencia.com.py); acá se lleva el stock del depósito (uno solo). La lista
@@ -108,9 +109,9 @@ const MAQUINAS_INICIALES = [
 const RUBROS_SANIDAD = ['Medicamentos', 'Insumos IATF', 'Semen'];
 const UNIDAD_NEGOCIO_SANIDAD = 'PATRIMONIAL';
 
-const TRABAJOS_INICIALES = ['Recorrida', 'Cargada de caminos', 'Traila', 'Plaina', 'Acarreo de fardos', 'Acarreo de postes',
-  'Fumigación', 'Bombeo', 'Generador', 'Asierraje', 'Corpida', 'Limpieza', 'Taller'];
-
+// Lista depurada por el usuario el 30/09/2026 (una sola para Combustible y Horómetro).
+const TRABAJOS_INICIALES = ['Caminería', 'Trabajos varios con traila', 'Trabajos varios con niveladora', 'Cargada de corral',
+  'Acarreo de fardos', 'Acarreos varios', 'Fumigación', 'Generador (energía)', 'Bombeo', 'Aviación', 'Uso general', 'Trabajos de carpida'];
 // Carpeta "1 Tapfeed" (dentro de "Confinamiento ZEHIRUT"): ahí se guarda cada PDF subido.
 const TAPFEED_CARPETA = '1ZybVBnxzMW_9OixfT_ut9GuvKtQbagH1';
 // Carga inicial (una sola vez): archivo CSV en el Drive del dueño, fuera del repositorio porque
@@ -167,6 +168,7 @@ function configurar() {
   asegurarTapfeed_(ss, ins);
   asegurarCombustible_(ss, ins, mov);
   asegurarSanidad_(ss, ins, usu);
+  asegurarHorometro_(ss);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
   [stock, mov, ins, des, usu, reg].forEach((h, i) => { ss.setActiveSheet(h); ss.moveActiveSheet(i + 1); });
@@ -337,7 +339,8 @@ function leerMaquinas_(ss) {
   return sh.getRange(2, 1, n - 1, COLS_MAQUINAS.length).getValues().filter((f) => String(f[0]).trim()).map((f) => ({
     codigo: String(f[0]).trim(), nombre: String(f[1]).trim(), combustible: String(f[2]).trim(),
     pideTrabajo: si(f[3]), agrupa: si(f[4]),
-    equipos: String(f[5] || '').split(',').map((x) => x.trim()).filter(Boolean), activo: si(f[6]),
+    equipos: String(f[5] || '').split(',').map((x) => x.trim()).filter(Boolean), activo: si(f[6]), horometro: si(f[7]),
+
   }));
 }
 
@@ -731,6 +734,15 @@ function guardar_(body) {
     const maquinas = {};
     leerMaquinas_(ss).forEach((q) => { maquinas[q.codigo] = q; });
     const moduloDe = (insumo) => (insumos[insumo] ? insumos[insumo].modulo : 'Stock');
+    // Partes de horómetro (hoja propia): se leen solo si llega alguno o una anulación.
+    let partes = null;
+    const parteDe = (id) => {
+      if (!partes) { partes = {}; leerPartes_(ss).forEach((p) => { partes[p.id] = p; }); }
+      return partes[id];
+    };
+    const shH = ss.getSheetByName('Horómetro');
+    const nuevasHoras = [];
+    let trabajos = null;
     const yaProcesados = idsRegistro_(ss);
     const nuevas = [];
     const log = [];
@@ -748,7 +760,7 @@ function guardar_(body) {
         if (estado !== 'duplicado') log.push([ahora, u.nombre, accionTexto_(op), detalle, estado === 'aplicado' ? 'Aplicado' : 'Rechazado: ' + motivo, id]);
       };
       if (!id || !isFinite(ts)) return res('rechazado', '', 'dato inválido');
-      if (porId[id] || yaProcesados[id]) return res('duplicado');
+      if (porId[id] || yaProcesados[id] || (op.tipo === 'horas' && parteDe(id))) return res('duplicado');
       try {
         if (op.tipo === 'mov') {
           exigir_(u, moduloDe(texto_(op.insumo, 60)), 'CARGAR');
@@ -761,6 +773,28 @@ function guardar_(body) {
           movs.push(porId[id]);
           tocoStock = true;
           res('aplicado', m.tipo + ' ' + m.insumo + (m.estancia ? ' (' + nombreEstancia_(m.estancia) + ')' : '') + ' ' + m.cantidad + ' ' + m.unidad + ' (' + ddmmaaaa_(m.fecha) + ')' + (m.destino ? ' → ' + m.destino : ''));
+        } else if (op.tipo === 'horas') {
+          exigir_(u, MODULO_HORAS, 'CARGAR');
+          trabajos = trabajos || leerTrabajos_(ss);
+          const p = validarParte_(op, u, maquinas, trabajos, hoy);
+          nuevasHoras.push([id, p.fecha, p.codigo, p.maquina, p.trabajo, p.cantidad, p.unidadCantidad, p.unidadNegocio,
+            p.inicio, p.fin, p.horas, p.nota, u.nombre, horaTel, ahora, false, '', ts]);
+          parteDe(id);
+          partes[id] = Object.assign({ id, usuario: u.nombre, anulado: false, ts }, p);
+          res('aplicado', 'Horómetro ' + p.maquina + ' ' + p.inicio + ' → ' + p.fin + ' (' + p.horas + ' h, ' + ddmmaaaa_(p.fecha) + ') ' + p.trabajo);
+        } else if (op.tipo === 'anular' && !porId[texto_(op.ref, 40)] && parteDe(texto_(op.ref, 40))) {
+          // Anular un parte de horómetro: mismas reglas que un movimiento (permisos de Combustible).
+          const ref = parteDe(texto_(op.ref, 40));
+          exigir_(u, MODULO_HORAS, 'CARGAR');
+          if (ref.anulado) return res('duplicado');
+          if (nivel_(u, MODULO_HORAS) < NIVELES.ADMINISTRAR && (ref.usuario !== u.nombre || ref.fecha < sumarDias_(hoy, -7))) {
+            throw new Error('solo quien administra Combustible puede anular partes de otros o de hace más de 7 días');
+          }
+          const motivo = texto_(op.motivo, 200);
+          ref.anulado = true;
+          if (ref.fila) shH.getRange(ref.fila, 16, 1, 2).setValues([[true, u.nombre + (motivo ? ': ' + motivo : '')]]);
+          else nuevasHoras.forEach((f) => { if (f[0] === ref.id) { f[15] = true; f[16] = u.nombre + (motivo ? ': ' + motivo : ''); } });
+          res('aplicado', 'Anula parte de horómetro ' + ref.maquina + ' (' + ddmmaaaa_(ref.fecha) + ')');
         } else if (op.tipo === 'anular' || op.tipo === 'factura') {
           const ref = porId[texto_(op.ref, 40)];
           if (!ref) throw new Error('ese movimiento no existe');
@@ -800,6 +834,7 @@ function guardar_(body) {
     });
 
     if (nuevas.length) shM.getRange(shM.getLastRow() + 1, 1, nuevas.length, COLS_MOV.length).setValues(nuevas.map(filaMov_));
+    if (nuevasHoras.length) shH.getRange(shH.getLastRow() + 1, 1, nuevasHoras.length, COLS_HORAS.length).setValues(nuevasHoras);
     if (lluvias.length) guardarLluvias_(lluvias, u.nombre);
     registrar_(ss, log);
     if (tocoStock) { reconstruirStock_(ss); publicarDatosInforme_(ss); }
@@ -808,7 +843,7 @@ function guardar_(body) {
 }
 
 function accionTexto_(op) {
-  return { mov: 'Movimiento', anular: 'Anular', factura: 'Asociar factura', lluvia: 'Lluvia' }[op.tipo] || String(op.tipo);
+  return { mov: 'Movimiento', anular: 'Anular', factura: 'Asociar factura', lluvia: 'Lluvia', horas: 'Horómetro' }[op.tipo] || String(op.tipo);
 }
 
 /** IDs de anulaciones/facturas/lluvias ya recibidas (esas no dejan fila propia en Movimientos). */
@@ -988,7 +1023,7 @@ function datos_(body) {
     };
     if (mods.indexOf('Sanidad') !== -1) r.stock.estancia = estadoEstancia_();
     if (mods.indexOf('Combustible') !== -1) {
-
+      r.horometro = datosHorometro_(ss, desde);
       r.stock.maquinas = leerMaquinas_(ss).filter((q) => q.activo);
       r.stock.trabajos = leerTrabajos_(ss);
     }
@@ -1222,7 +1257,9 @@ function publicarDatosInforme_(ss) {
 function exportarExcel_(body) {
   const ss = SpreadsheetApp.getActive();
   const u = usuarioDe_(ss, body.pin);
+  if (body.modulo === 'Horómetro') return exportarHorasExcel_(u, body);
   const modulo = ['Combustible', 'Sanidad'].indexOf(body.modulo) !== -1 ? body.modulo : 'Stock';
+
   exigir_(u, modulo, 'VER');
   // Sanidad: un Excel por rubro (Medicamentos, Insumos IATF, Semen), como la planilla de siempre:
   // Resumen + Movimientos, sin una hoja por producto (son casi cien).

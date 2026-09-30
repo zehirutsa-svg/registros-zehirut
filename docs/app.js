@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.12.0';
+const VERSION = '1.13.0';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -277,6 +277,7 @@ function descripcionOp(op) {
   if (op.tipo === 'anular') return 'Anular un movimiento';
   if (op.tipo === 'factura') return 'Asociar factura ' + op.factura;
   if (op.tipo === 'lluvia') return 'Lluvia ' + op.finca + ' ' + fechaTxt(op.fecha);
+  if (op.tipo === 'horas') return 'Parte de horómetro ' + op.codigo + ' ' + fechaTxt(op.fecha);
   return 'Cambio';
 }
 
@@ -394,7 +395,7 @@ function render() {
     app.innerHTML = barra('Registros Zehirut', false) + '<div class="contenido"><p class="vacio">Bajando los datos de Google…</p></div>';
     return;
   }
-  const pantallas = { inicio: htmlInicio, grupo: htmlGrupo, stock: htmlStock, lluvias: htmlLluvias, facturas: htmlFacturas, fondofijo: htmlFondoFijo };
+  const pantallas = { inicio: htmlInicio, grupo: htmlGrupo, stock: htmlStock, lluvias: htmlLluvias, facturas: htmlFacturas, fondofijo: htmlFondoFijo, horometro: htmlHorometro };
   app.innerHTML = (pantallas[ui.pantalla] || htmlInicio)();
   despuesDeRender();
 }
@@ -503,6 +504,11 @@ function tarjetasModulos() {
     const s = saldos();
     const txt = ['Nafta', 'Diesel'].map((n) => n + ' ' + num((s[n] || {}).cantidad || 0, 0) + ' L').join(' · ');
     g.stocks.push(tarjeta('combustible', 'data-p="stock" data-m="Combustible"', '⛽', 'Combustible', txt));
+    if (datos && datos.horometro) {
+      const partes = partesHor().filter((p) => !p.anulado);
+      g.stocks.push(tarjeta('combustible', 'data-p="horometro"', '⏱️', 'Horómetro',
+        partes.length ? 'Último parte: ' + fechaTxt(partes[0].fecha) : 'Partes de tractores y generadores'));
+    }
   }
   if (puede('Sanidad', 'VER')) {
     // Un stock por rubro (medicamentos, insumos de IATF, semen): cada uno con su tarjeta.
@@ -532,7 +538,7 @@ function tarjetasModulos() {
 }
 
 const GRUPOS = {
-  stocks: { titulo: 'Stocks', ico: '📦', sub: 'Insumos · Combustible · Sanidad' },
+  stocks: { titulo: 'Stocks', ico: '📦', sub: 'Insumos · Combustible · Horómetro · Sanidad' },
   comprobantes: { titulo: 'Comprobantes', ico: '🗂️', sub: 'Facturas · Fondo fijo' },
 };
 
@@ -1526,6 +1532,7 @@ function guardarLluvia() {
 // ---------------------------------------------------------------- eventos
 function despuesDeRender() {
   if (ui.pantalla === 'facturas' || ui.pantalla === 'fondofijo') despuesDeRenderFac();
+  if (ui.pantalla === 'horometro') despuesDeRenderHor();
   const cant = $('#f-cantidad');
   if (cant) cant.addEventListener('input', () => { ui.form.cantidad = cant.value; $('#f-equivale').textContent = equivale(); });
   ['proveedor', 'remito', 'factura', 'nota'].forEach((k) => {
@@ -1586,6 +1593,8 @@ document.addEventListener('click', (e) => {
       if (ui.pantalla === 'stock' && b.dataset.p === 'inicio') { atrasStock(); break; }
       if (ui.pantalla === 'facturas' && b.dataset.p === 'inicio' && atrasFacturas()) break;
       if (ui.pantalla === 'fondofijo' && b.dataset.p === 'inicio' && atrasFondoFijo()) break;
+      if (ui.pantalla === 'horometro' && b.dataset.p === 'inicio' && atrasHorometro()) break;
+      if (b.dataset.p === 'horometro') { hor.vista = 'lista'; hor.codigo = null; hor.form = null; hor.excel = null; }
       if (b.dataset.p === 'facturas') { ui.fac = null; }
       if (b.dataset.p === 'fondofijo') { ui.ff = null; }
       if (ui.pantalla === 'lluvias' && ui.vistaLluvia === 'cargar' && b.dataset.p === 'inicio') { ui.vistaLluvia = 'dia'; ui.lluvia = null; render(); break; }
@@ -1613,6 +1622,8 @@ document.addEventListener('click', (e) => {
     case 'bajarExcel': bajarExcel(); break;
     case 'fac': accionFac(b); break;
     case 'ff': accionFF(b); break;
+    case 'hor': accionHor(b); break;
+
     case 'tfOtro': ui.tf = null; render(); break;
     case 'masMovs': ui.movsVisibles = (ui.movsVisibles || 15) + 30; render(); break;
     case 'cargarDesde':
