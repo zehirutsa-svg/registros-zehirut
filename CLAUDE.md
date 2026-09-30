@@ -159,6 +159,23 @@ Ya existe en ZehirutApp (`Lluvias.js`: planilla "Registro de Lluvias Zehirut S.A
 estancia, ID AAAAMMDDFINCASECTOR, resumen año / temporada set-ago). Se integra acá; Osmar con
 acceso total.
 
+## Facturas y Fondo fijo (en prueba desde 30/09/2026, sin apagar ZehirutApp)
+
+- No se copia la lógica: el script usa **ZehirutApp como biblioteca** (símbolo `ZA`, versión fija en
+  `appsscript.json`, hoy 134). Misma planilla, carpetas de Drive, clave de Gemini y permisos/PIN de la
+  hoja Usuarios de ZehirutApp. Lo que se carga acá aparece en ZehirutApp y al revés.
+- El cliente llama `accion:"za"` con `fn` + `args`; el script solo deja pasar las funciones de
+  `ZA_PERMITIDAS` y reemplaza `"__PIN__"` por el PIN de la sesión. UI en `docs/facturas.js`.
+- **Prueba**: `FACTURAS_BETA = true` (Code.gs) → solo quien tiene "Configurar" ve los módulos;
+  `FACTURAS_PRUEBA = true` (app.js) → chip "en prueba". Para abrir a todos: ambos en false, dar
+  permisos Facturas / Fondo fijo en Usuarios y recién ahí apagar esos módulos en ZehirutApp.
+- **Cada vez que ZehirutApp publica versión nueva** que toque facturas/FF: subir el número de versión
+  de la biblioteca en `appsscript.json`, `clasp push --force` + update-deployment.
+- Scopes nuevos (calendar.events, send_mail, scriptapp, que usa la biblioteca): el dueño corre
+  `autorizar()` desde el editor.
+- Fotos: se achican solo si pasan de 2400 px de lado mayor (JPEG 0,88) para que Gemini lea bien; los
+  PDF no se tocan. Pendiente fase 2: cola offline de fotos ("pendiente de leer").
+
 ## Usuarios (inicio)
 
 - **Enrique Delfante**: todo.
