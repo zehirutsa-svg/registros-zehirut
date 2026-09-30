@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.9.0';
+const VERSION = '1.10.0';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -49,6 +49,7 @@ const ui = {
   movsVisibles: 15,
   tf: null,             // informe de Tapfeed en lectura / vista previa
   excel: null,          // período elegido para bajar el Excel
+  grupo: null,          // grupo abierto desde el inicio (stocks | comprobantes): ahí vuelve la flecha
   fac: null,            // pantallas de Facturas (facturas.js)
   ff: null,             // pantallas de Fondo fijo (facturas.js)
   vistaLluvia: 'dia',   // dia | cargar
@@ -382,7 +383,7 @@ function render() {
     app.innerHTML = barra('Registros Zehirut', false) + '<div class="contenido"><p class="vacio">Bajando los datos de Google…</p></div>';
     return;
   }
-  const pantallas = { inicio: htmlInicio, stock: htmlStock, lluvias: htmlLluvias, facturas: htmlFacturas, fondofijo: htmlFondoFijo };
+  const pantallas = { inicio: htmlInicio, grupo: htmlGrupo, stock: htmlStock, lluvias: htmlLluvias, facturas: htmlFacturas, fondofijo: htmlFondoFijo };
   app.innerHTML = (pantallas[ui.pantalla] || htmlInicio)();
   despuesDeRender();
 }
@@ -472,38 +473,59 @@ async function salir(forzado) {
 }
 
 // ---------------------------------------------------------------- inicio
-function htmlInicio() {
-  const mods = [];
+/** Tarjetas de cada módulo que el usuario puede ver, ya agrupadas. */
+function tarjetasModulos() {
+  const g = { stocks: [], comprobantes: [], lluvias: [] };
+  const prueba = FACTURAS_PRUEBA ? ' · <span class="chip naranja">en prueba</span>' : '';
+  const tarjeta = (cls, attrs, ico, titulo, sub) =>
+    '<button class="modulo ' + cls + '" data-a="ir" ' + attrs + '><span class="ico">' + ico + '</span><span><b>' + titulo + '</b><small>' + sub + '</small></span></button>';
+  let bajos = 0;
   if (puede('Stock', 'VER')) {
     const s = saldos();
     const ins = stockDatos().insumos.filter((i) => i.activo && (i.modulo || 'Stock') === 'Stock');
-    const bajos = ins.filter((i) => i.minimo != null && (i.porEstancia ? ESTANCIAS.map(([e]) => claveSaldo(i.nombre, e)) : [i.nombre])
+    bajos = ins.filter((i) => i.minimo != null && (i.porEstancia ? ESTANCIAS.map(([e]) => claveSaldo(i.nombre, e)) : [i.nombre])
       .some((k) => s[k] && s[k].cantidad < i.minimo)).length;
-    mods.push('<button class="modulo" data-a="ir" data-p="stock"><span class="ico">📦</span><span><b>Stock de insumos</b><small>' +
-      ins.length + ' insumos' + (bajos ? ' · <span class="chip alerta">' + bajos + ' bajo mínimo</span>' : '') + '</small></span></button>');
-  }
-  if (puede('Lluvias', 'VER')) {
-    const regs = registrosLluvia();
-    const ult = regs.length ? regs.map((r) => r.fecha).sort().pop() : null;
-    mods.push('<button class="modulo lluvias" data-a="ir" data-p="lluvias"><span class="ico">🌧️</span><span><b>Lluvias</b><small>' +
-      (ult ? 'Último registro: ' + fechaTxt(ult) : 'Registro de lluvias por sector') + '</small></span></button>');
+    g.stocks.push(tarjeta('insumos', 'data-p="stock"', '📦', 'Insumos',
+      ins.length + ' insumos' + (bajos ? ' · <span class="chip alerta">' + bajos + ' bajo mínimo</span>' : '')));
   }
   if (puede('Combustible', 'VER')) {
     const s = saldos();
     const txt = ['Nafta', 'Diesel'].map((n) => n + ' ' + num((s[n] || {}).cantidad || 0, 0) + ' L').join(' · ');
-    mods.push('<button class="modulo combustible" data-a="ir" data-p="stock" data-m="Combustible"><span class="ico">⛽</span><span><b>Combustible</b><small>' + txt + '</small></span></button>');
+    g.stocks.push(tarjeta('combustible', 'data-p="stock" data-m="Combustible"', '⛽', 'Combustible', txt));
   }
   const za = datos && datos.za && datos.za.ok ? datos.za : null;
-  if (za && (za.puedeFacturas || za.puedeVerFacturas)) {
-    mods.push('<button class="modulo facturas" data-a="ir" data-p="facturas"><span class="ico">🧾</span><span><b>Facturas</b><small>Cargar y ver comprobantes' + (FACTURAS_PRUEBA ? ' · <span class="chip naranja">en prueba</span>' : '') + '</small></span></button>');
-  }
-  if (za && za.puedeFondoFijo) {
-    mods.push('<button class="modulo fondofijo" data-a="ir" data-p="fondofijo"><span class="ico">💵</span><span><b>Fondo fijo</b><small>Caja chica' + (FACTURAS_PRUEBA ? ' · <span class="chip naranja">en prueba</span>' : '') + '</small></span></button>');
-  }
-  const pronto = ['Facturas', 'Fondo fijo'].filter((m) => puede(m, 'VER') && !za);
-  pronto.forEach((m) => {
-    mods.push('<div class="modulo pronto"><span class="ico">' + ({ Combustible: '⛽', Facturas: '🧾', 'Fondo fijo': '💵' }[m]) +
+  if (za && (za.puedeFacturas || za.puedeVerFacturas)) g.comprobantes.push(tarjeta('facturas', 'data-p="facturas"', '🧾', 'Facturas', 'Cargar y ver facturas' + prueba));
+  if (za && za.puedeFondoFijo) g.comprobantes.push(tarjeta('fondofijo', 'data-p="fondofijo"', '💵', 'Fondo fijo', 'Caja chica' + prueba));
+  ['Facturas', 'Fondo fijo'].filter((m) => puede(m, 'VER') && !za).forEach((m) => {
+    g.comprobantes.push('<div class="modulo pronto"><span class="ico">' + ({ Facturas: '🧾', 'Fondo fijo': '💵' }[m]) +
       '</span><span><b>' + m + '</b><small>Próximamente (por ahora en ZehirutApp)</small></span></div>');
+  });
+  if (puede('Lluvias', 'VER')) {
+    const regs = registrosLluvia();
+    const ult = regs.length ? regs.map((r) => r.fecha).sort().pop() : null;
+    g.lluvias.push(tarjeta('lluvias', 'data-p="lluvias"', '🌧️', 'Lluvias', ult ? 'Último registro: ' + fechaTxt(ult) : 'Registro de lluvias por sector'));
+  }
+  g.bajos = bajos;
+  g.prueba = za && FACTURAS_PRUEBA ? prueba : '';
+  return g;
+}
+
+const GRUPOS = {
+  stocks: { titulo: 'Stocks', ico: '📦', sub: 'Insumos · Combustible' },
+  comprobantes: { titulo: 'Comprobantes', ico: '🗂️', sub: 'Facturas · Fondo fijo' },
+};
+
+// Inicio: Stocks, Comprobantes y Lluvias. Un grupo con un solo módulo muestra ese módulo
+// directo (sin un toque de más).
+function htmlInicio() {
+  const g = tarjetasModulos();
+  const mods = [];
+  ['stocks', 'comprobantes', 'lluvias'].forEach((k) => {
+    if (g[k].length > 1 && GRUPOS[k]) {
+      const extra = k === 'stocks' && g.bajos ? ' · <span class="chip alerta">' + g.bajos + ' bajo mínimo</span>' : k === 'comprobantes' ? g.prueba : '';
+      mods.push('<button class="modulo grupo ' + k + '" data-a="ir" data-p="grupo" data-g="' + k + '"><span class="ico">' + GRUPOS[k].ico +
+        '</span><span><b>' + GRUPOS[k].titulo + '</b><small>' + GRUPOS[k].sub + extra + '</small></span><span class="flecha">›</span></button>');
+    } else mods.push.apply(mods, g[k]);
   });
   return barra('Registros Zehirut', false) +
     '<div class="contenido">' +
@@ -514,6 +536,13 @@ function htmlInicio() {
     '<button class="btn sec chico" data-a="salir">Salir</button>' +
     '<span>v' + VERSION + ' · ' + esc(sesion.nombre) + '</span></div>' +
     '</div>';
+}
+
+/** Pantalla de un grupo (Stocks o Comprobantes): las tarjetas de sus módulos. */
+function htmlGrupo() {
+  const k = ui.grupo;
+  const tarjetas = (GRUPOS[k] && tarjetasModulos()[k]) || [];
+  return barra(GRUPOS[k] ? GRUPOS[k].titulo : '', true) + '<div class="contenido"><div class="modulos">' + tarjetas.join('') + '</div></div>';
 }
 
 // ---------------------------------------------------------------- stock
@@ -543,7 +572,7 @@ function atrasStock() {
   const v = ui.vistaStock;
   if (v === 'form') ui.vistaStock = 'ficha';
   else if (v === 'ficha' || v === 'sinFactura' || v === 'config' || v === 'tapfeed' || v === 'excel') { ui.vistaStock = 'lista'; ui.insumoVer = null; ui.cfg = null; ui.tf = null; }
-  else ui.pantalla = 'inicio';
+  else ui.pantalla = ui.grupo ? 'grupo' : 'inicio';
   render();
   window.scrollTo(0, 0);
 }
@@ -1434,7 +1463,9 @@ document.addEventListener('click', (e) => {
       if (b.dataset.p === 'facturas') { ui.fac = null; }
       if (b.dataset.p === 'fondofijo') { ui.ff = null; }
       if (ui.pantalla === 'lluvias' && ui.vistaLluvia === 'cargar' && b.dataset.p === 'inicio') { ui.vistaLluvia = 'dia'; ui.lluvia = null; render(); break; }
-      ui.pantalla = b.dataset.p;
+      if (b.dataset.p === 'grupo') ui.grupo = b.dataset.g;
+      ui.pantalla = b.dataset.p === 'inicio' && ui.pantalla !== 'grupo' && ui.grupo ? 'grupo' : b.dataset.p;
+      if (ui.pantalla === 'inicio') ui.grupo = null;
       ui.cfg = null;
       ui.insumoVer = null;
       ui.vistaStock = 'lista';
