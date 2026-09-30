@@ -7,7 +7,8 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.15.0';
+const VERSION = '1.15.1';
+
 
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
@@ -753,7 +754,8 @@ function htmlFicha(nombre) {
   const botones = [];
   if (puede(ui.modStock, 'CARGAR') && i.activo) {
     // Sanidad: el uso (consumo) se carga solo en la app de la estancia; acá, ingresos y conteos.
-    if (!esSanidad()) botones.push(['Consumo', 'consumo', '⬆ Consumo']);
+    // Excepción: lo que no va a animales (alcohol, jeringas, guantes: "Baja en Registros").
+    if (!esSanidad() || i.bajaManual) botones.push(['Consumo', 'consumo', '⬆ Consumo']);
     botones.push(['Ingreso', 'ingreso', '⬇ Ingreso']);
     if (puede(ui.modStock, 'ADMINISTRAR')) botones.push(['Conteo', 'conteo', '✔ Conteo']);
   }
@@ -772,7 +774,8 @@ function htmlFicha(nombre) {
       const f = fichaSanidad(i);
       if (i.principio) f.unshift(['Principio activo', lindo(i.principio)]);
       cajas += '<table class="detalle" style="margin-top:10px">' + f.map(([a, b]) => '<tr><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table>' +
-        (ui.rubro !== 'Semen' ? '<p class="nota-estancia" style="margin-top:8px">El uso se carga en la app de la estancia (Sanidades) y se descuenta solo.</p>' : '');
+        (i.bajaManual ? '<p class="nota-estancia" style="margin-top:8px">No se aplica a animales: el uso se carga acá, con Consumo.</p>'
+          : ui.rubro !== 'Semen' ? '<p class="nota-estancia" style="margin-top:8px">El uso se carga en la app de la estancia (Sanidades) y se descuenta solo.</p>' : '');
     }
   }
   const mostrar = ui.movsVisibles || 15;
@@ -1315,7 +1318,8 @@ function htmlConfigSanidad() {
     lista.map((u) => '<option ' + (i[k] === u ? 'selected' : '') + '>' + esc(u) + '</option>').join('') + '</select></div>';
   return '<div class="form">' +
     '<div class="aviso">Los cambios necesitan señal. <b>Contenido</b>: lo que trae cada unidad (frasco de 500 ml, caja de 100 un); vacío si se cuenta de a uno (jeringas, pajuelas). ' +
-    'Un producto con movimientos no se borra: se desactiva. Para pasarlo a otro stock, cambiá el <b>Stock</b>.</div>' +
+    'Un producto con movimientos no se borra: se desactiva. Para pasarlo a otro stock, cambiá el <b>Stock</b>. ' +
+    '<b>Baja en Registros</b>: no se aplica a animales (alcohol, jeringas, guantes); su uso se carga acá y no aparece en la app de la estancia.</div>' +
     '<div class="tarjeta"><h3 style="margin-top:0">' + esc(ui.rubro) + '</h3>' +
     c.insumos.map((i, n) => '<div class="item-cfg"><div class="grilla">' +
       '<div class="ancho"><span class="mini-etq">Producto</span><input class="txt" data-cfg="insumos" data-n="' + n + '" data-k="nombre" value="' + esc(i.nombre) + '"></div>' +
@@ -1328,7 +1332,9 @@ function htmlConfigSanidad() {
       campo(i, n, 'indicacion', 'Indicación') + campo(i, n, 'laboratorio', 'Laboratorio') +
       campo(i, n, 'proveedor', 'Proveedor') + campo(i, n, 'dosisBase', 'Dosis base', ' inputmode="decimal"') +
       campo(i, n, 'pesoBase', 'Cada (kg)', ' inputmode="decimal"') +
-      '</div><label class="interruptor"><input type="checkbox" data-cfg="insumos" data-n="' + n + '" data-k="activo" ' + (i.activo ? 'checked' : '') + '> Activo</label></div>').join('') +
+      '</div><div><label class="interruptor"><input type="checkbox" data-cfg="insumos" data-n="' + n + '" data-k="activo" ' + (i.activo ? 'checked' : '') + '> Activo</label>' +
+      '<label class="interruptor" style="margin-top:6px"><input type="checkbox" data-cfg="insumos" data-n="' + n + '" data-k="bajaManual" ' + (i.bajaManual ? 'checked' : '') +
+      '> Baja en Registros</label></div></div>').join('') +
     '<button class="btn sec chico" data-a="cfgAgregar" data-cfg="insumos" style="margin-top:10px">+ Agregar producto</button> ' +
     '<button class="btn chico" data-a="cfgGuardar" data-cfg="insumos" style="margin-top:10px">Guardar productos</button></div></div>';
 }
@@ -1346,6 +1352,7 @@ async function cfgGuardar(tipo) {
         laboratorio: String(i.laboratorio || '').trim(), proveedor: String(i.proveedor || '').trim(),
         dosisBase: i.dosisBase === '' || i.dosisBase == null ? '' : leerNumero(i.dosisBase),
         pesoBase: i.pesoBase === '' || i.pesoBase == null ? '' : leerNumero(i.pesoBase),
+        bajaManual: !!i.bajaManual,
       };
     });
     const malo = lista.find((i) => (i.contenido !== '' && !(i.contenido > 0)) || (i.minimo !== '' && !(i.minimo >= 0)) ||

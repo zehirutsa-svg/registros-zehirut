@@ -167,8 +167,9 @@ Cada uno es una tarjeta en Stocks; permisos: columna **Sanidad** de Usuarios (ho
   planilla "Inventario y stock de medicamentos"), se agrega una sola vez (esquema 7). Después se edita
   desde la app: "⚙ Configurar productos" (por rubro; cambiar "Stock" pasa un producto a otro rubro).
 - **Solo ingresos y conteos en Registros** (pedido 30/09): el uso (baja) se carga únicamente en la app de la
-  estancia; el script rechaza un Consumo manual de Sanidad. Lo que no va a un animal (alcohol, jeringas,
-  guantes, vainas) y el semen se ajustan con Conteo hasta que la estancia los descuente.
+  estancia; el script rechaza un Consumo manual de Sanidad. Excepción: casilla **"Baja en Registros"** (alcohol,
+  jeringas, guantes; esquema 12): esos sí llevan Consumo a mano y NO se ofrecen en la app de la estancia
+  (se mandan como inactivos). El semen se ajusta con Conteo hasta el descuento por Servicios de IATF.
 - Ficha del producto (columnas Principio activo, Indicación, Laboratorio, Proveedor, Dosis base, Peso base
   en Insumos, de la hoja INVENTARIO; esquema 11). Pantalla: **solo aparecen las tarjetas que se buscan**
   (nombre comercial, principio activo, laboratorio, proveedor o indicación): nombre grande, principio

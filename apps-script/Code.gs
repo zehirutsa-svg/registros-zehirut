@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '11';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '12';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
@@ -43,7 +43,10 @@ const COLS_USUARIOS = ['Nombre', 'PIN', 'Activo'].concat(MODULOS, ['Configurar']
 // indicación, laboratorio, proveedor y dosis base (cantidad cada tantos kg de peso vivo).
 const COLS_INSUMOS = ['Insumo', 'Unidad', 'Kg por unidad', 'Stock mínimo', 'Activo', 'Por estancia', 'Producción propia', 'Nombre en Tapfeed', 'Módulo',
   'Rubro', 'Contenido por unidad', 'Unidad del contenido',
-  'Principio activo', 'Indicación', 'Laboratorio', 'Proveedor', 'Dosis base', 'Peso base (kg)'];
+  'Principio activo', 'Indicación', 'Laboratorio', 'Proveedor', 'Dosis base', 'Peso base (kg)',
+  'Baja en Registros'];
+// "Baja en Registros" (solo Sanidad): lo que no se aplica a animales (alcohol, jeringas, guantes) se da de
+// baja a mano acá con Consumo y no aparece en el desplegable de la app de la estancia.
 const CAMPOS_FICHA = ['principio', 'indicacion', 'laboratorio', 'proveedor', 'dosisBase', 'pesoBase'];
 const COLS_TAPFEED = ['Fecha', 'Corral', 'Cabezas', 'Insumo', 'Nombre en Tapfeed', 'Kg tal cual', 'Kg MS', 'Archivo', 'Cargado por', 'Recibido'];
 const COLS_DESTINOS = ['Destino', 'Activo'];
@@ -176,6 +179,7 @@ function configurar() {
   asegurarHorometro_(ss);
   asegurarRecorrida_(ss);
   asegurarFichaSanidad_(ss, ins);
+  asegurarBajaManual_(ins);
   agregarTrabajos_(ss, 'TRABAJOS_V10', ['Aserraje', 'Trabajos de limpieza']);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
@@ -321,7 +325,7 @@ function asegurarSanidad_(ss, ins, usu) {
     if (String(ins.getRange(1, c).getValue()) !== t) ins.getRange(1, c).setValue(t).setFontWeight('bold').setBackground('#eeeeee');
   });
   if (!leerInsumos_(ss).some((i) => i.modulo === 'Sanidad')) {
-    const filas = PRODUCTOS_SANIDAD.map((p) => [p[0], p[2], '', '', true, false, false, '', 'Sanidad', p[1], p[3], p[4]].concat(p.slice(5, 11)));
+    const filas = PRODUCTOS_SANIDAD.map((p) => [p[0], p[2], '', '', true, false, false, '', 'Sanidad', p[1], p[3], p[4]].concat(p.slice(5, 11), [/^(ALCOHOL|JERINGA|GUANTE)/i.test(p[0])]));
     ins.getRange(ins.getLastRow() + 1, 1, filas.length, COLS_INSUMOS.length).setValues(filas);
   }
   const ancho = usu.getLastColumn();
@@ -523,6 +527,7 @@ function leerInsumos_(ss) {
       proveedor: String(f[15] || '').trim(),
       dosisBase: f[16] === '' || f[16] == null ? null : Number(f[16]),
       pesoBase: f[17] === '' || f[17] == null ? null : Number(f[17]),
+      bajaManual: f[18] === true || String(f[18]).toUpperCase() === 'TRUE',
     }));
 }
 
@@ -578,14 +583,14 @@ function guardarCatalogo_(body) {
           };
           return [nombre, unidad, '', minimo, x.activo !== false, false, false, '', 'Sanidad', r, cont, uc,
             texto_(x.principio, 80), texto_(x.indicacion, 80), texto_(x.laboratorio, 80), texto_(x.proveedor, 80),
-            numOVacio(x.dosisBase, 'dosis base'), numOVacio(x.pesoBase, 'peso base')];
+            numOVacio(x.dosisBase, 'dosis base'), numOVacio(x.pesoBase, 'peso base'), x.bajaManual === true];
         }
         return [nombre, unidad, kg, minimo, x.activo !== false, x.porEstancia === true, x.propia === true, antes ? antes.tapfeed : '', 'Stock', '', '', '',
-          '', '', '', '', '', ''];
+          '', '', '', '', '', '', false];
       });
       const filaDe = (i, activo) => [i.nombre, i.unidad, i.kgUnidad == null ? '' : i.kgUnidad, i.minimo == null ? '' : i.minimo, activo, !!i.porEstancia, !!i.propia, i.tapfeed, i.modulo,
         i.rubro, i.contenido == null ? '' : i.contenido, i.unidadContenido]
-        .concat(CAMPOS_FICHA.map((k) => (i[k] == null ? '' : i[k])));
+        .concat(CAMPOS_FICHA.map((k) => (i[k] == null ? '' : i[k])), [!!i.bajaManual]);
       previos.forEach((i) => {
         if (!enAlcance(i)) {
           if (vistos[i.nombre.toUpperCase()]) throw new Error('"' + i.nombre + '" ya existe en ' + (i.modulo === 'Sanidad' ? i.rubro : 'el módulo ' + i.modulo));
@@ -910,7 +915,8 @@ function validarMov_(op, u, insumos, destinos, hoy, maquinas, trabajos) {
   if (!ins) throw new Error('insumo desconocido: ' + op.insumo);
   const comb = ins.modulo === 'Combustible';
   // Sanidad: la baja (consumo) llega solo desde la app de la estancia; acá, ingresos y conteos.
-  if (ins.modulo === 'Sanidad' && tipo === 'Consumo') throw new Error('el uso de ' + ins.nombre + ' se carga en la app de la estancia');
+  if (ins.modulo === 'Sanidad' && tipo === 'Consumo' && !ins.bajaManual) throw new Error('el uso de ' + ins.nombre + ' se carga en la app de la estancia');
+
 
   if (tipo === 'Conteo' && nivel_(u, ins.modulo) < NIVELES.ADMINISTRAR) throw new Error('solo quien administra ' + ins.modulo + ' carga conteos');
   if (comb && fecha < COMBUSTIBLE_DESDE) throw new Error('el registro de combustible arranca el ' + ddmmaaaa_(COMBUSTIBLE_DESDE));

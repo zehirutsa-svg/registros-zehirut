@@ -139,7 +139,9 @@ function estancia_(body) {
     const r = aplicarConsumosEstancia_(ss, insumos, body);
     return {
       ok: true, cambios: r.cambios, errores: r.errores,
-      productos: insumos.map((i) => ({ nombre: i.nombre, rubro: i.rubro, unidad: i.unidad, contenido: i.contenido, unidadContenido: i.unidadContenido, activo: i.activo })),
+      productos: insumos.map((i) => ({ nombre: i.nombre, rubro: i.rubro, unidad: i.unidad, contenido: i.contenido, unidadContenido: i.unidadContenido,
+        // Lo que se da de baja a mano en Registros no se ofrece en la estancia (no va a animales).
+        activo: i.activo && !i.bajaManual })),
     };
   });
 }
@@ -245,4 +247,19 @@ function asegurarFichaSanidad_(ss, ins) {
   const modulos = ins.getRange(2, COLS_INSUMOS.indexOf('Módulo') + 1, n - 1, 1).getValues();
   ins.getRange(2, primera, n - 1, 6).setValues(nombres.map((f, i) =>
     (String(modulos[i][0]).trim() === 'Sanidad' && porNombre[String(f[0]).trim().toUpperCase()]) || ['', '', '', '', '', '']));
+}
+
+/** Versión 12: casilla "Baja en Registros" (tildada en alcohol, jeringas y guantes, pedido del 30/09/2026). */
+function asegurarBajaManual_(ins) {
+  const col = COLS_INSUMOS.indexOf('Baja en Registros') + 1;
+  if (String(ins.getRange(1, col).getValue()) !== 'Baja en Registros') {
+    ins.getRange(1, col).setValue('Baja en Registros').setFontWeight('bold').setBackground('#eeeeee');
+    const n = ins.getLastRow();
+    if (n > 1) {
+      const mod = COLS_INSUMOS.indexOf('Módulo');
+      ins.getRange(2, col, n - 1, 1).setValues(ins.getRange(2, 1, n - 1, mod + 1).getValues().map((f) =>
+        [String(f[mod]).trim() === 'Sanidad' && /^(ALCOHOL|JERINGA|GUANTE)/i.test(String(f[0]).trim())]));
+    }
+  }
+  ins.getRange(2, col, 200, 1).insertCheckboxes();
 }
