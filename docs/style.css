@@ -114,7 +114,8 @@ button { cursor: pointer; }
 .saldos { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); grid-auto-rows: 1fr; gap: 10px; }
 /* Todas las tarjetas del mismo alto, con el contenido arriba y el nombre en dos renglones fijos. */
 button.saldo { display: flex; flex-direction: column; justify-content: flex-start; }
-.saldos .saldo h3 { min-height: 2.5em; }
+/* Título más grande con interlineado justo: dos renglones ocupan lo mismo que antes (la tarjeta no crece). */
+.saldos .saldo h3 { min-height: 2.2em; line-height: 1.1; margin-bottom: 4px; }
 .saldo {
   background: var(--papel); border-radius: var(--radio); box-shadow: var(--sombra); padding: 14px 16px;
   border-top: 6px solid var(--verde); text-align: left; border-left: 0; border-right: 0; border-bottom: 0;
@@ -123,7 +124,7 @@ button.saldo { display: flex; flex-direction: column; justify-content: flex-star
 .saldo.negativo { border-top-color: var(--alerta); }
 /* Siempre con franja de color: verde = al día, ocre = falta el conteo inicial (o sin partes), rojo = bajo mínimo / negativo. */
 .saldo.sin { border-top-color: var(--ocre); }
-.saldo h3 { margin: 0 0 6px; font-size: 17px; }
+.saldo h3 { margin: 0 0 6px; font-size: 20px; line-height: 1.1; }
 .saldo { container-type: inline-size; }
 /* El número se achica con el ancho de la tarjeta y, si igual no entra, la unidad pasa abajo. */
 .saldo .cant { font-size: clamp(22px, 15cqi, 36px); font-weight: 800; line-height: 1.1; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 4px; }
@@ -284,7 +285,7 @@ select.txt.grande { font-size: 18px; font-weight: 600; padding: 15px 12px; backg
 .btn.conteo { background: var(--azul); }
 @media (max-width: 520px) {
   .saldos .saldo { padding: 12px; }
-  .saldos .saldo h3 { font-size: 15px; min-height: 2.5em; }
+  .saldos .saldo h3 { font-size: 18px; min-height: 2.2em; }
   .saldos .saldo .cant { font-size: clamp(20px, 15cqi, 30px); }
   .saldos .saldo .det { font-size: 13px; }
 }
