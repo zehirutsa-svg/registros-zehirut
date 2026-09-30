@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.11.0';
+const VERSION = '1.12.0';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -650,10 +650,21 @@ function htmlSaldo() {
     (sesion.configura && esSanidad() ? '<button class="btn sec chico" data-a="vista" data-v="config">⚙ Configurar productos</button>' : '') + '</div>';
 }
 
+/** Lo aplicado a los animales llega solo desde la app de la estancia: cuándo fue la última vez y
+ *  qué no se pudo descontar (producto que no está en la lista o cargado en otra unidad). */
+function htmlEstadoEstancia() {
+  if (ui.rubro === 'Semen') return '';
+  const e = stockDatos().estancia || { ultima: 0, errores: [] };
+  const errores = (e.errores || []).length ? '<div class="aviso amarillo">⚠️ Desde la app de la estancia llegaron aplicaciones que <b>no se descontaron</b>:<ul>' +
+    e.errores.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>Corregilas allá o revisá el producto en Configurar.</div>' : '';
+  return '<p class="nota-estancia">🔄 Lo aplicado a los animales se descuenta solo desde la app de la estancia' +
+    (e.ultima ? ' (última actualización ' + haceCuanto(e.ultima) + ')' : ' (todavía no se conectó)') + '.</p>' + errores;
+}
+
 /** Sanidad: son muchos productos, así que va en lista (no en tarjetas), con un buscador. */
 function htmlListaSanidad(ins, s, c7) {
   if (!ins.length) return '<p class="vacio">Todavía no hay productos en ' + esc(ui.rubro) + '.</p>';
-  return '<input class="txt buscar" id="buscar-san" type="search" placeholder="🔍 Buscar producto…" autocomplete="off">' +
+  return htmlEstadoEstancia() + '<input class="txt buscar" id="buscar-san" type="search" placeholder="🔍 Buscar producto…" autocomplete="off">' +
     '<div class="lista-san">' + ins.map((i) => {
       const n = infoInsumo(i, s, c7);
       return '<button class="fila-san ' + n.cls + '" data-a="verInsumo" data-i="' + esc(i.nombre) + '" data-buscar="' + esc(i.nombre.toUpperCase()) + '">' +
@@ -935,12 +946,16 @@ async function verMov(id) {
   }
   if (m.nota) filas.push(['Nota', m.nota]);
   filas.push(['Cargado por', m.usuario + (m.pendiente ? ' (sin enviar)' : '')]);
+  // Consumos que manda la app de la estancia: se corrigen allá (acá se reescriben solos).
+  const deEstancia = String(m.id).indexOf('SAN-') === 0;
+  if (deEstancia) filas.push(['Origen', 'Sanidades de la app de la estancia. Si hay un error, corregilo allá: acá se actualiza solo.']);
   if (m.anulado) filas.push(['Anulado', m.anuladoPor || 'sí']);
   const mod = moduloDe(m.insumo);
   const admin = puede(mod, 'ADMINISTRAR');
   // Quien carga corrige/anula lo suyo de los últimos 7 días; quien administra, cualquier cosa.
   // Un conteo solo lo corrige quien administra (es quien puede cargarlo).
-  const puedeAnular = !m.anulado && puede(mod, 'CARGAR') &&
+  const puedeAnular = !m.anulado && !deEstancia && puede(mod, 'CARGAR') &&
+
     (admin || (m.usuario === sesion.nombre && m.fecha >= sumarDias(hoyISO(), -7)));
   const puedeCorregir = puedeAnular && (m.tipo !== 'Conteo' || admin);
   const puedeFactura = !m.anulado && m.tipo === 'Ingreso' && !esPropio(m.insumo) && puede(mod, 'CARGAR');

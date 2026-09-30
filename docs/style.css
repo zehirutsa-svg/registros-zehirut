@@ -375,3 +375,4 @@ label.btn { text-align: center; cursor: pointer; }
 .fila-san .val b { font-size: 19px; }
 .fila-san .val small { display: block; color: var(--gris); font-size: 13px; }
 .item-cfg .grilla .ancho { grid-column: 1 / -1; }
+.nota-estancia { color: var(--gris); font-size: 14px; margin: 0 0 10px; }

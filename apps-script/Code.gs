@@ -390,6 +390,8 @@ function doPost(e) {
       case 'tapfeed': return json_(cargarTapfeed_(body));
       case 'excel': return json_(exportarExcel_(body));
       case 'za': return json_(zehirut_(body));
+      case 'estancia': return json_(estancia_(body));
+      case 'claveEstancia': return json_(fijarClaveEstancia_(body));
       default: return json_({ ok: false, error: 'acción desconocida' });
     }
   } catch (err) {
@@ -984,7 +986,9 @@ function datos_(body) {
         }),
       proveedores: movs.map((m) => m.proveedor).filter((p, i, a) => p && a.indexOf(p) === i).sort(),
     };
+    if (mods.indexOf('Sanidad') !== -1) r.stock.estancia = estadoEstancia_();
     if (mods.indexOf('Combustible') !== -1) {
+
       r.stock.maquinas = leerMaquinas_(ss).filter((q) => q.activo);
       r.stock.trabajos = leerTrabajos_(ss);
     }

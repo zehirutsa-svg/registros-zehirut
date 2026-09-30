@@ -149,11 +149,15 @@ Cada uno es una tarjeta en Stocks; permisos: columna **Sanidad** de Usuarios (ho
   desde la app: "⚙ Configurar productos" (por rubro; cambiar "Stock" pasa un producto a otro rubro).
 - Pantalla: lista compacta con buscador (no tarjetas: son casi cien). Excel por rubro: Resumen +
   Movimientos, con Unidad de negocio **PATRIMONIAL** (decisión del contador), sin hoja por producto.
-- **Pendiente (fase 2):** los consumos por animal vienen de la app de la estancia
-  (`Proyectos Claude\estancia-app`, sanidad_eventos/sanidad_aplicaciones, dosis en ml/lts/un).
-  Plan: Registros es dueño de la lista de productos (estancia-app la baja para su desplegable, sin
-  "+ Nuevo…"); estancia-app publica totales día × producto de 30 días (con clave) y Registros los lee
-  cada hora como Consumo con ID `SAN-AAAA-MM-DD-<producto>`, reescribiendo la ventana (correcciones).
+- **Conexión con la app de la estancia** (`Proyectos Claude\estancia-app`, sección "Sanidad ↔ Registros
+  Zehirut" de su CLAUDE.md): su servidor llama cada 15 min `accion: 'estancia'` con la clave compartida
+  (propiedad CLAVE_ESTANCIA; se fija una sola vez con `accion: 'claveEstancia'`). Manda el total por
+  día × producto de 30 días y recibe la lista de productos (Registros es el dueño de la lista; allá no
+  se crean productos). Acá queda un Consumo por día × producto, ID `SAN-AAAA-MM-DD-<producto>`,
+  "Cargado por" = "App de la estancia", reescrito en cada llamada (en el lugar; si ya no hay
+  aplicaciones, anulado). Cuenta desde el primer conteo de cada producto. Esos consumos no se corrigen
+  ni anulan desde la app (se corrigen allá). Lo que no se pudo descontar (producto desconocido, unidad
+  distinta) se ve arriba de la lista y en la hoja Registro. Código en `apps-script/Sanidad.gs`.
 - **Más adelante (verlo aparte):** descontar semen y hormonas al cargar un Servicio de IATF.
 - Arranque: cuando el usuario actualice su planilla, se carga el stock inicial como Conteo.
 
