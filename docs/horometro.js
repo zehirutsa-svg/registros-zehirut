@@ -81,13 +81,16 @@ function atrasHorometro() {
 function htmlHorLista() {
   const maqs = horDatos().maquinas;
   if (!maqs.length) return '<p class="vacio">No hay máquinas con horómetro (hoja Máquinas, columna Horómetro).</p>';
-  return '<div class="lista-san">' + maqs.map((q) => {
+  // Mismas tarjetas que Stock y Combustible: el número grande es el último horómetro.
+  return '<div class="saldos">' + maqs.map((q) => {
     const u = ultimoHor(q.codigo);
     const m = mesHor(q.codigo);
-    return '<button class="fila-san' + (u ? '' : ' sin') + '" data-a="hor" data-h="maquina" data-c="' + esc(q.codigo) + '">' +
-      '<span class="nom">' + esc(q.nombre) + (u ? '' : ' <span class="chip">sin partes</span>') + '</span>' +
-      '<span class="val"><b>' + (u ? num(u.fin, 1) : '—') + '</b> h' +
-      '<small>' + (m.horas ? 'este mes ' + num(m.horas, 1) + ' h' + (m.lh ? ' · ' + num(m.lh, 1) + ' l/h' : '') : 'sin horas este mes') + '</small></span></button>';
+    const pend = partesHor().some((p) => p.codigo === q.codigo && p.pendiente);
+    return '<button class="saldo' + (u ? '' : ' sin') + '" data-a="hor" data-h="maquina" data-c="' + esc(q.codigo) + '">' +
+      '<h3>' + esc(q.nombre) + (pend ? ' <span class="chip pend">sin enviar</span>' : '') + '</h3>' +
+      '<div class="cant">' + (u ? num(u.fin, 1) : '—') + '<small>h</small></div>' +
+      '<div class="det">' + (m.horas ? 'Este mes ' + num(m.horas, 1) + ' h' + (m.lh ? ' · ' + num(m.lh, 1) + ' l/h' : '') : 'Sin horas este mes') +
+      (u ? '' : '<br><span class="chip">Sin partes</span>') + '</div></button>';
   }).join('') + '</div>' +
     '<div class="pie-stock"><button class="btn sec chico" data-a="hor" data-h="excel">📥 Bajar Excel</button>' +
     (sesion.configura ? '<button class="btn sec chico" data-a="hor" data-h="trabajos">⚙ Configurar trabajos</button>' : '') + '</div>';

@@ -121,7 +121,8 @@ button.saldo { display: flex; flex-direction: column; justify-content: flex-star
 }
 .saldo.bajo { border-top-color: var(--alerta); background: #fff7f6; }
 .saldo.negativo { border-top-color: var(--alerta); }
-.saldo.sin { border-top-color: var(--linea); }
+/* Siempre con franja de color: verde = al día, ocre = falta el conteo inicial (o sin partes), rojo = bajo mínimo / negativo. */
+.saldo.sin { border-top-color: var(--ocre); }
 .saldo h3 { margin: 0 0 6px; font-size: 17px; }
 .saldo { container-type: inline-size; }
 /* El número se achica con el ancho de la tarjeta y, si igual no entra, la unidad pasa abajo. */
@@ -368,7 +369,7 @@ label.btn { text-align: center; cursor: pointer; }
   display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; font: inherit; color: inherit;
   background: var(--papel); border: 0; border-left: 6px solid var(--verde); border-radius: 12px; box-shadow: var(--sombra); padding: 12px 14px;
 }
-.fila-san.sin { border-left-color: var(--linea); }
+.fila-san.sin { border-left-color: var(--ocre); }
 .fila-san.bajo, .fila-san.negativo { border-left-color: var(--alerta); background: #fff7f6; }
 .fila-san .nom { flex: 1; min-width: 0; font-weight: 700; }
 .fila-san .val { text-align: right; white-space: nowrap; }
