@@ -149,8 +149,8 @@ Tarjeta en Stocks debajo de Combustible; permisos = columna Combustible. Código
   máquina (ficha: horas del mes por unidad de negocio, litros del mes, l/h).
 - Trabajos (lista depurada por el usuario, única para Combustible y Horómetro): Caminería, Trabajos varios
   con traila, Trabajos varios con niveladora, Cargada de corral, Acarreo de fardos, Acarreos varios,
-  Fumigación, Generador (energía), Bombeo, Aviación, Uso general, Trabajos de carpida, Recorrida (agregada
-  30/09). **Solo desplegable, también en Combustible** (el script rechaza un trabajo que no esté en la lista);
+  Fumigación, Generador (energía), Bombeo, Aviación, Uso general, Trabajos de carpida, Recorrida, Aserraje,
+  Trabajos de limpieza (agregados 30/09 con migraciones de una vez: agregarTrabajos_). **Solo desplegable, también en Combustible** (el script rechaza un trabajo que no esté en la lista);
   la edita solo quien tiene Configurar: "⚙ Configurar trabajos" al pie de Horómetro (catálogo tipo 'trabajos').
 - Excel: Resumen (horas por unidad de negocio, litros, l/h por máquina) + una hoja por máquina con el
   formato de "Hora Tractor" de la planilla de rendición.

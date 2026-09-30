@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '9';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '10';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
@@ -112,7 +112,7 @@ const UNIDAD_NEGOCIO_SANIDAD = 'PATRIMONIAL';
 // Lista depurada por el usuario el 30/09/2026 (una sola para Combustible y Horómetro).
 const TRABAJOS_INICIALES = ['Caminería', 'Trabajos varios con traila', 'Trabajos varios con niveladora', 'Cargada de corral',
   'Acarreo de fardos', 'Acarreos varios', 'Fumigación', 'Generador (energía)', 'Bombeo', 'Aviación', 'Uso general', 'Trabajos de carpida',
-  'Recorrida'];
+  'Recorrida', 'Aserraje', 'Trabajos de limpieza'];
 // Carpeta "1 Tapfeed" (dentro de "Confinamiento ZEHIRUT"): ahí se guarda cada PDF subido.
 const TAPFEED_CARPETA = '1ZybVBnxzMW_9OixfT_ut9GuvKtQbagH1';
 // Carga inicial (una sola vez): archivo CSV en el Drive del dueño, fuera del repositorio porque
@@ -171,6 +171,7 @@ function configurar() {
   asegurarSanidad_(ss, ins, usu);
   asegurarHorometro_(ss);
   asegurarRecorrida_(ss);
+  agregarTrabajos_(ss, 'TRABAJOS_V10', ['Aserraje', 'Trabajos de limpieza']);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
   [stock, mov, ins, des, usu, reg].forEach((h, i) => { ss.setActiveSheet(h); ss.moveActiveSheet(i + 1); });

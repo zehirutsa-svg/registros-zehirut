@@ -183,3 +183,14 @@ function asegurarRecorrida_(ss) {
   if (leerTrabajos_(ss).indexOf('Recorrida') === -1) tra.getRange(tra.getLastRow() + 1, 1).setValue('Recorrida');
   props_().setProperty('TRABAJOS_RECORRIDA', '1');
 }
+
+/** Agrega trabajos pedidos por el usuario a la lista real, una sola vez (marca = propiedad del script).
+ *  10: Aserraje y Trabajos de limpieza (motosierra y desmalezadora / taller, 30/09/2026). */
+function agregarTrabajos_(ss, marca, nuevos) {
+  if (props_().getProperty(marca)) return;
+  const tra = ss.getSheetByName('Trabajos');
+  const actuales = leerTrabajos_(ss).map((t) => t.toUpperCase());
+  const faltan = nuevos.filter((t) => actuales.indexOf(t.toUpperCase()) === -1);
+  if (faltan.length) tra.getRange(tra.getLastRow() + 1, 1, faltan.length, 1).setValues(faltan.map((t) => [t]));
+  props_().setProperty(marca, '1');
+}
