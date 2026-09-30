@@ -956,7 +956,7 @@ function diasTapfeed_(ss) {
 function cargarTapfeed_(body) {
   const ss = SpreadsheetApp.getActive();
   const u = usuarioDe_(ss, body.pin);
-  if (!u.configura) throw new Error('solo quien configura puede cargar informes de Tapfeed');
+  if (!u.configura) throw new Error('solo quien configura puede cargar informes de TAP Feed');
   const d = body.datos || {};
   const fecha = String(d.fecha || '');
   const hoy = Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd');

@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.10.1';
+const VERSION = '1.10.2';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -559,7 +559,7 @@ function htmlStock() {
     form: [ui.form ? (ui.form.corrige ? 'Corregir ' + ui.form.clase.toLowerCase() : ui.form.clase) + ' · ' + ui.form.insumo : '', htmlCargar],
     sinFactura: ['Ingresos sin factura', htmlSinFactura],
     config: ['Configurar', htmlConfig],
-    tapfeed: ['Informe Tapfeed', htmlTapfeed],
+    tapfeed: ['Informe TAP Feed', htmlTapfeed],
     excel: ['Bajar Excel', htmlExcel],
   };
   const [titulo, fn] = vistas[ui.vistaStock] || vistas.lista;
@@ -623,7 +623,7 @@ function htmlSaldo() {
         '</div></button>';
     }).join('') + '</div>' : '<p class="vacio">Todavía no hay insumos cargados.</p>') +
     '<div class="pie-stock"><button class="btn sec chico" data-a="vista" data-v="excel">📥 Bajar Excel</button>' +
-    (sesion.configura && !esCombustible() ? '<button class="btn sec chico" data-a="vista" data-v="tapfeed">📄 Subir informe Tapfeed</button>' +
+    (sesion.configura && !esCombustible() ? '<button class="btn sec chico" data-a="vista" data-v="tapfeed">📄 Subir informe TAP Feed</button>' +
       '<button class="btn sec chico" data-a="vista" data-v="config">⚙ Configurar insumos y corrales</button>' : '') + '</div>';
 }
 
@@ -1029,8 +1029,8 @@ function htmlTapfeed() {
     if (tf && tf.estado === 'error') {
       h += '<div class="aviso rojo-fondo"><b>No se puede cargar este PDF:</b><ul>' + tf.problemas.map((p) => '<li>' + esc(p) + '</li>').join('') + '</ul></div>';
     }
-    h += '<div class="aviso">Elegí el PDF <b>"Uso de ingredientes por grupo"</b> de Tapfeed, de <b>un solo día</b>.</div>' +
-      '<label class="btn">📄 Elegir PDF de Tapfeed<input type="file" id="tf-archivo" accept="application/pdf,.pdf" hidden></label>';
+    h += '<div class="aviso">Elegí el PDF <b>"Uso de ingredientes por grupo"</b> de TAP Feed, de <b>un solo día</b>.</div>' +
+      '<label class="btn">📄 Elegir PDF de TAP Feed<input type="file" id="tf-archivo" accept="application/pdf,.pdf" hidden></label>';
     if (dias.length) {
       const ultimo = dias[dias.length - 1];
       const faltan = [];
@@ -1100,7 +1100,7 @@ async function tfConfirmar() {
     if (!r.ok) throw new Error(r.error || 'error del servidor');
     if (r.yaCargado) throw new Error('ese día ya estaba cargado');
     ui.tf = null;
-    toast('✓ Tapfeed del ' + fechaTxt(r.fecha) + ' cargado (' + r.consumos + ' consumos)', 3500);
+    toast('✓ TAP Feed del ' + fechaTxt(r.fecha) + ' cargado (' + r.consumos + ' consumos)', 3500);
     await sincronizar();
   } catch (e) {
     ui.tf = Object.assign({}, tf, { estado: 'listo' });
