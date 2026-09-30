@@ -115,7 +115,7 @@ const contexto = {
   SpreadsheetApp: { flush() {}, create: (n) => { ultimoExcel = nuevoLibro(['Hoja 1'], 'excel'); ultimoExcel.nombre = n; ultimoExcel.getId = () => 'EXCEL'; return ultimoExcel; }, getActive: () => libro, openById: (id) => (id === '1DXk0c3HOAsjoPwmfZzqSCUEZ9ByAOL9XlkmRdEBT7Ds' ? libroLluvias : libroInforme), newDataValidation: () => validacion },
   UrlFetchApp: { fetch: () => ({ getResponseCode: () => 200, getBlob: () => ({ getBytes: () => [80, 75] }) }) },
   ScriptApp: { getOAuthToken: () => 'x' },
-  Utilities: { base64Encode: (b) => Buffer.from(b).toString('base64'), formatDate, newBlob: (bytes, tipo, nombre) => ({ nombre, bytes }), base64Decode: (b) => Buffer.from(b, 'base64') },
+  Utilities: { DigestAlgorithm: { SHA_256: 'sha256' }, computeDigest: (alg, txt) => [...require('crypto').createHash(alg).update(String(txt)).digest()], base64Encode: (b) => Buffer.from(b).toString('base64'), formatDate, newBlob: (bytes, tipo, nombre) => ({ nombre, bytes }), base64Decode: (b) => Buffer.from(b, 'base64') },
   CacheService: {
     getScriptCache: () => ({
       get: (k) => (cache[k] && cache[k].hasta > Date.now() ? cache[k].v : null),

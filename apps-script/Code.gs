@@ -487,6 +487,7 @@ function guardarCatalogo_(body) {
     let filas, sh, ancho;
     if (body.tipo === 'insumos') {
       const vistos = {};
+      const previos = leerInsumos_(ss);   // una sola lectura de la hoja (antes se leía una vez por insumo)
       filas = (Array.isArray(body.lista) ? body.lista : []).map((x) => {
         const nombre = texto_(x.nombre, 60);
         const unidad = texto_(x.unidad, 20) || 'kg';
@@ -498,11 +499,11 @@ function guardarCatalogo_(body) {
         if (kg !== '' && !(kg > 0)) throw new Error('kg por unidad inválido en ' + nombre);
         if (minimo !== '' && !(minimo >= 0)) throw new Error('stock mínimo inválido en ' + nombre);
         // El nombre en Tapfeed no se edita desde la app: se conserva el de la hoja.
-        const antes = leerInsumos_(ss).find((i) => i.nombre.toUpperCase() === nombre.toUpperCase());
+        const antes = previos.find((i) => i.nombre.toUpperCase() === nombre.toUpperCase());
         return [nombre, unidad, kg, minimo, x.activo !== false, x.porEstancia === true, x.propia === true, antes ? antes.tapfeed : '', 'Stock'];
       });
       const filaDe = (i, activo) => [i.nombre, i.unidad, i.kgUnidad == null ? '' : i.kgUnidad, i.minimo == null ? '' : i.minimo, activo, !!i.porEstancia, !!i.propia, i.tapfeed, i.modulo];
-      leerInsumos_(ss).forEach((i) => {
+      previos.forEach((i) => {
         if (i.modulo !== 'Stock') {
           if (vistos[i.nombre.toUpperCase()]) throw new Error('"' + i.nombre + '" ya existe en el módulo ' + i.modulo);
           filas.push(filaDe(i, i.activo));
@@ -932,7 +933,7 @@ function datos_(body) {
   }
   if (u.configura) r.tapfeedDias = diasTapfeed_(ss).filter((f) => f >= desde);
   if (facturasVisibles_(u)) {
-    try { r.za = ZA.iniciarSesion(body.pin); } catch (e) { r.za = { ok: false, error: String(e.message || e) }; }
+    try { r.za = sesionZA_(body.pin); } catch (e) { r.za = { ok: false, error: String(e.message || e) }; }
   }
   if (nivel_(u, 'Lluvias') >= NIVELES.VER) r.lluvias = datosLluvias_(desde);
   return r;
@@ -1307,6 +1308,18 @@ const ZA_PERMITIDAS = {
 
 function facturasVisibles_(u) {
   return FACTURAS_BETA ? !!u.configura : (nivel_(u, 'Facturas') >= NIVELES.VER || nivel_(u, 'Fondo fijo') >= NIVELES.VER);
+}
+
+/** Sesión de ZehirutApp (qué puede hacer en Facturas / Fondo fijo), guardada 10 minutos para que
+ *  cada sincronización no tenga que consultar ZehirutApp. */
+function sesionZA_(pin) {
+  const clave = 'za:' + Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, 'zehirut-' + pin));
+  const cache = CacheService.getScriptCache();
+  const guardada = cache.get(clave);
+  if (guardada) return JSON.parse(guardada);
+  const s = ZA.iniciarSesion(pin);
+  if (s && s.ok) cache.put(clave, JSON.stringify(s), 600);
+  return s;
 }
 
 function zehirut_(body) {

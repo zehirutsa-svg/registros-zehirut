@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.10.3';
+const VERSION = '1.10.4';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -1193,9 +1193,18 @@ async function cfgGuardar(tipo) {
   try {
     toast('Guardando…', 10000);
     await llamar({ accion: 'catalogo', pin: sesion.pin, tipo, lista });
+    // Se ve enseguida: la lista guardada se aplica acá y los datos completos bajan después.
+    const s = datos && datos.stock;
+    if (s && tipo === 'insumos') {
+      const antes = {};
+      s.insumos.forEach((i) => { antes[i.nombre.toUpperCase()] = i; });
+      s.insumos = lista.map((i) => Object.assign({ tapfeed: (antes[i.nombre.toUpperCase()] || {}).tapfeed || '' }, i, { kgUnidad: i.kgUnidad === '' ? null : i.kgUnidad, minimo: i.minimo === '' ? null : i.minimo, modulo: 'Stock' }))
+        .concat(s.insumos.filter((i) => (i.modulo || 'Stock') !== 'Stock'));
+    } else if (s) s.destinos = lista;
     ui.cfg = null;
+    render();
     toast('✓ Lista de ' + tipo + ' guardada');
-    await sincronizar();
+    sincronizar();
   } catch (e) {
     toast('No se pudo guardar: ' + ((e && e.message) || e), 5000);
   }
