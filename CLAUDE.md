@@ -166,7 +166,14 @@ Cada uno es una tarjeta en Stocks; permisos: columna **Sanidad** de Usuarios (ho
 - Lista inicial: `apps-script/Sanidad.gs` (PRODUCTOS_SANIDAD, 98 productos de la hoja INVENTARIO de la
   planilla "Inventario y stock de medicamentos"), se agrega una sola vez (esquema 7). Después se edita
   desde la app: "⚙ Configurar productos" (por rubro; cambiar "Stock" pasa un producto a otro rubro).
-- Pantalla: lista compacta con buscador (no tarjetas: son casi cien). Excel por rubro: Resumen +
+- **Solo ingresos y conteos en Registros** (pedido 30/09): el uso (baja) se carga únicamente en la app de la
+  estancia; el script rechaza un Consumo manual de Sanidad. Lo que no va a un animal (alcohol, jeringas,
+  guantes, vainas) y el semen se ajustan con Conteo hasta que la estancia los descuente.
+- Ficha del producto (columnas Principio activo, Indicación, Laboratorio, Proveedor, Dosis base, Peso base
+  en Insumos, de la hoja INVENTARIO; esquema 11). Pantalla: **solo aparecen las tarjetas que se buscan**
+  (nombre comercial, principio activo, laboratorio, proveedor o indicación): nombre grande, principio
+  activo en gris debajo, saldo y la ficha. El Ingreso trae el proveedor de la ficha.
+- Pantalla (antes): lista compacta con buscador (no tarjetas: son casi cien). Excel por rubro: Resumen +
   Movimientos, con Unidad de negocio **PATRIMONIAL** (decisión del contador), sin hoja por producto.
 - **Conexión con la app de la estancia** (`Proyectos Claude\estancia-app`, sección "Sanidad ↔ Registros
   Zehirut" de su CLAUDE.md): su servidor llama cada 15 min `accion: 'estancia'` con la clave compartida

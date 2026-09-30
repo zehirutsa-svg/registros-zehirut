@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.14.2';
+const VERSION = '1.15.0';
 
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
@@ -669,17 +669,62 @@ function htmlEstadoEstancia() {
 }
 
 /** Sanidad: son muchos productos, así que va en lista (no en tarjetas), con un buscador. */
+/** Sanidad: son casi cien productos, así que no se muestran todos: solo los que se buscan (por
+ *  nombre comercial, principio activo, laboratorio, proveedor o indicación), en tarjetas con su ficha. */
 function htmlListaSanidad(ins, s, c7) {
   if (!ins.length) return '<p class="vacio">Todavía no hay productos en ' + esc(ui.rubro) + '.</p>';
-  return htmlEstadoEstancia() + '<input class="txt buscar" id="buscar-san" type="search" placeholder="🔍 Buscar producto…" autocomplete="off">' +
-    '<div class="lista-san">' + ins.map((i) => {
-      const n = infoInsumo(i, s, c7);
-      return '<button class="fila-san ' + n.cls + '" data-a="verInsumo" data-i="' + esc(i.nombre) + '" data-buscar="' + esc(i.nombre.toUpperCase()) + '">' +
-        '<span class="nom">' + esc(i.nombre) + (n.x.pendiente ? ' <span class="chip pend">sin enviar</span>' : '') +
-        (n.bajo ? ' <span class="chip alerta">bajo mínimo</span>' : '') + (!n.x.ultimoConteo ? ' <span class="chip">sin conteo</span>' : '') + '</span>' +
-        '<span class="val"><b class="' + (n.x.cantidad < 0 ? 'rojo' : '') + '">' + num(n.x.cantidad, 1) + '</b> ' + esc(unidadTxt(i.unidad, n.x.cantidad)) +
-        (n.kg && n.x.cantidad ? '<small>' + esc(n.kg) + '</small>' : '') + '</span></button>';
-    }).join('') + '</div><p class="vacio oculto" id="buscar-nada">No hay productos con ese nombre.</p>';
+  const bajos = ins.filter((i) => infoInsumo(i, s, c7).bajo).length;
+  return htmlEstadoEstancia() +
+    '<input class="txt buscar" id="buscar-san" type="search" placeholder="🔍 Nombre, principio activo, laboratorio…" autocomplete="off" value="' + esc(ui.buscarSan || '') + '">' +
+    '<div id="res-san">' + htmlResultadosSanidad() + '</div>' +
+    '<p class="nota-estancia" style="margin-top:12px">' + ins.length + ' productos en ' + esc(ui.rubro) +
+    (bajos ? ' · <span class="chip alerta">' + bajos + ' bajo mínimo</span>' : '') + '</p>';
+}
+
+/** Mayúsculas de la planilla a texto normal ("CONSULTPEC SRL" → "Consultpec SRL"); siglas cortas quedan. */
+function lindo(t) {
+  const s = String(t || '').trim();
+  if (!s || s !== s.toUpperCase()) return s;
+  return s.split(/(\s+|\/|,)/).map((p, n) => (n && /^(Y|E|O|DE|DEL|LA|EL|CON)$/.test(p) ? p.toLowerCase()
+    : /^[A-ZÁÉÍÓÚÑ]{4,}$/.test(p) ? p.charAt(0) + p.slice(1).toLowerCase() : p)).join('');
+}
+
+/** Dosis base, ej. "4 ml cada 500 kg" (la planilla la da por kg de peso vivo). */
+function dosisTxt(i) {
+  if (i.dosisBase == null) return '';
+  return num(i.dosisBase) + ' ' + (i.unidadContenido || 'un') + (i.pesoBase ? ' cada ' + num(i.pesoBase, 0) + ' kg' : '');
+}
+
+/** Datos del producto, ordenados como la planilla de inventario. */
+function fichaSanidad(i) {
+  return [
+    ['Indicación', lindo(i.indicacion)],
+    ['Laboratorio', lindo(i.laboratorio)],
+    ['Proveedor', lindo(i.proveedor)],
+    ['Dosis', dosisTxt(i)],
+    ['Presentación', i.contenido ? i.unidad + ' de ' + num(i.contenido) + ' ' + i.unidadContenido : i.unidad],
+  ].filter((x) => x[1]);
+}
+
+function htmlResultadosSanidad() {
+  const q = String(ui.buscarSan || '').trim().toUpperCase();
+  if (!q) return '<p class="vacio" style="padding:20px 8px">Escribí para buscar un producto.</p>';
+  const s = saldos();
+  const c7 = consumo7();
+  const ins = insumosMod().filter((i) => (i.activo || (s[i.nombre] && s[i.nombre].cantidad)) &&
+    [i.nombre, i.principio, i.laboratorio, i.proveedor, i.indicacion].join(' ').toUpperCase().indexOf(q) !== -1);
+  if (!ins.length) return '<p class="vacio">No hay productos con "' + esc(ui.buscarSan.trim()) + '".</p>';
+  return ins.slice(0, 30).map((i) => {
+    const n = infoInsumo(i, s, c7);
+    const chips = [n.x.pendiente ? '<span class="chip pend">sin enviar</span>' : '', n.bajo ? '<span class="chip alerta">Bajo el mínimo</span>' : '',
+      n.x.cantidad < 0 ? '<span class="chip alerta">Saldo negativo</span>' : '', !n.x.ultimoConteo ? '<span class="chip">Sin conteo inicial</span>' : ''].filter(Boolean);
+    return '<button class="saldo tarjeta-san ' + n.cls + '" data-a="verInsumo" data-i="' + esc(i.nombre) + '">' +
+      '<div class="cab"><div><h3>' + esc(i.nombre) + '</h3>' + (i.principio ? '<div class="sub">' + esc(lindo(i.principio)) + '</div>' : '') + '</div>' +
+      '<div class="cant-san"><b class="' + (n.x.cantidad < 0 ? 'rojo' : '') + '">' + num(n.x.cantidad, 1) + '</b> ' + esc(unidadTxt(i.unidad, n.x.cantidad)) +
+      (n.kg && n.x.cantidad ? '<small>' + esc(n.kg) + '</small>' : '') + '</div></div>' +
+      '<dl class="ficha-san">' + fichaSanidad(i).map(([a, b]) => '<dt>' + esc(a) + '</dt><dd>' + esc(b) + '</dd>').join('') + '</dl>' +
+      (chips.length ? '<div>' + chips.join(' ') + '</div>' : '') + '</button>';
+  }).join('') + (ins.length > 30 ? '<p class="vacio">Hay ' + ins.length + ' productos: escribí más para achicar la búsqueda.</p>' : '');
 }
 
 
@@ -707,7 +752,9 @@ function htmlFicha(nombre) {
   const movs = movimientos().filter((m) => m.insumo === nombre);
   const botones = [];
   if (puede(ui.modStock, 'CARGAR') && i.activo) {
-    botones.push(['Consumo', 'consumo', '⬆ Consumo'], ['Ingreso', 'ingreso', '⬇ Ingreso']);
+    // Sanidad: el uso (consumo) se carga solo en la app de la estancia; acá, ingresos y conteos.
+    if (!esSanidad()) botones.push(['Consumo', 'consumo', '⬆ Consumo']);
+    botones.push(['Ingreso', 'ingreso', '⬇ Ingreso']);
     if (puede(ui.modStock, 'ADMINISTRAR')) botones.push(['Conteo', 'conteo', '✔ Conteo']);
   }
   let cajas;
@@ -721,6 +768,12 @@ function htmlFicha(nombre) {
     }
   } else {
     cajas = cajaSaldo(i, infoInsumo(i, s, c7));
+    if ((i.modulo || 'Stock') === 'Sanidad') {
+      const f = fichaSanidad(i);
+      if (i.principio) f.unshift(['Principio activo', lindo(i.principio)]);
+      cajas += '<table class="detalle" style="margin-top:10px">' + f.map(([a, b]) => '<tr><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table>' +
+        (ui.rubro !== 'Semen' ? '<p class="nota-estancia" style="margin-top:8px">El uso se carga en la app de la estancia (Sanidades) y se descuenta solo.</p>' : '');
+    }
   }
   const mostrar = ui.movsVisibles || 15;
   return '<div class="form">' +
@@ -744,8 +797,10 @@ function htmlSinFactura() {
 function nuevoForm(clase, insumo) {
   const prev = ui.form || {};
   const fecha = prev.fecha || hoyISO();
+  // En Sanidad el proveedor viene de la ficha del producto (se puede cambiar).
+  const ins = stockDatos().insumos.find((i) => i.nombre === insumo) || {};
   return { clase, insumo, estancia: '', fecha: esCombustible() && fecha < COMBUSTIBLE_DESDE ? hoyISO() : fecha, cantidad: '', destino: '',
-    proveedor: '', remito: '', factura: '', nota: '', maquina: '', equipo: '', trabajo: '', finca: '' };
+    proveedor: clase === 'Ingreso' && ins.proveedor ? lindo(ins.proveedor) : '', remito: '', factura: '', nota: '', maquina: '', equipo: '', trabajo: '', finca: '' };
 }
 
 /** Formulario de un solo tipo de carga para el insumo de la ficha (ya elegidos). */
@@ -1269,6 +1324,10 @@ function htmlConfigSanidad() {
       opciones(i, n, 'unidadContenido', ['ml', 'un'], 'ml / un') +
       campo(i, n, 'minimo', 'Stock mínimo', ' inputmode="decimal"') +
       opciones(i, n, 'rubro', RUBROS_SANIDAD.map((r) => r[0]), 'Stock') +
+      '<div class="ancho">' + campo(i, n, 'principio', 'Principio activo') + '</div>' +
+      campo(i, n, 'indicacion', 'Indicación') + campo(i, n, 'laboratorio', 'Laboratorio') +
+      campo(i, n, 'proveedor', 'Proveedor') + campo(i, n, 'dosisBase', 'Dosis base', ' inputmode="decimal"') +
+      campo(i, n, 'pesoBase', 'Cada (kg)', ' inputmode="decimal"') +
       '</div><label class="interruptor"><input type="checkbox" data-cfg="insumos" data-n="' + n + '" data-k="activo" ' + (i.activo ? 'checked' : '') + '> Activo</label></div>').join('') +
     '<button class="btn sec chico" data-a="cfgAgregar" data-cfg="insumos" style="margin-top:10px">+ Agregar producto</button> ' +
     '<button class="btn chico" data-a="cfgGuardar" data-cfg="insumos" style="margin-top:10px">Guardar productos</button></div></div>';
@@ -1283,9 +1342,14 @@ async function cfgGuardar(tipo) {
       return {
         nombre: String(i.nombre).trim(), unidad: i.unidad || 'frasco', contenido: cont, unidadContenido: cont === '' ? '' : (i.unidadContenido || 'ml'),
         minimo: i.minimo === '' || i.minimo == null ? '' : leerNumero(i.minimo), activo: !!i.activo, rubro: i.rubro || ui.rubro,
+        principio: String(i.principio || '').trim(), indicacion: String(i.indicacion || '').trim(),
+        laboratorio: String(i.laboratorio || '').trim(), proveedor: String(i.proveedor || '').trim(),
+        dosisBase: i.dosisBase === '' || i.dosisBase == null ? '' : leerNumero(i.dosisBase),
+        pesoBase: i.pesoBase === '' || i.pesoBase == null ? '' : leerNumero(i.pesoBase),
       };
     });
-    const malo = lista.find((i) => (i.contenido !== '' && !(i.contenido > 0)) || (i.minimo !== '' && !(i.minimo >= 0)));
+    const malo = lista.find((i) => (i.contenido !== '' && !(i.contenido > 0)) || (i.minimo !== '' && !(i.minimo >= 0)) ||
+      (i.dosisBase !== '' && !(i.dosisBase > 0)) || (i.pesoBase !== '' && !(i.pesoBase > 0)));
     if (malo) { toast('Revisá los números de ' + malo.nombre + '.', 3500); return; }
   } else if (tipo === 'insumos') {
     lista = ui.cfg.insumos.filter((i) => String(i.nombre).trim()).map((i) => ({
@@ -1306,7 +1370,8 @@ async function cfgGuardar(tipo) {
     if (s && tipo === 'insumos' && esSanidad()) {
       const vistos = new Set(lista.map((i) => i.nombre.toUpperCase()));
       s.insumos = s.insumos.filter((i) => !(i.modulo === 'Sanidad' && i.rubro === ui.rubro) && !vistos.has(i.nombre.toUpperCase()))
-        .concat(lista.map((i) => Object.assign({}, i, { modulo: 'Sanidad', kgUnidad: null, contenido: i.contenido === '' ? null : i.contenido, minimo: i.minimo === '' ? null : i.minimo })));
+        .concat(lista.map((i) => Object.assign({}, i, { modulo: 'Sanidad', kgUnidad: null, contenido: i.contenido === '' ? null : i.contenido, minimo: i.minimo === '' ? null : i.minimo,
+          dosisBase: i.dosisBase === '' ? null : i.dosisBase, pesoBase: i.pesoBase === '' ? null : i.pesoBase })));
     } else if (s && tipo === 'insumos') {
       const antes = {};
       s.insumos.forEach((i) => { antes[i.nombre.toUpperCase()] = i; });
@@ -1547,16 +1612,8 @@ function despuesDeRender() {
   // Buscador de Sanidad: filtra la lista sin volver a dibujar la pantalla (no pierde el teclado).
   const bus = $('#buscar-san');
   if (bus) {
-    bus.addEventListener('input', () => {
-      const q = bus.value.trim().toUpperCase();
-      let visibles = 0;
-      document.querySelectorAll('.fila-san').forEach((el) => {
-        const ok = !q || el.dataset.buscar.indexOf(q) !== -1;
-        el.classList.toggle('oculto', !ok);
-        if (ok) visibles++;
-      });
-      $('#buscar-nada').classList.toggle('oculto', visibles > 0);
-    });
+    bus.addEventListener('input', () => { ui.buscarSan = bus.value; $('#res-san').innerHTML = htmlResultadosSanidad(); });
+
   }
   const tfa = $('#tf-archivo');
 
@@ -1593,7 +1650,7 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'ir':
-      if (b.dataset.p === 'stock') { ui.modStock = b.dataset.m || 'Stock'; ui.rubro = b.dataset.r || null; ui.excel = null; }
+      if (b.dataset.p === 'stock') { ui.modStock = b.dataset.m || 'Stock'; ui.rubro = b.dataset.r || null; ui.excel = null; ui.buscarSan = ''; }
       // La flecha de Stock vuelve un paso (formulario → ficha → tarjetas → inicio).
       if (ui.pantalla === 'stock' && b.dataset.p === 'inicio') { atrasStock(); break; }
       if (ui.pantalla === 'facturas' && b.dataset.p === 'inicio' && atrasFacturas()) break;

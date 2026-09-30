@@ -378,3 +378,15 @@ label.btn { text-align: center; cursor: pointer; }
 .fila-san .val small { display: block; color: var(--gris); font-size: 13px; }
 .item-cfg .grilla .ancho { grid-column: 1 / -1; }
 .nota-estancia { color: var(--gris); font-size: 14px; margin: 0 0 10px; }
+/* Sanidad: tarjeta de un producto buscado (nombre comercial, principio activo, saldo y ficha) */
+.tarjeta-san { display: block; width: 100%; margin-bottom: 10px; font: inherit; color: inherit; }
+.tarjeta-san .cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.tarjeta-san h3 { margin: 0; font-size: 20px; line-height: 1.15; }
+.tarjeta-san .sub { color: var(--gris); font-size: 14px; margin-top: 2px; }
+.tarjeta-san .cant-san { text-align: right; white-space: nowrap; color: var(--gris); font-weight: 600; }
+.tarjeta-san .cant-san b { font-size: 26px; font-weight: 800; color: var(--tinta); }
+.tarjeta-san .cant-san b.rojo { color: var(--alerta); }
+.tarjeta-san .cant-san small { display: block; font-size: 13px; }
+.ficha-san { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 10px 0 4px; font-size: 14px; }
+.ficha-san dt { color: var(--gris); }
+.ficha-san dd { margin: 0; font-weight: 600; }
