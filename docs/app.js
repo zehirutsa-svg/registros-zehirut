@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.10.2';
+const VERSION = '1.10.3';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -1151,7 +1151,8 @@ async function bajarExcel() {
 // ------ configurar insumos y destinos (solo quien administra Stock; necesita señal)
 function htmlConfig() {
   const s = stockDatos();
-  if (!ui.cfg) ui.cfg = { insumos: s.insumos.map((i) => Object.assign({}, i)), destinos: s.destinos.map((d) => Object.assign({}, d)) };
+  // Solo los insumos de Stock: Nafta y Diesel son de Combustible y el script los conserva aparte.
+  if (!ui.cfg) ui.cfg = { insumos: s.insumos.filter((i) => (i.modulo || 'Stock') === 'Stock').map((i) => Object.assign({}, i)), destinos: s.destinos.map((d) => Object.assign({}, d)) };
   const c = ui.cfg;
   return '<div class="form">' +
     '<div class="aviso">Los cambios de la lista necesitan señal. Un insumo o destino que ya tiene movimientos no se borra: se desactiva (deja de aparecer para cargar pero queda en el historial).</div>' +
