@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.10.0';
+const VERSION = '1.10.1';
 const DIAS_HISTORIAL = 60;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -515,12 +515,12 @@ const GRUPOS = {
   comprobantes: { titulo: 'Comprobantes', ico: '🗂️', sub: 'Facturas · Fondo fijo' },
 };
 
-// Inicio: Stocks, Comprobantes y Lluvias. Un grupo con un solo módulo muestra ese módulo
+// Inicio: Comprobantes, Stocks y Lluvias. Un grupo con un solo módulo muestra ese módulo
 // directo (sin un toque de más).
 function htmlInicio() {
   const g = tarjetasModulos();
   const mods = [];
-  ['stocks', 'comprobantes', 'lluvias'].forEach((k) => {
+  ['comprobantes', 'stocks', 'lluvias'].forEach((k) => {
     if (g[k].length > 1 && GRUPOS[k]) {
       const extra = k === 'stocks' && g.bajos ? ' · <span class="chip alerta">' + g.bajos + ' bajo mínimo</span>' : k === 'comprobantes' ? g.prueba : '';
       mods.push('<button class="modulo grupo ' + k + '" data-a="ir" data-p="grupo" data-g="' + k + '"><span class="ico">' + GRUPOS[k].ico +
