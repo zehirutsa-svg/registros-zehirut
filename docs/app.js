@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.15.1';
+const VERSION = '1.16.0';
 
 
 const DIAS_HISTORIAL = 60;
@@ -581,7 +581,8 @@ function htmlStock() {
   const i = ui.insumoVer && stockDatos().insumos.find((x) => x.nombre === ui.insumoVer);
   if ((ui.vistaStock === 'ficha' || ui.vistaStock === 'form') && !i) ui.vistaStock = 'lista';
   if (ui.vistaStock === 'form' && !(ui.form && ui.form.clase)) ui.vistaStock = 'ficha';
-  if ((ui.vistaStock === 'config' && (!sesion.configura || esCombustible())) ||
+  if (((ui.vistaStock === 'config' || ui.vistaStock === 'producto') && (!sesion.configura || esCombustible())) ||
+    (ui.vistaStock === 'config' && esSanidad()) || (ui.vistaStock === 'producto' && !ui.prod) ||
     (ui.vistaStock === 'tapfeed' && (!sesion.configura || ui.modStock !== 'Stock'))) ui.vistaStock = 'lista';
   const vistas = {
     lista: [esSanidad() ? ui.rubro : esCombustible() ? 'Combustible' : 'Stock de insumos', htmlSaldo],
@@ -589,6 +590,7 @@ function htmlStock() {
     form: [ui.form ? (ui.form.corrige ? 'Corregir ' + ui.form.clase.toLowerCase() : ui.form.clase) + ' · ' + ui.form.insumo : '', htmlCargar],
     sinFactura: ['Ingresos sin factura', htmlSinFactura],
     config: ['Configurar', htmlConfig],
+    producto: [ui.prod && ui.prod.original ? 'Editar producto' : 'Nuevo producto', htmlProducto],
     tapfeed: ['Informe TAP Feed', htmlTapfeed],
     excel: ['Bajar Excel', htmlExcel],
   };
@@ -601,6 +603,7 @@ function atrasStock() {
   leerCamposForm();
   const v = ui.vistaStock;
   if (v === 'form') ui.vistaStock = 'ficha';
+  else if (v === 'producto') { ui.vistaStock = ui.prod && ui.prod.original ? 'ficha' : 'lista'; ui.prod = null; }
   else if (v === 'ficha' || v === 'sinFactura' || v === 'config' || v === 'tapfeed' || v === 'excel') { ui.vistaStock = 'lista'; ui.insumoVer = null; ui.cfg = null; ui.tf = null; }
   else ui.pantalla = ui.grupo ? 'grupo' : 'inicio';
   render();
@@ -655,7 +658,7 @@ function htmlSaldo() {
     '<div class="pie-stock"><button class="btn sec chico" data-a="vista" data-v="excel">📥 Bajar Excel</button>' +
     (sesion.configura && ui.modStock === 'Stock' ? '<button class="btn sec chico" data-a="vista" data-v="tapfeed">📄 Subir informe TAP Feed</button>' +
       '<button class="btn sec chico" data-a="vista" data-v="config">⚙ Configurar insumos y corrales</button>' : '') +
-    (sesion.configura && esSanidad() ? '<button class="btn sec chico" data-a="vista" data-v="config">⚙ Configurar productos</button>' : '') + '</div>';
+    (sesion.configura && esSanidad() ? '<button class="btn sec chico" data-a="nuevoProducto">➕ Nuevo producto</button>' : '') + '</div>';
 }
 
 /** Lo aplicado a los animales llega solo desde la app de la estancia: cuándo fue la última vez y
@@ -775,7 +778,8 @@ function htmlFicha(nombre) {
       if (i.principio) f.unshift(['Principio activo', lindo(i.principio)]);
       cajas += '<table class="detalle" style="margin-top:10px">' + f.map(([a, b]) => '<tr><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table>' +
         (i.bajaManual ? '<p class="nota-estancia" style="margin-top:8px">No se aplica a animales: el uso se carga acá, con Consumo.</p>'
-          : ui.rubro !== 'Semen' ? '<p class="nota-estancia" style="margin-top:8px">El uso se carga en la app de la estancia (Sanidades) y se descuenta solo.</p>' : '');
+          : ui.rubro !== 'Semen' ? '<p class="nota-estancia" style="margin-top:8px">El uso se carga en la app de la estancia (Sanidades) y se descuenta solo.</p>' : '') +
+        (sesion.configura ? '<button class="btn sec chico" data-a="editarProducto" style="margin-top:4px">✏️ Editar datos del producto</button>' : '');
     }
   }
   const mostrar = ui.movsVisibles || 15;
@@ -1281,7 +1285,6 @@ async function bajarExcel() {
 
 // ------ configurar insumos y destinos (solo quien administra Stock; necesita señal)
 function htmlConfig() {
-  if (esSanidad()) return htmlConfigSanidad();
   const s = stockDatos();
   // Solo los insumos de Stock: Nafta y Diesel son de Combustible y el script los conserva aparte.
   if (!ui.cfg) ui.cfg = { insumos: s.insumos.filter((i) => (i.modulo || 'Stock') === 'Stock').map((i) => Object.assign({}, i)), destinos: s.destinos.map((d) => Object.assign({}, d)) };
@@ -1308,57 +1311,74 @@ function htmlConfig() {
     '</div>';
 }
 
-/** Productos de un rubro de Sanidad: nombre, en qué se guarda (frasco, caja…), cuánto trae y el mínimo. */
-function htmlConfigSanidad() {
-  if (!ui.cfg) ui.cfg = { insumos: insumosMod().map((i) => Object.assign({}, i)) };
-  const c = ui.cfg;
-  const campo = (i, n, k, etq, extra) => '<div><span class="mini-etq">' + etq + '</span><input class="txt" data-cfg="insumos" data-n="' + n + '" data-k="' + k + '" value="' +
-    esc(i[k] == null ? '' : i[k]) + '"' + (extra || '') + '></div>';
-  const opciones = (i, n, k, lista, etq) => '<div><span class="mini-etq">' + etq + '</span><select class="txt" data-cfg="insumos" data-n="' + n + '" data-k="' + k + '">' +
-    lista.map((u) => '<option ' + (i[k] === u ? 'selected' : '') + '>' + esc(u) + '</option>').join('') + '</select></div>';
+/** Sanidad: alta o edición de UN producto (desde "➕ Nuevo producto" o la ficha). Solo quien tiene
+ *  Configurar; necesita señal. Un producto con movimientos no cambia de nombre (lo controla el script). */
+function productoForm(i) {
+  const v = (x) => (x == null ? '' : String(x).replace('.', ','));
+  return i ? { original: i.nombre, nombre: i.nombre, principio: i.principio || '', rubro: i.rubro, unidad: i.unidad, contenido: v(i.contenido),
+    unidadContenido: i.unidadContenido || 'ml', indicacion: i.indicacion || '', laboratorio: i.laboratorio || '', proveedor: i.proveedor || '',
+    dosisBase: v(i.dosisBase), pesoBase: v(i.pesoBase), minimo: v(i.minimo), activo: !!i.activo, bajaManual: !!i.bajaManual }
+    : { original: '', nombre: '', principio: '', rubro: ui.rubro, unidad: 'frasco', contenido: '', unidadContenido: 'ml', indicacion: '',
+      laboratorio: '', proveedor: '', dosisBase: '', pesoBase: '', minimo: '', activo: true, bajaManual: false };
+}
+
+function htmlProducto() {
+  const p = ui.prod;
+  const txt = (k, etq, extra) => '<div class="campo"><label for="p-' + k + '">' + etq + '</label><input class="txt" id="p-' + k + '" data-prod="' + k + '" value="' +
+    esc(p[k]) + '"' + (extra || '') + '></div>';
+  const sel = (k, etq, lista) => '<div class="campo"><label for="p-' + k + '">' + etq + '</label><select class="txt" id="p-' + k + '" data-prod="' + k + '">' +
+    lista.map((x) => '<option' + (p[k] === x ? ' selected' : '') + '>' + esc(x) + '</option>').join('') + '</select></div>';
+  const chk = (k, etq, ayuda) => '<label class="interruptor"><input type="checkbox" data-prod="' + k + '"' + (p[k] ? ' checked' : '') + '> ' + etq +
+    (ayuda ? ' <small style="color:var(--gris)">' + ayuda + '</small>' : '') + '</label>';
+  const dec = ' inputmode="decimal" autocomplete="off"';
   return '<div class="form">' +
-    '<div class="aviso">Los cambios necesitan señal. <b>Contenido</b>: lo que trae cada unidad (frasco de 500 ml, caja de 100 un); vacío si se cuenta de a uno (jeringas, pajuelas). ' +
-    'Un producto con movimientos no se borra: se desactiva. Para pasarlo a otro stock, cambiá el <b>Stock</b>. ' +
-    '<b>Baja en Registros</b>: no se aplica a animales (alcohol, jeringas, guantes); su uso se carga acá y no aparece en la app de la estancia.</div>' +
-    '<div class="tarjeta"><h3 style="margin-top:0">' + esc(ui.rubro) + '</h3>' +
-    c.insumos.map((i, n) => '<div class="item-cfg"><div class="grilla">' +
-      '<div class="ancho"><span class="mini-etq">Producto</span><input class="txt" data-cfg="insumos" data-n="' + n + '" data-k="nombre" value="' + esc(i.nombre) + '"></div>' +
-      opciones(i, n, 'unidad', UNIDADES_SAN, 'Se guarda en') +
-      campo(i, n, 'contenido', 'Contenido', ' inputmode="decimal"') +
-      opciones(i, n, 'unidadContenido', ['ml', 'un'], 'ml / un') +
-      campo(i, n, 'minimo', 'Stock mínimo', ' inputmode="decimal"') +
-      opciones(i, n, 'rubro', RUBROS_SANIDAD.map((r) => r[0]), 'Stock') +
-      '<div class="ancho">' + campo(i, n, 'principio', 'Principio activo') + '</div>' +
-      campo(i, n, 'indicacion', 'Indicación') + campo(i, n, 'laboratorio', 'Laboratorio') +
-      campo(i, n, 'proveedor', 'Proveedor') + campo(i, n, 'dosisBase', 'Dosis base', ' inputmode="decimal"') +
-      campo(i, n, 'pesoBase', 'Cada (kg)', ' inputmode="decimal"') +
-      '</div><div><label class="interruptor"><input type="checkbox" data-cfg="insumos" data-n="' + n + '" data-k="activo" ' + (i.activo ? 'checked' : '') + '> Activo</label>' +
-      '<label class="interruptor" style="margin-top:6px"><input type="checkbox" data-cfg="insumos" data-n="' + n + '" data-k="bajaManual" ' + (i.bajaManual ? 'checked' : '') +
-      '> Baja en Registros</label></div></div>').join('') +
-    '<button class="btn sec chico" data-a="cfgAgregar" data-cfg="insumos" style="margin-top:10px">+ Agregar producto</button> ' +
-    '<button class="btn chico" data-a="cfgGuardar" data-cfg="insumos" style="margin-top:10px">Guardar productos</button></div></div>';
+    txt('nombre', 'Nombre comercial') + txt('principio', 'Principio activo <small>(opcional)</small>') +
+    '<div class="fila2">' + sel('rubro', 'Stock', RUBROS_SANIDAD.map((r) => r[0])) + sel('unidad', 'Se guarda en', UNIDADES_SAN) + '</div>' +
+    '<div class="fila2">' + txt('contenido', 'Contenido <small>(opc.)</small>', dec) + sel('unidadContenido', 'ml / un', ['ml', 'un']) + '</div>' +
+    txt('indicacion', 'Indicación <small>(opcional)</small>') +
+    '<div class="fila2">' + txt('laboratorio', 'Laboratorio <small>(opc.)</small>') + txt('proveedor', 'Proveedor <small>(opc.)</small>') + '</div>' +
+    '<div class="fila2">' + txt('dosisBase', 'Dosis base <small>(opc.)</small>', dec) + txt('pesoBase', 'Cada … kg <small>(opc.)</small>', dec) + '</div>' +
+    txt('minimo', 'Stock mínimo <small>(opcional)</small>', dec) +
+    '<div style="margin:6px 0 16px">' + chk('activo', 'Activo', '') +
+    '<div style="height:8px"></div>' + chk('bajaManual', 'Baja en Registros', '(no va a animales: alcohol, jeringas, guantes)') + '</div>' +
+    '<button class="btn" data-a="guardarProducto"' + (p.guardando ? ' disabled' : '') + '>' + (p.guardando ? 'Guardando…' : (p.original ? 'Guardar cambios' : 'Crear producto')) + '</button></div>';
+}
+
+async function guardarProducto() {
+  const p = ui.prod;
+  if (!String(p.nombre).trim()) { toast('Escribí el nombre comercial.', 3000); return; }
+  if (!navigator.onLine) { toast('Sin señal: los cambios de productos necesitan señal.', 3500); return; }
+  const n = (x) => (String(x).trim() ? leerNumero(x) : '');
+  const prod = { nombre: String(p.nombre).trim(), principio: p.principio.trim(), rubro: p.rubro, unidad: p.unidad, contenido: n(p.contenido),
+    unidadContenido: p.unidadContenido, indicacion: p.indicacion.trim(), laboratorio: p.laboratorio.trim(), proveedor: p.proveedor.trim(),
+    dosisBase: n(p.dosisBase), pesoBase: n(p.pesoBase), minimo: n(p.minimo), activo: !!p.activo, bajaManual: !!p.bajaManual };
+  if (['contenido', 'dosisBase', 'pesoBase', 'minimo'].some((k) => prod[k] !== '' && !(prod[k] >= 0))) { toast('Revisá los números.', 3000); return; }
+  p.guardando = true;
+  render();
+  try {
+    const r = await llamar({ accion: 'producto', pin: sesion.pin, original: p.original, producto: prod });
+    // Se ve enseguida; los datos completos bajan después.
+    const s = datos && datos.stock;
+    if (s && r.producto) s.insumos = s.insumos.filter((i) => i.nombre !== (p.original || r.producto.nombre)).concat([r.producto]);
+    toast(p.original ? '✓ Producto guardado' : '✓ Producto creado', 3000);
+    ui.prod = null;
+    ui.rubro = r.producto ? r.producto.rubro : ui.rubro;
+    ui.insumoVer = r.producto ? r.producto.nombre : null;
+    ui.vistaStock = ui.insumoVer ? 'ficha' : 'lista';
+    render();
+    window.scrollTo(0, 0);
+    sincronizar();
+  } catch (e) {
+    p.guardando = false;
+    render();
+    toast('No se pudo guardar: ' + ((e && e.message) || e), 5000);
+  }
 }
 
 async function cfgGuardar(tipo) {
   if (!navigator.onLine) { toast('Sin señal: los cambios de la lista necesitan señal.', 3500); return; }
   let lista;
-  if (tipo === 'insumos' && esSanidad()) {
-    lista = ui.cfg.insumos.filter((i) => String(i.nombre).trim()).map((i) => {
-      const cont = i.contenido === '' || i.contenido == null ? '' : leerNumero(i.contenido);
-      return {
-        nombre: String(i.nombre).trim(), unidad: i.unidad || 'frasco', contenido: cont, unidadContenido: cont === '' ? '' : (i.unidadContenido || 'ml'),
-        minimo: i.minimo === '' || i.minimo == null ? '' : leerNumero(i.minimo), activo: !!i.activo, rubro: i.rubro || ui.rubro,
-        principio: String(i.principio || '').trim(), indicacion: String(i.indicacion || '').trim(),
-        laboratorio: String(i.laboratorio || '').trim(), proveedor: String(i.proveedor || '').trim(),
-        dosisBase: i.dosisBase === '' || i.dosisBase == null ? '' : leerNumero(i.dosisBase),
-        pesoBase: i.pesoBase === '' || i.pesoBase == null ? '' : leerNumero(i.pesoBase),
-        bajaManual: !!i.bajaManual,
-      };
-    });
-    const malo = lista.find((i) => (i.contenido !== '' && !(i.contenido > 0)) || (i.minimo !== '' && !(i.minimo >= 0)) ||
-      (i.dosisBase !== '' && !(i.dosisBase > 0)) || (i.pesoBase !== '' && !(i.pesoBase > 0)));
-    if (malo) { toast('Revisá los números de ' + malo.nombre + '.', 3500); return; }
-  } else if (tipo === 'insumos') {
+  if (tipo === 'insumos') {
     lista = ui.cfg.insumos.filter((i) => String(i.nombre).trim()).map((i) => ({
       nombre: String(i.nombre).trim(), unidad: i.unidad,
       kgUnidad: i.unidad === 'kg' ? 1 : (i.kgUnidad === '' || i.kgUnidad == null ? '' : leerNumero(i.kgUnidad)),
@@ -1371,15 +1391,10 @@ async function cfgGuardar(tipo) {
   }
   try {
     toast('Guardando…', 10000);
-    await llamar({ accion: 'catalogo', pin: sesion.pin, tipo, lista, modulo: ui.modStock, rubro: ui.rubro });
+    await llamar({ accion: 'catalogo', pin: sesion.pin, tipo, lista });
     // Se ve enseguida: la lista guardada se aplica acá y los datos completos bajan después.
     const s = datos && datos.stock;
-    if (s && tipo === 'insumos' && esSanidad()) {
-      const vistos = new Set(lista.map((i) => i.nombre.toUpperCase()));
-      s.insumos = s.insumos.filter((i) => !(i.modulo === 'Sanidad' && i.rubro === ui.rubro) && !vistos.has(i.nombre.toUpperCase()))
-        .concat(lista.map((i) => Object.assign({}, i, { modulo: 'Sanidad', kgUnidad: null, contenido: i.contenido === '' ? null : i.contenido, minimo: i.minimo === '' ? null : i.minimo,
-          dosisBase: i.dosisBase === '' ? null : i.dosisBase, pesoBase: i.pesoBase === '' ? null : i.pesoBase })));
-    } else if (s && tipo === 'insumos') {
+    if (s && tipo === 'insumos') {
       const antes = {};
       s.insumos.forEach((i) => { antes[i.nombre.toUpperCase()] = i; });
       s.insumos = lista.map((i) => Object.assign({ tapfeed: (antes[i.nombre.toUpperCase()] || {}).tapfeed || '' }, i, { kgUnidad: i.kgUnidad === '' ? null : i.kgUnidad, minimo: i.minimo === '' ? null : i.minimo, modulo: 'Stock' }))
@@ -1634,6 +1649,12 @@ function despuesDeRender() {
   const lf = $('#l-fecha');
   if (lf) lf.addEventListener('change', () => { if (lf.value && lf.value <= hoyISO()) { ui.lluvia.fecha = lf.value; ui.lluvia.mm = {}; render(); } });
   document.querySelectorAll('[data-sector]').forEach((el) => el.addEventListener('input', () => { ui.lluvia.mm[el.dataset.sector] = el.value; }));
+  // Formulario de producto (Sanidad): cada campo se guarda en ui.prod al tocarlo.
+  document.querySelectorAll('[data-prod]').forEach((el) => {
+    el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', () => {
+      ui.prod[el.dataset.prod] = el.type === 'checkbox' ? el.checked : el.value;
+    });
+  });
   document.querySelectorAll('[data-cfg][data-k]').forEach((el) => {
     el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', () => {
       const item = ui.cfg[el.dataset.cfg][Number(el.dataset.n)];
@@ -1721,12 +1742,14 @@ document.addEventListener('click', (e) => {
     case 'guardarMov': guardarMov(); break;
     case 'verMov': verMov(b.dataset.id); break;
     case 'cfgAgregar':
-      if (b.dataset.cfg === 'insumos' && esSanidad()) ui.cfg.insumos.push({ nombre: '', unidad: 'frasco', contenido: '', unidadContenido: 'ml', minimo: '', activo: true, rubro: ui.rubro });
-      else if (b.dataset.cfg === 'insumos') ui.cfg.insumos.push({ nombre: '', unidad: 'bolsa', kgUnidad: 40, minimo: '', activo: true });
+      if (b.dataset.cfg === 'insumos') ui.cfg.insumos.push({ nombre: '', unidad: 'bolsa', kgUnidad: 40, minimo: '', activo: true });
       else ui.cfg.destinos.push({ nombre: '', activo: true });
       render();
       break;
     case 'cfgGuardar': cfgGuardar(b.dataset.cfg); break;
+    case 'nuevoProducto': ui.prod = productoForm(null); ui.vistaStock = 'producto'; render(); window.scrollTo(0, 0); break;
+    case 'editarProducto': ui.prod = productoForm(stockDatos().insumos.find((x) => x.nombre === ui.insumoVer)); ui.vistaStock = 'producto'; render(); window.scrollTo(0, 0); break;
+    case 'guardarProducto': guardarProducto(); break;
     case 'finca': ui.lluvia.finca = b.dataset.f; ui.lluvia.mm = {}; render(); break;
     case 'fechaLluvia': {
       const f = sumarDias(ui.lluvia.fecha, Number(b.dataset.d));

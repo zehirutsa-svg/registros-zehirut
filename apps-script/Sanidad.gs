@@ -263,3 +263,51 @@ function asegurarBajaManual_(ins) {
   }
   ins.getRange(2, col, 200, 1).insertCheckboxes();
 }
+
+// ---------------------------------------------------------------- un producto (alta o edición)
+// Desde la ficha del producto ("✏️ Editar datos") o "➕ Nuevo producto" (solo quien tiene Configurar).
+// Se escribe solo su fila de Insumos. Un producto con movimientos no cambia de nombre: los
+// movimientos y la app de la estancia lo nombran así (se desactiva y se crea otro).
+function guardarProducto_(body) {
+  const ss = SpreadsheetApp.getActive();
+  const u = usuarioDe_(ss, body.pin);
+  if (!u.configura) throw new Error('no tenés permiso para cambiar la lista de productos');
+  const x = body.producto || {};
+  return conLock_(() => {
+    const sh = ss.getSheetByName('Insumos');
+    const insumos = leerInsumos_(ss);
+    const original = texto_(body.original, 60);
+    const nombre = texto_(x.nombre, 60);
+    if (!nombre) throw new Error('falta el nombre comercial');
+    const actual = original ? insumos.find((i) => i.nombre === original && i.modulo === 'Sanidad') : null;
+    if (original && !actual) throw new Error('ese producto ya no existe');
+    const otro = insumos.find((i) => i.nombre.toUpperCase() === nombre.toUpperCase() && i !== actual);
+    if (otro) throw new Error('ya existe "' + otro.nombre + '"' + (otro.modulo === 'Sanidad' ? ' en ' + otro.rubro : ''));
+    if (actual && nombre !== actual.nombre && leerMovimientos_(ss).some((m) => m.insumo === actual.nombre)) {
+      throw new Error('"' + actual.nombre + '" ya tiene movimientos: no se le cambia el nombre (desactivalo y creá uno nuevo)');
+    }
+    const rubro = RUBROS_SANIDAD.indexOf(x.rubro) !== -1 ? x.rubro : '';
+    if (!rubro) throw new Error('elegí el stock (Medicamentos, Insumos IATF o Semen)');
+    const num = (v, que, cero) => {
+      if (v === '' || v == null) return '';
+      const n = Number(v);
+      if (!(cero ? n >= 0 : n > 0)) throw new Error(que + ' inválido');
+      return n;
+    };
+    const cont = num(x.contenido, 'contenido');
+    const fila = [nombre, texto_(x.unidad, 20) || 'frasco', '', num(x.minimo, 'stock mínimo', true), x.activo !== false, false, false, '', 'Sanidad',
+      rubro, cont, cont === '' ? '' : (x.unidadContenido === 'un' ? 'un' : 'ml'),
+      texto_(x.principio, 80), texto_(x.indicacion, 80), texto_(x.laboratorio, 80), texto_(x.proveedor, 80),
+      num(x.dosisBase, 'dosis base'), num(x.pesoBase, 'peso base'), x.bajaManual === true];
+    let n = 0;
+    if (actual) {
+      const nombres = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+      n = nombres.findIndex((f) => String(f[0]).trim() === actual.nombre) + 2;
+    }
+    if (n >= 2) sh.getRange(n, 1, 1, COLS_INSUMOS.length).setValues([fila]);
+    else sh.getRange(sh.getLastRow() + 1, 1, 1, COLS_INSUMOS.length).setValues([fila]);   // las casillas ya están (200 filas)
+    registrar_(ss, [[new Date(), u.nombre, actual ? 'Editar producto' : 'Nuevo producto', nombre + ' (' + rubro + ')', 'Aplicado', '']]);
+    reconstruirStock_(ss);
+    return { ok: true, producto: leerInsumos_(ss).find((i) => i.nombre === nombre) };
+  });
+}

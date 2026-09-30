@@ -163,9 +163,13 @@ Cada uno es una tarjeta en Stocks; permisos: columna **Sanidad** de Usuarios (ho
 - Mismo motor que Stock (Módulo = "Sanidad"). Cada presentación es un producto distinto (CIDENTAL 250 ml ≠
   500 ml). Columnas "Contenido por unidad" + "Unidad del contenido" (frasco de 500 ml, caja de 100 un):
   el saldo se guarda en frascos **con decimales** y se muestra también en ml/un. Sin destinos (corrales).
+- **Alta y edición de productos, de a uno** (pedido 30/09, la lista larga de Configurar era engorrosa): "➕ Nuevo
+  producto" al pie de cada stock y "✏️ Editar datos del producto" en la ficha (solo con Configurar; acción
+  'producto' → guardarProducto_ en Sanidad.gs, escribe solo esa fila). Un producto con movimientos no cambia
+  de nombre (lo nombran los movimientos y la app de la estancia): se desactiva y se crea otro.
 - Lista inicial: `apps-script/Sanidad.gs` (PRODUCTOS_SANIDAD, 98 productos de la hoja INVENTARIO de la
   planilla "Inventario y stock de medicamentos"), se agrega una sola vez (esquema 7). Después se edita
-  desde la app: "⚙ Configurar productos" (por rubro; cambiar "Stock" pasa un producto a otro rubro).
+  desde la app (ver "Alta y edición de productos"); cambiar "Stock" pasa un producto a otro rubro.
 - **Solo ingresos y conteos en Registros** (pedido 30/09): el uso (baja) se carga únicamente en la app de la
   estancia; el script rechaza un Consumo manual de Sanidad. Excepción: casilla **"Baja en Registros"** (alcohol,
   jeringas, guantes; esquema 12): esos sí llevan Consumo a mano y NO se ofrecen en la app de la estancia
