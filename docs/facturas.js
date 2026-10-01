@@ -125,26 +125,27 @@ async function copiar(texto) {
 
 // ================================================================ FACTURAS
 function estadoFac() {
-  if (!ui.fac) ui.fac = { vista: 'lista', lista: null, q: '', mes: '', archivos: {} };
+  if (!ui.fac) ui.fac = { vista: 'lista', raiz: 'lista', lista: null, q: '', mes: '', archivos: {} };
   return ui.fac;
 }
 
 function htmlFacturas() {
   const f = estadoFac();
   const p = zaP();
-  const titulos = { lista: 'Facturas', tipo: '¿Qué vas a cargar?', carga: 'Cargar factura', form: f.form && f.form.modo === 'editar' ? 'Corregir factura' : 'Revisá los datos',
+  const titulos = { lista: 'Ver facturas', tipo: 'Comprobantes', carga: 'Cargar factura', form: f.form && f.form.modo === 'editar' ? 'Corregir factura' : 'Revisá los datos',
     detalle: 'Factura', comprobante: 'Agregar comprobante', vincular: 'Vincular anticipo', anticipo: 'Anticipo a proveedor', pagoSF: 'Pago sin factura' };
   let cuerpo;
   if (!p) cuerpo = '<div class="aviso amarillo">' + esc((datos && datos.za && datos.za.error) || 'No se pudo conectar con los permisos de ZehirutApp.') + '</div>';
   else cuerpo = ({ lista: htmlFacLista, tipo: htmlFacTipo, carga: htmlFacCarga, form: htmlFacForm, detalle: htmlFacDetalle,
     comprobante: htmlFacComprobante, vincular: htmlFacVincular, anticipo: htmlFacAnticipo, pagoSF: htmlFacPagoSF }[f.vista] || htmlFacLista)();
-  return barra(titulos[f.vista] || 'Facturas', true) + '<div class="contenido"><div class="form">' + cuerpo + '</div></div>';
+  return barra(titulos[f.vista] || 'Comprobantes', true) + '<div class="contenido"><div class="form">' + cuerpo + '</div></div>';
 }
 
-/** Flecha de arriba: un paso atrás. Devuelve true si se quedó dentro de Facturas. */
+/** Flecha de arriba: un paso atrás. Devuelve true si se quedó dentro (en la pantalla de entrada vuelve al grupo). */
 function atrasFacturas() {
   const f = estadoFac();
-  const antes = { tipo: 'lista', carga: 'tipo', anticipo: 'tipo', pagoSF: 'tipo', detalle: 'lista', comprobante: 'detalle', vincular: 'detalle' };
+  if (f.vista === f.raiz) return false;
+  const antes = { carga: 'tipo', anticipo: 'tipo', pagoSF: 'tipo', detalle: 'lista', comprobante: 'detalle', vincular: 'detalle' };
   if (f.vista === 'form') {
     if (f.form && f.form.modo === 'editar') { f.vista = 'detalle'; render(); return true; }
     descartarCargaFac(); return true;
@@ -157,12 +158,15 @@ function atrasFacturas() {
 function htmlFacLista() {
   const f = estadoFac();
   const p = zaP();
-  if (!f.lista && !f.cargando) setTimeout(() => cargarListaFac(true), 0);
-  let h = p.puedeFacturas ? '<button class="btn" data-a="fac" data-x="nuevo" style="margin-bottom:14px">➕ Cargar comprobante</button>' : '';
+  // No se trae nada hasta que se busca algo o se elige un mes (antes cargaba todas al entrar).
+  const buscando = !!(f.q || f.mes);
+  if (buscando && !f.lista && !f.cargando) setTimeout(() => cargarListaFac(true), 0);
+  let h = '';
   h += '<div class="filtros"><input class="txt" id="fac-q" placeholder="Buscar N°, proveedor o RUC" value="' + esc(f.q) + '" autocomplete="off">' +
     '<input class="txt" type="month" id="fac-mes" value="' + esc(f.mes) + '" style="flex:0 1 170px"></div>';
-  if (!f.lista) return h + '<p class="vacio">' + (f.error ? '⚠️ ' + esc(f.error) : 'Cargando facturas…') + '</p>';
-  if (!f.lista.filas.length) h += '<p class="vacio">No hay facturas' + (f.q || f.mes ? ' con ese filtro' : '') + '.</p>';
+  if (!buscando) return h + '<p class="vacio" style="padding:20px 8px">Escribí un N°, proveedor o RUC, o elegí un mes.</p>';
+  if (!f.lista) return h + '<p class="vacio">' + (f.error ? '⚠️ ' + esc(f.error) : 'Buscando…') + '</p>';
+  if (!f.lista.filas.length) h += '<p class="vacio">No hay facturas con ese filtro.</p>';
   h += f.lista.filas.map((x) =>
     '<button class="mov factura' + (x.cargadoAlbor ? ' albor' : '') + '" data-a="fac" data-x="abrir" data-id="' + esc(x.id) + '">' +
     '<span class="cuerpo"><b>' + esc(x.proveedor || '(sin proveedor)') + '</b><small>' + esc(x.numeroFactura) + ' · ' + esc(x.fecha) +
@@ -170,7 +174,7 @@ function htmlFacLista() {
     (x.cargadoAlbor ? ' <span class="chip verde">✓ Albor</span>' : '') + '</small></span>' +
     '<span class="num">' + fmtMonto(x.monto, x.moneda) + '<br><small style="font-weight:600;color:var(--gris)">' + esc(x.moneda) + '</small></span></button>').join('');
   if (f.lista.hayMas) h += '<button class="btn sec" data-a="fac" data-x="mas">Ver más (' + (f.lista.total - f.lista.filas.length) + ')</button>';
-  if (f.lista.filas.length) h += '<div class="pie-stock"><button class="btn sec chico" data-a="fac" data-x="excel">📥 Bajar Excel' + (f.mes || f.q ? ' (con este filtro)' : '') + '</button></div>';
+  if (f.lista.filas.length) h += '<div class="pie-stock"><button class="btn sec chico" data-a="fac" data-x="excel">📥 Bajar Excel (con este filtro)</button></div>';
   return h;
 }
 
@@ -192,9 +196,11 @@ async function cargarListaFac(reiniciar) {
 
 // ---- elegir qué cargar
 function htmlFacTipo() {
-  return '<div class="opciones-grandes">' +
-    '<button class="modulo" data-a="fac" data-x="ir" data-v="carga"><span class="ico">🧾</span><span><b>Factura</b><small>Foto o PDF: la lee Gemini y revisás los datos</small></span></button>' +
-    '<button class="modulo" data-a="fac" data-x="ir" data-v="anticipo"><span class="ico">💸</span><span><b>Anticipo a proveedor</b><small>Adelanto pagado antes de tener la factura</small></span></button>' +
+  return '<h3 style="margin:0 0 10px">Carga de comprobantes</h3>' +
+    '<input type="file" id="fac-elegir" accept="image/*,application/pdf" hidden>' +
+    '<div class="opciones-grandes">' +
+    '<button class="modulo" data-a="fac" data-x="elegir" data-v="carga"><span class="ico">🧾</span><span><b>Factura</b><small>Sacale una foto o elegí el archivo: la lee Gemini y revisás los datos</small></span></button>' +
+    '<button class="modulo" data-a="fac" data-x="elegir" data-v="anticipo"><span class="ico">💸</span><span><b>Anticipo a proveedor</b><small>Foto o archivo del comprobante del adelanto</small></span></button>' +
     '<button class="modulo" data-a="fac" data-x="ir" data-v="pagoSF"><span class="ico">💵</span><span><b>Pago sin factura</b><small>Gastos que nunca van a tener factura</small></span></button></div>';
 }
 
@@ -270,7 +276,7 @@ function descartarCargaFac() {
   const f = estadoFac();
   if (f.form && f.form.modo === 'nueva' && f.form.archivoId) za('descartarArchivo', [f.form.archivoId, '__PIN__']).catch(() => {});
   f.form = null;
-  f.vista = 'carga';
+  f.vista = f.raiz;
   render();
   toast('Carga descartada');
 }
@@ -361,7 +367,7 @@ async function guardarFormFac() {
       toast('✓ Factura guardada', 3000);
       f.form = null;
       f.lista = null;
-      f.vista = 'lista';
+      f.vista = f.raiz;
       render();
       window.scrollTo(0, 0);
     }
@@ -553,7 +559,7 @@ async function guardarAnticipoFac() {
     await za('guardarAnticipo', [x.base64, x.tipo, x.nombre, { proveedor: a.proveedor.trim(), ruc: String(a.ruc || '').trim(), fecha: isoADdmm(a.fecha),
       moneda: a.moneda, monto: montoParaGuardar(a.monto), motivo: String(a.motivo || '').trim() }, '__PIN__']);
     toast('✓ Anticipo guardado', 3000);
-    f.ant = null; f.archivos = {}; f.vista = 'lista'; f.lista = null;
+    f.ant = null; f.archivos = {}; f.vista = f.raiz; f.lista = null;
     render();
   } catch (e) {
     a.guardando = false; render();
@@ -576,7 +582,7 @@ async function guardarPagoSFFac() {
     await za('guardarPagoSinFactura', [x.base64, x.tipo, x.nombre, { proveedor: a.proveedor.trim(), fecha: isoADdmm(a.fecha), item: String(a.item || '').trim(),
       moneda: a.moneda, monto: montoParaGuardar(a.monto), unidadNegocio: a.unidad || '', formaPago: a.forma || '' }, '__PIN__']);
     toast('✓ Pago sin factura guardado', 3000);
-    f.psf = null; f.archivos = {}; f.vista = 'lista'; f.lista = null;
+    f.psf = null; f.archivos = {}; f.vista = f.raiz; f.lista = null;
     render();
   } catch (e) {
     a.guardando = false; render();
@@ -588,7 +594,15 @@ async function guardarPagoSFFac() {
 async function accionFac(b) {
   const f = estadoFac();
   const x = b.dataset.x;
-  if (x === 'nuevo') { f.vista = 'tipo'; render(); return; }
+  if (x === 'elegir') {
+    // Se abre el selector en el mismo toque (si no, el navegador lo bloquea): en el celular ofrece sacar
+    // foto o elegir archivo; en la compu, el explorador. Al elegir, sigue en la pantalla que corresponde.
+    const inp = $('#fac-elegir');
+    inp.dataset.destino = b.dataset.v;
+    inp.value = '';
+    inp.click();
+    return;
+  }
   if (x === 'ir') {
     if (b.dataset.v === 'comprobante') f.comp = null;
     if (b.dataset.v === 'vincular') f.vinc = null;
@@ -634,7 +648,7 @@ async function accionFac(b) {
     const ok = await cartel({ icono: '🗑️', titulo: 'Eliminar factura', si: 'Eliminar', peligro: true,
       html: '<p>Se borra la factura N° <b>' + esc(d.numeroFactura) + '</b> de ' + esc(d.proveedor) + ', sus ítems, sus comprobantes asociados y su carpeta de Drive (va a la papelera).</p>' });
     if (!ok) return;
-    try { await za('eliminarFactura', ['__PIN__', d.id]); toast('Factura eliminada'); f.vista = 'lista'; f.lista = null; render(); }
+    try { await za('eliminarFactura', ['__PIN__', d.id]); toast('Factura eliminada'); f.vista = 'lista'; f.lista = null; render(); cargarListaFac(true); }
     catch (e) { toast('No se pudo: ' + e.message, 4000); }
     return;
   }
@@ -761,7 +775,7 @@ function despuesDeRenderFac() {
     const file = inp.files && inp.files[0];
     if (!file) return;
     const clave = inp.dataset.archivo;
-    if (ui.pantalla === 'facturas' && clave === 'factura') { leerFacturaElegida(file); return; }
+    if (ui.pantalla === 'facturas' && clave === 'factura') { estadoFac().vista = 'carga'; leerFacturaElegida(file); return; }
     const st = ui.pantalla === 'fondofijo' ? estadoFF() : estadoFac();
     // Antes de redibujar, se guarda lo escrito en el formulario de la pantalla.
     if (st.ant) leerCampos('fa-', st.ant, ['proveedor', 'ruc', 'fecha', 'moneda', 'monto', 'motivo']);
@@ -771,6 +785,15 @@ function despuesDeRenderFac() {
     st.archivos[clave] = file;
     render();
   }));
+  const elegir = $('#fac-elegir');
+  if (elegir) elegir.addEventListener('change', () => {
+    const file = elegir.files && elegir.files[0];
+    if (!file) return;
+    const f = estadoFac();
+    f.archivos = {};
+    if (elegir.dataset.destino === 'anticipo') { f.ant = null; f.archivos.anticipo = file; f.vista = 'anticipo'; render(); window.scrollTo(0, 0); }
+    else { f.vista = 'carga'; render(); leerFacturaElegida(file); }
+  });
   const q = $('#fac-q');
   if (q) {
     let t = null;

@@ -221,6 +221,13 @@ acceso total.
 
 ## Facturas y Fondo fijo (en prueba desde 30/09/2026, sin apagar ZehirutApp)
 
+- **Navegación (pedido 01/10/2026):** en el inicio el grupo se llama **Registros contables** (antes Comprobantes) y
+  tiene tres tarjetas: **Comprobantes** (abre "Carga de comprobantes": Factura, Anticipo a proveedor, Pago sin
+  factura), **Ver facturas** (buscador; **no carga nada hasta que se busca algo o se elige un mes**) y Fondo
+  fijo. Factura y Anticipo abren el selector de archivo en el mismo toque (`#fac-elegir`, sin `capture`:
+  el celular ofrece sacar foto o elegir archivo; la compu, el explorador). `ui.fac.raiz` = pantalla de
+  entrada (tipo | lista): la flecha vuelve ahí y después al grupo; al guardar se vuelve a la raíz.
+
 - No se copia la lógica: el script usa **ZehirutApp como biblioteca** (símbolo `ZA`, versión fija en
   `appsscript.json`, hoy 134). Misma planilla, carpetas de Drive, clave de Gemini y permisos/PIN de la
   hoja Usuarios de ZehirutApp. Lo que se carga acá aparece en ZehirutApp y al revés.

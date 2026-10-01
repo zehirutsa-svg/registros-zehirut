@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.17.1';
+const VERSION = '1.18.0';
 
 
 const DIAS_HISTORIAL = 60;
@@ -529,7 +529,9 @@ function tarjetasModulos() {
     });
   }
   const za = datos && datos.za && datos.za.ok ? datos.za : null;
-  if (za && (za.puedeFacturas || za.puedeVerFacturas)) g.comprobantes.push(tarjeta('facturas', 'data-p="facturas"', '🧾', 'Facturas', 'Cargar y ver facturas' + prueba));
+  // Registros contables: cargar comprobantes (factura, anticipo, pago sin factura) y ver facturas, por separado.
+  if (za && za.puedeFacturas) g.comprobantes.push(tarjeta('facturas', 'data-p="facturas" data-fv="tipo"', '🧾', 'Comprobantes', 'Factura, anticipo o pago sin factura' + prueba));
+  if (za && (za.puedeFacturas || za.puedeVerFacturas)) g.comprobantes.push(tarjeta('facturas', 'data-p="facturas" data-fv="lista"', '🔎', 'Ver facturas', 'Buscar las facturas cargadas' + prueba));
   if (za && za.puedeFondoFijo) g.comprobantes.push(tarjeta('fondofijo', 'data-p="fondofijo"', '💵', 'Fondo fijo', 'Caja chica' + prueba));
   ['Facturas', 'Fondo fijo'].filter((m) => puede(m, 'VER') && !za).forEach((m) => {
     g.comprobantes.push('<div class="modulo pronto"><span class="ico">' + ({ Facturas: '🧾', 'Fondo fijo': '💵' }[m]) +
@@ -547,7 +549,7 @@ function tarjetasModulos() {
 
 const GRUPOS = {
   stocks: { titulo: 'Stocks', ico: '📦', sub: 'Insumos · Combustible · Horómetro · Sanidad' },
-  comprobantes: { titulo: 'Comprobantes', ico: '🗂️', sub: 'Facturas · Fondo fijo' },
+  comprobantes: { titulo: 'Registros contables', ico: '🗂️', sub: 'Comprobantes · Ver facturas · Fondo fijo' },
 };
 
 // Inicio: Comprobantes, Stocks y Lluvias. Un grupo con un solo módulo muestra ese módulo
@@ -1693,7 +1695,7 @@ document.addEventListener('click', (e) => {
       if (ui.pantalla === 'fondofijo' && b.dataset.p === 'inicio' && atrasFondoFijo()) break;
       if (ui.pantalla === 'horometro' && b.dataset.p === 'inicio' && atrasHorometro()) break;
       if (b.dataset.p === 'horometro') { hor.vista = 'lista'; hor.codigo = null; hor.form = null; hor.excel = null; }
-      if (b.dataset.p === 'facturas') { ui.fac = null; }
+      if (b.dataset.p === 'facturas') { ui.fac = null; estadoFac().vista = estadoFac().raiz = b.dataset.fv || 'lista'; }
       if (b.dataset.p === 'fondofijo') { ui.ff = null; }
       if (ui.pantalla === 'lluvias' && ui.vistaLluvia === 'cargar' && b.dataset.p === 'inicio') { ui.vistaLluvia = 'dia'; ui.lluvia = null; render(); break; }
       if (b.dataset.p === 'grupo') ui.grupo = b.dataset.g;
