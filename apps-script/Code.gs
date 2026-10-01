@@ -1514,6 +1514,9 @@ function zehirut_(body) {
   if (!facturasVisibles_(u)) throw new Error('Facturas y Fondo fijo todavía no están habilitados para tu usuario');
   const fn = String(body.fn || '');
   if (!ZA_PERMITIDAS[fn] || typeof ZA[fn] !== 'function') throw new Error('función no permitida: ' + fn);
+  // En ZehirutApp Fondo fijo es un solo permiso (ver y cargar); acá se separa: con "Ver" en la columna
+  // Fondo fijo de Usuarios no se registran ni eliminan fondeos.
+  if (/FondeoFondoFijo$/.test(fn) && nivel_(u, 'Fondo fijo') < NIVELES.CARGAR) throw new Error('tu usuario solo puede ver el Fondo fijo');
   const args = (Array.isArray(body.args) ? body.args : []).map((a) => (a === '__PIN__' ? String(body.pin) : a));
   // Lo que devuelve ZehirutApp viaja como JSON (las fechas ya vienen como texto).
   return { ok: true, resultado: ZA[fn].apply(null, args) };

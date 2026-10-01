@@ -699,7 +699,8 @@ function htmlFFResumen() {
   const s = f.res.saldo;
   let h = '<div class="saldo ' + (s < 0 ? 'negativo' : '') + '" style="margin-bottom:14px"><h3>Saldo de la caja chica</h3><div class="cant">' +
     (s < 0 ? '−' : '') + fmtMonto(Math.abs(s), 'PYG') + '<small>Gs.</small></div></div>' +
-    '<button class="btn" data-a="ff" data-x="fondeo" style="margin-bottom:16px">➕ Registrar fondeo</button>' +
+    // Con "Ver" en Fondo fijo (hoja Usuarios) no se registran ni eliminan fondeos.
+    (puede('Fondo fijo', 'CARGAR') ? '<button class="btn" data-a="ff" data-x="fondeo" style="margin-bottom:16px">➕ Registrar fondeo</button>' : '') +
     '<h3 class="subt">Últimos movimientos</h3>';
   h += (f.res.ultimos || []).map((m, i) => '<button class="mov" data-a="ff" data-x="mov" data-i="' + i + '"><span class="tipo ' + (m.tipo === 'fondeo' ? 'Ingreso' : 'Consumo') + '">' +
     (m.tipo === 'fondeo' ? '⬇' : '⬆') + '</span><span class="cuerpo"><b>' + esc(m.tipo === 'fondeo' ? 'Fondeo' : (m.proveedor || '')) + '</b><small>' + esc(m.fecha) +
@@ -761,6 +762,7 @@ async function accionFF(b) {
   if (x === 'mov') {
     const m = f.res.ultimos[Number(b.dataset.i)];
     if (m.tipo !== 'fondeo') { toast('Es un gasto: se corrige desde la factura, en Facturas.', 3000); return; }
+    if (!puede('Fondo fijo', 'CARGAR')) return;
     const ok = await cartel({ icono: '🗑️', titulo: 'Eliminar fondeo', si: 'Eliminar', peligro: true,
       html: '<p>Fondeo del ' + esc(m.fecha) + ' por <b>' + fmtMonto(m.haber, 'PYG') + ' Gs.</b>' + (m.usuario ? ', cargado por ' + esc(m.usuario) : '') + '.</p>' });
     if (!ok) return;
