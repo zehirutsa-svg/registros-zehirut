@@ -6,6 +6,23 @@ Estancias La Prudencia / La Paciencia (ZEHIRUT S.A.). Proyecto separado de `Zehi
 fondo fijo). Mismo esquema que `Registro de score confinamiento` (Lectura de Comederos):
 HTML/CSS/JS planos en GitHub Pages + Apps Script propio + Google Sheet propio.
 
+## Arquitectura (estado 01/10/2026) — leer primero
+
+Para los usuarios hay **una sola app: Registros Zehirut**. Por dentro:
+
+| Parte | Dónde vive |
+|---|---|
+| Pantallas (lo que abre el celular) | **GitHub Pages**: carpeta `docs/` de este repo |
+| Servidor de Registros (stock, sanidad, horómetro, combustible, lluvias, usuarios, conexión con la estancia) | **Apps Script** ligado al Sheet "Registros Zehirut" (`apps-script/`) |
+| Servidor de facturas, fondo fijo y mail diario | **Apps Script de ZehirutApp**, usado como **biblioteca** `ZA` (versión fija en `appsscript.json`) |
+| Datos (planillas, comprobantes, carpetas) | **Google Drive / Sheets** |
+| Sanidad por animal | App de la estancia (estancia-app, servidor propio) → manda consumos cada 15 min |
+
+- **ZehirutApp ya no es una app**: sin pantallas (web apagada, muestra un botón a Registros). Sigue viva solo como
+  biblioteca y por el disparador del mail diario. Cambiar facturas = publicar ZehirutApp + subir la versión acá.
+- **Usuarios y permisos: una sola planilla, la hoja Usuarios de este Sheet** (ZehirutApp también la lee).
+- Unificar ZehirutApp dentro de este Apps Script: decidido **dejarlo separado** por ahora (01/10/2026).
+
 ## Estructura
 
 ```
