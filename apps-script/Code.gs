@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '12';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '13';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
@@ -37,16 +37,15 @@ const COLS_USUARIOS = ['Nombre', 'PIN', 'Activo'].concat(MODULOS, ['Configurar']
 // "Producción propia": se produce en la estancia; sus ingresos no llevan proveedor, remito ni factura.
 // "Nombre en Tapfeed": cómo aparece el insumo en el PDF de Tapfeed (ej. "Maiz Molido DGM 1,2").
 // "Módulo": en qué módulo de la app aparece el insumo (Stock, Combustible o Sanidad); los permisos son los de ese módulo.
-// "Rubro" (solo Sanidad): Medicamentos, Insumos IATF o Semen, cada uno con su propio stock.
+// "Rubro" (solo Sanidad): Medicamentos, Materiales sanitarios o Semen, cada uno con su propio stock. El rubro
+// dice cómo se descuenta: Medicamentos desde la app de la estancia (por animal), Materiales sanitarios a mano
+// acá (Consumo). Lo de IATF no es un rubro: es la Indicación "Reproducción" (filtro 🏷 IATF en la app).
 // "Contenido por unidad" / "Unidad del contenido" (solo Sanidad): ej. frasco de 500 ml, caja de 100 un.
 // Ficha del producto (solo Sanidad, de la planilla "Inventario y stock de medicamentos"): principio activo,
 // indicación, laboratorio, proveedor y dosis base (cantidad cada tantos kg de peso vivo).
 const COLS_INSUMOS = ['Insumo', 'Unidad', 'Kg por unidad', 'Stock mínimo', 'Activo', 'Por estancia', 'Producción propia', 'Nombre en Tapfeed', 'Módulo',
   'Rubro', 'Contenido por unidad', 'Unidad del contenido',
-  'Principio activo', 'Indicación', 'Laboratorio', 'Proveedor', 'Dosis base', 'Peso base (kg)',
-  'Baja en Registros'];
-// "Baja en Registros" (solo Sanidad): lo que no se aplica a animales (alcohol, jeringas, guantes) se da de
-// baja a mano acá con Consumo y no aparece en el desplegable de la app de la estancia.
+  'Principio activo', 'Indicación', 'Laboratorio', 'Proveedor', 'Dosis base', 'Peso base (kg)'];
 const CAMPOS_FICHA = ['principio', 'indicacion', 'laboratorio', 'proveedor', 'dosisBase', 'pesoBase'];
 const COLS_TAPFEED = ['Fecha', 'Corral', 'Cabezas', 'Insumo', 'Nombre en Tapfeed', 'Kg tal cual', 'Kg MS', 'Archivo', 'Cargado por', 'Recibido'];
 const COLS_DESTINOS = ['Destino', 'Activo'];
@@ -113,7 +112,8 @@ const MAQUINAS_INICIALES = [
 // la estancia (app.laprudencia.com.py); acá se lleva el stock del depósito (uno solo). La lista
 // inicial de productos (PRODUCTOS_SANIDAD, en Sanidad.gs) sale de la planilla "Inventario y stock de
 // medicamentos" (30/09/2026). Todo va a la unidad de negocio PATRIMONIAL (decisión del contador).
-const RUBROS_SANIDAD = ['Medicamentos', 'Insumos IATF', 'Semen'];
+const RUBROS_SANIDAD = ['Medicamentos', 'Materiales sanitarios', 'Semen'];
+const RUBRO_MATERIALES = 'Materiales sanitarios';   // el único con consumo a mano
 const UNIDAD_NEGOCIO_SANIDAD = 'PATRIMONIAL';
 
 // Lista depurada por el usuario el 30/09/2026 (una sola para Combustible y Horómetro).
@@ -179,7 +179,7 @@ function configurar() {
   asegurarHorometro_(ss);
   asegurarRecorrida_(ss);
   asegurarFichaSanidad_(ss, ins);
-  asegurarBajaManual_(ins);
+  migrarRubrosSanidad_(ss, ins);
   agregarTrabajos_(ss, 'TRABAJOS_V10', ['Aserraje', 'Trabajos de limpieza']);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
@@ -325,7 +325,7 @@ function asegurarSanidad_(ss, ins, usu) {
     if (String(ins.getRange(1, c).getValue()) !== t) ins.getRange(1, c).setValue(t).setFontWeight('bold').setBackground('#eeeeee');
   });
   if (!leerInsumos_(ss).some((i) => i.modulo === 'Sanidad')) {
-    const filas = PRODUCTOS_SANIDAD.map((p) => [p[0], p[2], '', '', true, false, false, '', 'Sanidad', p[1], p[3], p[4]].concat(p.slice(5, 11), [/^(ALCOHOL|JERINGA|GUANTE)/i.test(p[0])]));
+    const filas = PRODUCTOS_SANIDAD.map((p) => [p[0], p[2], '', '', true, false, false, '', 'Sanidad', p[1], p[3], p[4]].concat(p.slice(5, 11)));
     ins.getRange(ins.getLastRow() + 1, 1, filas.length, COLS_INSUMOS.length).setValues(filas);
   }
   const ancho = usu.getLastColumn();
@@ -528,7 +528,6 @@ function leerInsumos_(ss) {
       proveedor: String(f[15] || '').trim(),
       dosisBase: f[16] === '' || f[16] == null ? null : Number(f[16]),
       pesoBase: f[17] === '' || f[17] == null ? null : Number(f[17]),
-      bajaManual: f[18] === true || String(f[18]).toUpperCase() === 'TRUE',
     }));
 }
 
@@ -552,11 +551,8 @@ function guardarCatalogo_(body) {
     leerMovimientos_(ss).forEach((m) => { usados[m.insumo] = true; usados['D:' + m.destino] = true; });
     let filas, sh, ancho;
     if (body.tipo === 'insumos') {
-      // Se edita la lista de un módulo (Stock o Sanidad); en Sanidad, la de un rubro. Lo demás queda igual.
-      const modulo = body.modulo === 'Sanidad' ? 'Sanidad' : 'Stock';
-      const rubro = modulo === 'Sanidad' ? String(body.rubro || '') : '';
-      if (modulo === 'Sanidad' && RUBROS_SANIDAD.indexOf(rubro) === -1) throw new Error('rubro inválido');
-      const enAlcance = (i) => i.modulo === modulo && (modulo !== 'Sanidad' || i.rubro === rubro);
+      // La lista de Stock (los de Combustible y Sanidad se conservan: Sanidad se edita de a un producto).
+      const enAlcance = (i) => i.modulo === 'Stock';
       const vistos = {};
       const previos = leerInsumos_(ss);   // una sola lectura de la hoja (antes se leía una vez por insumo)
       filas = (Array.isArray(body.lista) ? body.lista : []).map((x) => {
@@ -571,27 +567,12 @@ function guardarCatalogo_(body) {
         if (minimo !== '' && !(minimo >= 0)) throw new Error('stock mínimo inválido en ' + nombre);
         // El nombre en Tapfeed no se edita desde la app: se conserva el de la hoja.
         const antes = previos.find((i) => i.nombre.toUpperCase() === nombre.toUpperCase());
-        if (modulo === 'Sanidad') {
-          const r = RUBROS_SANIDAD.indexOf(x.rubro) === -1 ? rubro : x.rubro;
-          const cont = x.contenido === '' || x.contenido == null ? '' : Number(x.contenido);
-          if (cont !== '' && !(cont > 0)) throw new Error('contenido inválido en ' + nombre);
-          const uc = cont === '' ? '' : (x.unidadContenido === 'un' ? 'un' : 'ml');
-          const numOVacio = (v, que) => {
-            if (v === '' || v == null) return '';
-            const n = Number(v);
-            if (!(n > 0)) throw new Error(que + ' inválido en ' + nombre);
-            return n;
-          };
-          return [nombre, unidad, '', minimo, x.activo !== false, false, false, '', 'Sanidad', r, cont, uc,
-            texto_(x.principio, 80), texto_(x.indicacion, 80), texto_(x.laboratorio, 80), texto_(x.proveedor, 80),
-            numOVacio(x.dosisBase, 'dosis base'), numOVacio(x.pesoBase, 'peso base'), x.bajaManual === true];
-        }
         return [nombre, unidad, kg, minimo, x.activo !== false, x.porEstancia === true, x.propia === true, antes ? antes.tapfeed : '', 'Stock', '', '', '',
-          '', '', '', '', '', '', false];
+          '', '', '', '', '', ''];
       });
       const filaDe = (i, activo) => [i.nombre, i.unidad, i.kgUnidad == null ? '' : i.kgUnidad, i.minimo == null ? '' : i.minimo, activo, !!i.porEstancia, !!i.propia, i.tapfeed, i.modulo,
         i.rubro, i.contenido == null ? '' : i.contenido, i.unidadContenido]
-        .concat(CAMPOS_FICHA.map((k) => (i[k] == null ? '' : i[k])), [!!i.bajaManual]);
+        .concat(CAMPOS_FICHA.map((k) => (i[k] == null ? '' : i[k])));
       previos.forEach((i) => {
         if (!enAlcance(i)) {
           if (vistos[i.nombre.toUpperCase()]) throw new Error('"' + i.nombre + '" ya existe en ' + (i.modulo === 'Sanidad' ? i.rubro : 'el módulo ' + i.modulo));
@@ -916,7 +897,7 @@ function validarMov_(op, u, insumos, destinos, hoy, maquinas, trabajos) {
   if (!ins) throw new Error('insumo desconocido: ' + op.insumo);
   const comb = ins.modulo === 'Combustible';
   // Sanidad: la baja (consumo) llega solo desde la app de la estancia; acá, ingresos y conteos.
-  if (ins.modulo === 'Sanidad' && tipo === 'Consumo' && !ins.bajaManual) throw new Error('el uso de ' + ins.nombre + ' se carga en la app de la estancia');
+  if (ins.modulo === 'Sanidad' && tipo === 'Consumo' && ins.rubro !== RUBRO_MATERIALES) throw new Error('el uso de ' + ins.nombre + ' se carga en la app de la estancia');
 
 
   if (tipo === 'Conteo' && nivel_(u, ins.modulo) < NIVELES.ADMINISTRAR) throw new Error('solo quien administra ' + ins.modulo + ' carga conteos');
@@ -1311,7 +1292,7 @@ function exportarExcel_(body) {
   const modulo = ['Combustible', 'Sanidad'].indexOf(body.modulo) !== -1 ? body.modulo : 'Stock';
 
   exigir_(u, modulo, 'VER');
-  // Sanidad: un Excel por rubro (Medicamentos, Insumos IATF, Semen), como la planilla de siempre:
+  // Sanidad: un Excel por rubro (Medicamentos, Materiales sanitarios, Semen), como la planilla de siempre:
   // Resumen + Movimientos, sin una hoja por producto (son casi cien).
   const san = modulo === 'Sanidad';
   const rubro = san ? (RUBROS_SANIDAD.indexOf(body.rubro) !== -1 ? body.rubro : RUBROS_SANIDAD[0]) : '';
@@ -1342,7 +1323,7 @@ function exportarExcel_(body) {
     else cuenta({ insumo: i.nombre, estancia: '' });
   });
   const plana = san
-    ? [['Fecha', 'Producto', 'Rubro', 'Tipo', 'Cantidad', 'Unidad', 'Equivale a', 'Unidad del contenido', 'Unidad de negocio',
+    ? [['Fecha', 'Producto', 'Rubro', 'Uso', 'Tipo', 'Cantidad', 'Unidad', 'Equivale a', 'Unidad del contenido', 'Unidad de negocio',
       'Proveedor', 'Remito', 'Factura', 'Nota', 'Cargado por']]
     : [['Fecha', 'Insumo', 'Estancia', 'Tipo', 'Cantidad', 'Unidad', 'Kg', 'Destino', 'Cód. bien de uso', 'Equipo', 'Trabajo',
       'Finca', 'Proveedor', 'Remito', 'Factura', 'Nota', 'Cargado por']];
@@ -1366,7 +1347,7 @@ function exportarExcel_(body) {
     c.filas.push([aDate(m.fecha), destino, codigo, m.trabajo || (m.tipo === 'Consumo' ? '' : esInicial ? 'Stock inicial' : m.tipo), m.finca ? nombreEstancia_(m.finca) : '', sale || '', entra || '']);
     if (san) {
       const i = porNombre[m.insumo];
-      plana.push([aDate(m.fecha), m.insumo, rubro, m.tipo, m.cantidad, m.unidad, i.contenido ? kgDe(i, m.cantidad) : '', i.unidadContenido,
+      plana.push([aDate(m.fecha), m.insumo, rubro, esIatf_(i) ? 'IATF' : '', m.tipo, m.cantidad, m.unidad, i.contenido ? kgDe(i, m.cantidad) : '', i.unidadContenido,
         UNIDAD_NEGOCIO_SANIDAD, m.proveedor, m.remito, m.factura, m.nota, m.usuario]);
     } else {
       plana.push([aDate(m.fecha), m.insumo, m.estancia ? nombreEstancia_(m.estancia) : '', m.tipo, m.cantidad, m.unidad, m.kg == null ? '' : m.kg,
@@ -1384,13 +1365,13 @@ function exportarExcel_(body) {
     const res = tmp.getSheets()[0];
     res.setName('Resumen');
     const filasRes = san
-      ? [['Producto', 'Unidad', 'Contenido', 'Saldo al ' + ddmmaaaa_(desde), 'Entradas', 'Salidas', 'Saldo al ' + ddmmaaaa_(hasta), 'Saldo final en ml / un', 'Unidad de negocio']]
+      ? [['Producto', 'Uso', 'Unidad', 'Contenido', 'Saldo al ' + ddmmaaaa_(desde), 'Entradas', 'Salidas', 'Saldo al ' + ddmmaaaa_(hasta), 'Saldo final en ml / un', 'Unidad de negocio']]
       : [['Insumo', 'Estancia', 'Unidad', 'Saldo al ' + ddmmaaaa_(desde), 'Entradas', 'Salidas', 'Saldo al ' + ddmmaaaa_(hasta), 'Saldo final kg']];
     lista.forEach((c) => {
       const i = porNombre[c.insumo];
       const fin = c.inicial + c.entradas - c.salidas;
       if (san) {
-        filasRes.push([c.insumo, i.unidad, i.contenido ? i.contenido + ' ' + i.unidadContenido : '', c.inicial, c.entradas, c.salidas, fin,
+        filasRes.push([c.insumo, esIatf_(i) ? 'IATF' : '', i.unidad, i.contenido ? i.contenido + ' ' + i.unidadContenido : '', c.inicial, c.entradas, c.salidas, fin,
           i.contenido ? kgDe(i, fin) : '', UNIDAD_NEGOCIO_SANIDAD]);
       } else {
         filasRes.push([c.insumo, c.estancia ? nombreEstancia_(c.estancia) : '', i.unidad, c.inicial, c.entradas, c.salidas, fin, kgDe(i, fin)]);
@@ -1400,7 +1381,7 @@ function exportarExcel_(body) {
       ' – del ' + ddmmaaaa_(desde) + ' al ' + ddmmaaaa_(hasta)).setFontSize(14).setFontWeight('bold');
     res.getRange(3, 1, filasRes.length, filasRes[0].length).setValues(filasRes).setBorder(true, true, true, true, true, true);
     res.getRange(3, 1, 1, filasRes[0].length).setFontWeight('bold').setBackground('#eeeeee');
-    if (filasRes.length > 1) res.getRange(4, 4, filasRes.length - 1, 5).setNumberFormat('#,##0.##;-#,##0.##;"-"');
+    if (filasRes.length > 1) res.getRange(4, san ? 5 : 4, filasRes.length - 1, 5).setNumberFormat('#,##0.##;-#,##0.##;"-"');
     res.autoResizeColumns(1, filasRes[0].length);
 
     // Una hoja por insumo (formato de las planillas de siempre, con el saldo como fórmula).

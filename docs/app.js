@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.16.2';
+const VERSION = '1.17.0';
 
 
 const DIAS_HISTORIAL = 60;
@@ -18,7 +18,11 @@ const PLURAL = { bolsa: 'bolsas', fardo: 'fardos', litro: 'litros', unidad: 'uni
 const UNIDADES = ['bolsa', 'kg', 'fardo', 'litro', 'unidad'];
 // Sanidad: tres stocks separados (cada producto es de un rubro) y sus unidades de depósito.
 // Íconos propios (docs/icons): no hay emoji de frasco de vacuna ni de pistola de inseminación.
-const RUBROS_SANIDAD = [['Medicamentos', '<img src="icons/vacuna.svg" alt="">'], ['Insumos IATF', '<img src="icons/iatf.svg" alt="">'], ['Semen', '🧬']];
+// El stock dice cómo se descuenta: Medicamentos desde la app de la estancia, Materiales sanitarios a mano acá.
+const RUBROS_SANIDAD = [['Medicamentos', '<img src="icons/vacuna.svg" alt="">'], ['Materiales sanitarios', '<img src="icons/materiales.svg" alt="">'], ['Semen', '🧬']];
+const RUBRO_MATERIALES = 'Materiales sanitarios';
+/** Producto de IATF: Indicación "Reproducción" (hormonas, dispositivos, vainas, guante de tacto). Es un filtro, no un stock. */
+const esIatf = (i) => /REPRODUC/i.test(String(i.indicacion || ''));
 const UNIDADES_SAN = ['frasco', 'bidón', 'caja', 'unidad', 'pajuela'];
 // Insumos "por estancia" (ej. Fardos) llevan un stock separado en cada una.
 const ESTANCIAS = [['LA PRUDENCIA', 'La Prudencia'], ['LA PACIENCIA', 'La Paciencia']];
@@ -50,7 +54,8 @@ function guardarTodo() {
 const ui = {
   pantalla: 'inicio',
   modStock: 'Stock',    // módulo que se está viendo con el recorrido de stock: Stock | Combustible | Sanidad
-  rubro: null,          // en Sanidad: Medicamentos | Insumos IATF | Semen
+  rubro: null,          // en Sanidad: Medicamentos | Materiales sanitarios | Semen
+  filtroIatf: false,    // en Sanidad: mostrar solo lo de IATF
   vistaStock: 'lista',  // lista | ficha | form | sinFactura | config
   insumoVer: null,      // insumo de la ficha abierta
   movsVisibles: 15,
@@ -665,7 +670,7 @@ function htmlSaldo() {
 /** Lo aplicado a los animales llega solo desde la app de la estancia: cuándo fue la última vez y
  *  qué no se pudo descontar (producto que no está en la lista o cargado en otra unidad). */
 function htmlEstadoEstancia() {
-  if (ui.rubro === 'Semen') return '';
+  if (ui.rubro !== 'Medicamentos') return '';
   const e = stockDatos().estancia || { ultima: 0, errores: [] };
   const errores = (e.errores || []).length ? '<div class="aviso amarillo">⚠️ Desde la app de la estancia llegaron aplicaciones que <b>no se descontaron</b>:<ul>' +
     e.errores.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>Corregilas allá o revisá el producto en Configurar.</div>' : '';
@@ -680,7 +685,8 @@ function htmlListaSanidad(ins, s, c7) {
   if (!ins.length) return '<p class="vacio">Todavía no hay productos en ' + esc(ui.rubro) + '.</p>';
   const bajos = ins.filter((i) => infoInsumo(i, s, c7).bajo).length;
   return htmlEstadoEstancia() +
-    '<input class="txt buscar" id="buscar-san" type="search" placeholder="🔍 Nombre, principio activo, laboratorio…" autocomplete="off" value="' + esc(ui.buscarSan || '') + '">' +
+    '<div class="buscar-fila"><input class="txt buscar" id="buscar-san" type="search" placeholder="🔍 Nombre, principio activo, laboratorio…" autocomplete="off" value="' + esc(ui.buscarSan || '') + '">' +
+    (ui.rubro !== 'Semen' ? '<button class="chip-filtro' + (ui.filtroIatf ? ' activo' : '') + '" data-a="filtroIatf">🏷 IATF</button>' : '') + '</div>' +
     '<div id="res-san">' + htmlResultadosSanidad() + '</div>' +
     '<p class="nota-estancia" style="margin-top:12px">' + ins.length + ' productos en ' + esc(ui.rubro) +
     (bajos ? ' · <span class="chip alerta">' + bajos + ' bajo mínimo</span>' : '') + '</p>';
@@ -713,18 +719,18 @@ function fichaSanidad(i) {
 
 function htmlResultadosSanidad() {
   const q = String(ui.buscarSan || '').trim().toUpperCase();
-  if (!q) return '<p class="vacio" style="padding:20px 8px">Escribí para buscar un producto.</p>';
+  if (!q && !ui.filtroIatf) return '<p class="vacio" style="padding:20px 8px">Escribí para buscar un producto' + (ui.rubro !== 'Semen' ? ', o tocá 🏷 IATF.' : '.') + '</p>';
   const s = saldos();
   const c7 = consumo7();
-  const ins = insumosMod().filter((i) => (i.activo || (s[i.nombre] && s[i.nombre].cantidad)) &&
+  const ins = insumosMod().filter((i) => (i.activo || (s[i.nombre] && s[i.nombre].cantidad)) && (!ui.filtroIatf || esIatf(i)) &&
     [i.nombre, i.principio, i.laboratorio, i.proveedor, i.indicacion].join(' ').toUpperCase().indexOf(q) !== -1);
-  if (!ins.length) return '<p class="vacio">No hay productos con "' + esc(ui.buscarSan.trim()) + '".</p>';
+  if (!ins.length) return '<p class="vacio">No hay productos' + (q ? ' con "' + esc(ui.buscarSan.trim()) + '"' : '') + (ui.filtroIatf ? ' de IATF' : '') + '.</p>';
   return ins.slice(0, 30).map((i) => {
     const n = infoInsumo(i, s, c7);
     const chips = [n.x.pendiente ? '<span class="chip pend">sin enviar</span>' : '', n.bajo ? '<span class="chip alerta">Bajo el mínimo</span>' : '',
       n.x.cantidad < 0 ? '<span class="chip alerta">Saldo negativo</span>' : '', !n.x.ultimoConteo ? '<span class="chip">Sin conteo inicial</span>' : ''].filter(Boolean);
     return '<button class="saldo tarjeta-san ' + n.cls + '" data-a="verInsumo" data-i="' + esc(i.nombre) + '">' +
-      '<div class="cab"><div><h3>' + esc(i.nombre) + '</h3>' + (i.principio ? '<div class="sub">' + esc(lindo(i.principio)) + '</div>' : '') + '</div>' +
+      '<div class="cab"><div><h3>' + esc(i.nombre) + (esIatf(i) && ui.rubro !== 'Semen' ? ' <span class="chip azul">IATF</span>' : '') + '</h3>' + (i.principio ? '<div class="sub">' + esc(lindo(i.principio)) + '</div>' : '') + '</div>' +
       '<div class="cant-san"><b class="' + (n.x.cantidad < 0 ? 'rojo' : '') + '">' + num(n.x.cantidad, 1) + '</b> ' + esc(unidadTxt(i.unidad, n.x.cantidad)) +
       (n.kg && n.x.cantidad ? '<small>' + esc(n.kg) + '</small>' : '') + '</div></div>' +
       '<dl class="ficha-san">' + fichaSanidad(i).map(([a, b]) => '<dt>' + esc(a) + '</dt><dd>' + esc(b) + '</dd>').join('') + '</dl>' +
@@ -758,8 +764,8 @@ function htmlFicha(nombre) {
   const botones = [];
   if (puede(ui.modStock, 'CARGAR') && i.activo) {
     // Sanidad: el uso (consumo) se carga solo en la app de la estancia; acá, ingresos y conteos.
-    // Excepción: lo que no va a animales (alcohol, jeringas, guantes: "Baja en Registros").
-    if (!esSanidad() || i.bajaManual) botones.push(['Consumo', 'consumo', '⬆ Consumo']);
+    // Excepción: los materiales sanitarios (no van a animales) se dan de baja acá.
+    if (!esSanidad() || i.rubro === RUBRO_MATERIALES) botones.push(['Consumo', 'consumo', '⬆ Consumo']);
     botones.push(['Ingreso', 'ingreso', '⬇ Ingreso']);
     if (puede(ui.modStock, 'ADMINISTRAR')) botones.push(['Conteo', 'conteo', '✔ Conteo']);
   }
@@ -778,7 +784,7 @@ function htmlFicha(nombre) {
       const f = fichaSanidad(i);
       if (i.principio) f.unshift(['Principio activo', lindo(i.principio)]);
       cajas += '<table class="detalle" style="margin-top:10px">' + f.map(([a, b]) => '<tr><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table>' +
-        (i.bajaManual ? '<p class="nota-estancia" style="margin-top:8px">No se aplica a animales: el uso se carga acá, con Consumo.</p>'
+        (i.rubro === RUBRO_MATERIALES ? '<p class="nota-estancia" style="margin-top:8px">No se aplica a animales: el uso se carga acá, con Consumo.</p>'
           : ui.rubro !== 'Semen' ? '<p class="nota-estancia" style="margin-top:8px">El uso se carga en la app de la estancia (Sanidades) y se descuenta solo.</p>' : '') +
         (sesion.configura ? '<button class="btn sec chico" data-a="editarProducto" style="margin-top:4px">✏️ Editar datos del producto</button>' : '');
     }
@@ -1318,9 +1324,9 @@ function productoForm(i) {
   const v = (x) => (x == null ? '' : String(x).replace('.', ','));
   return i ? { original: i.nombre, nombre: i.nombre, principio: i.principio || '', rubro: i.rubro, unidad: i.unidad, contenido: v(i.contenido),
     unidadContenido: i.unidadContenido || 'ml', indicacion: i.indicacion || '', laboratorio: i.laboratorio || '', proveedor: i.proveedor || '',
-    dosisBase: v(i.dosisBase), pesoBase: v(i.pesoBase), minimo: v(i.minimo), activo: !!i.activo, bajaManual: !!i.bajaManual }
+    dosisBase: v(i.dosisBase), pesoBase: v(i.pesoBase), minimo: v(i.minimo), activo: !!i.activo }
     : { original: '', nombre: '', principio: '', rubro: ui.rubro, unidad: 'frasco', contenido: '', unidadContenido: 'ml', indicacion: '',
-      laboratorio: '', proveedor: '', dosisBase: '', pesoBase: '', minimo: '', activo: true, bajaManual: false };
+      laboratorio: '', proveedor: '', dosisBase: '', pesoBase: '', minimo: '', activo: true };
 }
 
 function htmlProducto() {
@@ -1341,7 +1347,8 @@ function htmlProducto() {
     '<div class="fila2">' + txt('dosisBase', 'Dosis base <small>(opc.)</small>', dec) + txt('pesoBase', 'Cada … kg <small>(opc.)</small>', dec) + '</div>' +
     txt('minimo', 'Stock mínimo <small>(opcional)</small>', dec) +
     '<div style="margin:6px 0 16px">' + chk('activo', 'Activo', '') +
-    '<div style="height:8px"></div>' + chk('bajaManual', 'Baja en Registros', '(no va a animales: alcohol, jeringas, guantes)') + '</div>' +
+    '<p class="nota-estancia" style="margin-top:8px"><b>Stock</b>: en Medicamentos el uso llega desde la app de la estancia; en Materiales sanitarios se carga acá. ' +
+    'Para que aparezca en el filtro 🏷 IATF, poné Indicación <b>Reproducción</b>.</p></div>' +
     '<button class="btn" data-a="guardarProducto"' + (p.guardando ? ' disabled' : '') + '>' + (p.guardando ? 'Guardando…' : (p.original ? 'Guardar cambios' : 'Crear producto')) + '</button></div>';
 }
 
@@ -1352,7 +1359,7 @@ async function guardarProducto() {
   const n = (x) => (String(x).trim() ? leerNumero(x) : '');
   const prod = { nombre: String(p.nombre).trim(), principio: p.principio.trim(), rubro: p.rubro, unidad: p.unidad, contenido: n(p.contenido),
     unidadContenido: p.unidadContenido, indicacion: p.indicacion.trim(), laboratorio: p.laboratorio.trim(), proveedor: p.proveedor.trim(),
-    dosisBase: n(p.dosisBase), pesoBase: n(p.pesoBase), minimo: n(p.minimo), activo: !!p.activo, bajaManual: !!p.bajaManual };
+    dosisBase: n(p.dosisBase), pesoBase: n(p.pesoBase), minimo: n(p.minimo), activo: !!p.activo };
   if (['contenido', 'dosisBase', 'pesoBase', 'minimo'].some((k) => prod[k] !== '' && !(prod[k] >= 0))) { toast('Revisá los números.', 3000); return; }
   p.guardando = true;
   render();
@@ -1679,7 +1686,7 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'ir':
-      if (b.dataset.p === 'stock') { ui.modStock = b.dataset.m || 'Stock'; ui.rubro = b.dataset.r || null; ui.excel = null; ui.buscarSan = ''; }
+      if (b.dataset.p === 'stock') { ui.modStock = b.dataset.m || 'Stock'; ui.rubro = b.dataset.r || null; ui.excel = null; ui.buscarSan = ''; ui.filtroIatf = false; }
       // La flecha de Stock vuelve un paso (formulario → ficha → tarjetas → inicio).
       if (ui.pantalla === 'stock' && b.dataset.p === 'inicio') { atrasStock(); break; }
       if (ui.pantalla === 'facturas' && b.dataset.p === 'inicio' && atrasFacturas()) break;
@@ -1748,6 +1755,7 @@ document.addEventListener('click', (e) => {
       render();
       break;
     case 'cfgGuardar': cfgGuardar(b.dataset.cfg); break;
+    case 'filtroIatf': ui.filtroIatf = !ui.filtroIatf; b.classList.toggle('activo', ui.filtroIatf); $('#res-san').innerHTML = htmlResultadosSanidad(); break;
     case 'nuevoProducto': ui.prod = productoForm(null); ui.vistaStock = 'producto'; render(); window.scrollTo(0, 0); break;
     case 'editarProducto': ui.prod = productoForm(stockDatos().insumos.find((x) => x.nombre === ui.insumoVer)); ui.vistaStock = 'producto'; render(); window.scrollTo(0, 0); break;
     case 'guardarProducto': guardarProducto(); break;

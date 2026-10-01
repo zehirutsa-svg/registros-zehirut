@@ -10,13 +10,13 @@ const PRODUCTOS_SANIDAD = [
   ['ADAPTADOR MIN', 'Medicamentos', 'frasco', 500, 'ml', 'SUPLEMENTO MINERAL', 'TÓNICO', 'BIOGÉNESIS', 'CONSULTPEC SRL', 4, 500],
   ['ADAPTADOR VIT', 'Medicamentos', 'frasco', 500, 'ml', 'SUPLEMENTO MINERAL', 'TÓNICO', 'BIOGÉNESIS', 'CONSULTPEC SRL', 4, 500],
   ['ADE', 'Medicamentos', 'frasco', 500, 'ml', 'VITAMINAS', 'VITAMÍNICO', 'CHINFIELD S.A.', 'MARKET SRL', 1, 50],
-  ['ALCOHOL', 'Medicamentos', 'frasco', 1000, 'ml', '', 'DESINFECTANTE', 'FARMACIA', 'CONSULTPEC SRL', '', ''],
+  ['ALCOHOL', 'Materiales sanitarios', 'frasco', 1000, 'ml', '', 'DESINFECTANTE', 'FARMACIA', 'CONSULTPEC SRL', '', ''],
   ['ALGIMINE', 'Medicamentos', 'frasco', 100, 'ml', 'FLUNIXIN', 'ANTIFLAMATORIO', 'ZOOVET', 'AGROFIELD S.A.', 1, 10],
   ['ANTOTOXICO', 'Medicamentos', 'frasco', 100, 'ml', 'SUPLEMENTO VITAMÍNICO', 'DESINTOXICANTE', 'UCB', 'MARKET SRL', 1, 20],
   ['ASCINDEL PLUS 2,5L', 'Medicamentos', 'bidón', 2500, 'ml', 'CIPERMETRINA', 'ANTIPARASITARIO EXTERNO', 'BIOGÉNESIS', 'CONSULTPEC SRL', 1, 10],
   ['B12', 'Medicamentos', 'frasco', 50, 'ml', 'B12', 'VITAMÍNICO', 'CHINFIELD S.A.', 'MARKET SRL', 5, 200],
-  ['BAGODRYL', 'Medicamentos', 'bidón', 5000, 'ml', 'AMONIO CUATERNARIO', 'DESINFECTANTE', 'BIOGÉNESIS', 'CONSULTPEC SRL', '', ''],
-  ['BAGODRYL 1L', 'Medicamentos', 'frasco', 1000, 'ml', 'AMONIO CUATERNARIO', 'DESINFECTANTE', 'BIOGÉNESIS', 'CONSULTPEC SRL', '', ''],
+  ['BAGODRYL', 'Materiales sanitarios', 'bidón', 5000, 'ml', 'AMONIO CUATERNARIO', 'DESINFECTANTE', 'BIOGÉNESIS', 'CONSULTPEC SRL', '', ''],
+  ['BAGODRYL 1L', 'Materiales sanitarios', 'frasco', 1000, 'ml', 'AMONIO CUATERNARIO', 'DESINFECTANTE', 'BIOGÉNESIS', 'CONSULTPEC SRL', '', ''],
   ['BERTAC', 'Medicamentos', 'frasco', 1000, 'ml', 'TRICLORFON', 'LARVICIDA LIQUIDA', 'PEARSON', 'COVEPA', '', ''],
   ['BIOXAN', 'Medicamentos', 'frasco', 500, 'ml', 'CALCIO, MAGNESIO, POTASIO', 'SUERO', 'BIOGÉNESIS', 'CONSULTPEC SRL', 500, 500],
   ['BOVISAN TOTAL 100 ml', 'Medicamentos', 'frasco', 100, 'ml', 'VACUNA REPRODUCTIVA', 'ANTIABORTIVA', 'VIRBAC', 'CONSULTPEC SRL', 5, 500],
@@ -42,14 +42,14 @@ const PRODUCTOS_SANIDAD = [
   ['GALMETRIN PLUS SPRY', 'Medicamentos', 'frasco', 440, 'ml', 'CIPERMETRINA', 'ANTIPARASITARIO EXTERNO', 'BIOGÉNESIS', 'CONSULTPEC SRL', '', ''],
   ['GALMETRIN POMADA', 'Medicamentos', 'frasco', 1000, 'ml', 'CIPERMETRINA', 'ANTIPARASITARIO EXTERNO', 'BIOGÉNESIS', 'CONSULTPEC SRL', '', ''],
   ['GEMICIN SPRY', 'Medicamentos', 'frasco', 250, 'ml', 'GENTAMICINA', 'ANTIBIÓTICO', 'OVER', 'CONSULTPEC SRL', '', ''],
-  ['GUANTE LATEX', 'Medicamentos', 'caja', 100, 'un', '', '', '', '', '', ''],
+  ['GUANTE LATEX', 'Materiales sanitarios', 'caja', 100, 'un', '', '', '', '', '', ''],
   ['HEPATONIC', 'Medicamentos', 'frasco', 100, 'ml', 'ÁCIDO GENABÍLICO', 'DESINTOXICANTE', 'VIRBAC', 'CONSULTPEC SRL', 1, 10],
   ['IMIDOGAN', 'Medicamentos', 'frasco', 100, 'ml', 'IMIDOCARB', 'ANAPLASMOSIS', 'VIRBAC', 'CONSULTPEC SRL', 2.5, 100],
   ['IMPACTO 5L', 'Medicamentos', 'bidón', 5000, 'ml', 'CIPERMETRINA', 'ANTIPARASITARIO EXTERNO', 'OUROFINO', 'MARKET SRL', 10, 50],
-  ['JERINGA DESECHABLE 10 ml', 'Medicamentos', 'unidad', '', '', '', '', '', '', '', ''],
-  ['JERINGA DESECHABLE 20 ml', 'Medicamentos', 'unidad', '', '', '', '', '', '', '', ''],
-  ['JERINGA DESECHABLE 3 ml', 'Medicamentos', 'unidad', '', '', '', '', '', '', '', ''],
-  ['JERINGA DESECHABLE 50 ml', 'Medicamentos', 'unidad', '', '', '', '', '', '', '', ''],
+  ['JERINGA DESECHABLE 10 ml', 'Materiales sanitarios', 'unidad', '', '', '', '', '', '', '', ''],
+  ['JERINGA DESECHABLE 20 ml', 'Materiales sanitarios', 'unidad', '', '', '', '', '', '', '', ''],
+  ['JERINGA DESECHABLE 3 ml', 'Materiales sanitarios', 'unidad', '', '', '', '', '', '', '', ''],
+  ['JERINGA DESECHABLE 50 ml', 'Materiales sanitarios', 'unidad', '', '', '', '', '', '', '', ''],
   ['LEPTO 8 240 ml', 'Medicamentos', 'frasco', 240, 'ml', 'VACUNA REPRODUCTIVA', 'LEPTOSPIROSIS', 'VIRBAC', 'CONSULTPEC SRL', 3, 500],
   ['LEPTO 8 45 ml', 'Medicamentos', 'frasco', 45, 'ml', 'VACUNA REPRODUCTIVA', 'LEPTOSPIROSIS', 'VIRBAC', 'CONSULTPEC SRL', 3, 500],
   ['MAGNECAL PLUS', 'Medicamentos', 'frasco', 500, 'ml', 'MINERALES', 'TÓNICO', 'AGROINSUMOS', 'ASISTENCIA GANADERA', 1, 20],
@@ -80,18 +80,18 @@ const PRODUCTOS_SANIDAD = [
   ['VERRUGAL', 'Medicamentos', 'frasco', 20, 'ml', 'CLOROBUTANOL', 'VERRUGAS', 'GALMEDIC', 'CONSULTPEC SRL', 1, 20],
   ['ZUPREVO', 'Medicamentos', 'frasco', 100, 'ml', 'TILDIPIROSINA', 'ANTIBIOTICO', 'MSD SAUDE ANIMAL', 'COVEPA', 1, 45],
   ['ZURONTOP', 'Medicamentos', 'bidón', 5000, 'ml', 'FLUAZURON', 'ANTIPARASITARIO EXTERNO', 'CIBELES', 'CORONADO SRL', 1, 10],
-  ['APLICADOR DIB', 'Insumos IATF', 'unidad', '', '', '', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 0.002, 500],
-  ['BIOESTROGEN', 'Insumos IATF', 'frasco', 100, 'ml', 'BENZOATO DE ESTRADIOL', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
-  ['BURESELINA', 'Insumos IATF', 'frasco', 50, 'ml', 'GnRH', 'REPRODUCCIÓN', 'ZOOVET', 'ZOOVET', 2.5, 500],
-  ['CRONI-CIP', 'Insumos IATF', 'frasco', 100, 'ml', 'CIPIONATO DE ESTRADIOL', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
-  ['ECEGON 100 ml', 'Insumos IATF', 'frasco', 100, 'ml', 'ECG', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
-  ['ECEGON 20 ml', 'Insumos IATF', 'frasco', 20, 'ml', 'ECG', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
-  ['ENZAPROST 100 ml', 'Insumos IATF', 'frasco', 100, 'ml', 'PROSTAGLANDINA', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
-  ['ENZAPROST 20 ml', 'Insumos IATF', 'frasco', 20, 'ml', 'PROSTAGLANDINA', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
-  ['GONAXAL', 'Insumos IATF', 'frasco', 50, 'ml', 'GnRH', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2.5, 500],
-  ['GUANTE DE TACTO', 'Insumos IATF', 'caja', 100, 'un', '', '', '', '', '', ''],
-  ['PROGESTAR (DISPOSITIVO)', 'Insumos IATF', 'caja', 10, 'un', 'PROGESTERONA', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 1, 500],
-  ['VAINAS', 'Insumos IATF', 'unidad', '', '', '', 'REPRODUCCIÓN', 'MINITUBE', 'CONSULTPEC SRL', 1, 500],
+  ['APLICADOR DIB', 'Materiales sanitarios', 'unidad', '', '', '', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 0.002, 500],
+  ['BIOESTROGEN', 'Medicamentos', 'frasco', 100, 'ml', 'BENZOATO DE ESTRADIOL', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
+  ['BURESELINA', 'Medicamentos', 'frasco', 50, 'ml', 'GnRH', 'REPRODUCCIÓN', 'ZOOVET', 'ZOOVET', 2.5, 500],
+  ['CRONI-CIP', 'Medicamentos', 'frasco', 100, 'ml', 'CIPIONATO DE ESTRADIOL', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
+  ['ECEGON 100 ml', 'Medicamentos', 'frasco', 100, 'ml', 'ECG', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
+  ['ECEGON 20 ml', 'Medicamentos', 'frasco', 20, 'ml', 'ECG', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
+  ['ENZAPROST 100 ml', 'Medicamentos', 'frasco', 100, 'ml', 'PROSTAGLANDINA', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
+  ['ENZAPROST 20 ml', 'Medicamentos', 'frasco', 20, 'ml', 'PROSTAGLANDINA', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
+  ['GONAXAL', 'Medicamentos', 'frasco', 50, 'ml', 'GnRH', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2.5, 500],
+  ['GUANTE DE TACTO', 'Materiales sanitarios', 'caja', 100, 'un', '', 'REPRODUCCIÓN', '', '', '', ''],
+  ['PROGESTAR (DISPOSITIVO)', 'Medicamentos', 'caja', 10, 'un', 'PROGESTERONA', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 1, 500],
+  ['VAINAS', 'Materiales sanitarios', 'unidad', '', '', '', 'REPRODUCCIÓN', 'MINITUBE', 'CONSULTPEC SRL', 1, 500],
   ['SEMEN BN LEBRON', 'Semen', 'pajuela', '', '', 'SEMEN', 'REPRODUCCIÓN', 'BUDEGUER', 'DEBERNARDI', 1, 500],
   ['SEMEN BR BAQUEANO', 'Semen', 'pajuela', '', '', 'SEMEN', 'REPRODUCCIÓN', 'LAS LILAS', 'SEMCOM SRL', 1, 500],
   ['SEMEN BR CAPITANEJO', 'Semen', 'pajuela', '', '', 'SEMEN', 'REPRODUCCIÓN', 'LAS LILAS', 'SEMCOM SRL', 1, 500],
@@ -140,8 +140,8 @@ function estancia_(body) {
     return {
       ok: true, cambios: r.cambios, errores: r.errores,
       productos: insumos.map((i) => ({ nombre: i.nombre, rubro: i.rubro, unidad: i.unidad, contenido: i.contenido, unidadContenido: i.unidadContenido,
-        // Lo que se da de baja a mano en Registros no se ofrece en la estancia (no va a animales).
-        activo: i.activo && !i.bajaManual })),
+        // Los materiales sanitarios se dan de baja a mano acá: no se ofrecen en la estancia (no van a animales).
+        activo: i.activo && i.rubro !== RUBRO_MATERIALES })),
     };
   });
 }
@@ -249,19 +249,33 @@ function asegurarFichaSanidad_(ss, ins) {
     (String(modulos[i][0]).trim() === 'Sanidad' && porNombre[String(f[0]).trim().toUpperCase()]) || ['', '', '', '', '', '']));
 }
 
-/** Versión 12: casilla "Baja en Registros" (tildada en alcohol, jeringas y guantes, pedido del 30/09/2026). */
-function asegurarBajaManual_(ins) {
-  const col = COLS_INSUMOS.indexOf('Baja en Registros') + 1;
-  if (String(ins.getRange(1, col).getValue()) !== 'Baja en Registros') {
-    ins.getRange(1, col).setValue('Baja en Registros').setFontWeight('bold').setBackground('#eeeeee');
-    const n = ins.getLastRow();
-    if (n > 1) {
-      const mod = COLS_INSUMOS.indexOf('Módulo');
-      ins.getRange(2, col, n - 1, 1).setValues(ins.getRange(2, 1, n - 1, mod + 1).getValues().map((f) =>
-        [String(f[mod]).trim() === 'Sanidad' && /^(ALCOHOL|JERINGA|GUANTE)/i.test(String(f[0]).trim())]));
-    }
+/** Versión 13 (01/10/2026): los stocks se separan por CÓMO se descuentan, no por para qué se usan.
+ *  "Insumos IATF" desaparece: hormonas y Progestar pasan a Medicamentos (se aplican a animales);
+ *  guante de tacto, vainas y aplicador DIB, más alcohol, jeringas, guante latex y Bagodryl, a Materiales
+ *  sanitarios (consumo a mano). Lo de IATF queda como Indicación "Reproducción". Se borra la columna
+ *  "Baja en Registros" (versión 12), que pasa a ser el rubro. Una sola vez. */
+const MATERIALES_V13 = /^(ALCOHOL|JERINGA|GUANTE|VAINAS|APLICADOR DIB|BAGODRYL)/i;
+function migrarRubrosSanidad_(ss, ins) {
+  if (props_().getProperty('RUBROS_V13')) return;
+  const n = ins.getLastRow();
+  if (n > 1) {
+    const cRubro = COLS_INSUMOS.indexOf('Rubro');
+    const cInd = COLS_INSUMOS.indexOf('Indicación');
+    const filas = ins.getRange(2, 1, n - 1, COLS_INSUMOS.length).getValues();
+    filas.forEach((f) => {
+      if (String(f[8]).trim() !== 'Sanidad' || String(f[cRubro]).trim() === 'Semen') return;
+      const nombre = String(f[0]).trim();
+      if (MATERIALES_V13.test(nombre)) f[cRubro] = RUBRO_MATERIALES;
+      else if (String(f[cRubro]).trim() === 'Insumos IATF') f[cRubro] = 'Medicamentos';
+      if (/^GUANTE DE TACTO/i.test(nombre) && !String(f[cInd]).trim()) f[cInd] = 'REPRODUCCIÓN';
+    });
+    ins.getRange(2, 1, n - 1, COLS_INSUMOS.length).setValues(filas);
   }
-  ins.getRange(2, col, 200, 1).insertCheckboxes();
+  const vieja = COLS_INSUMOS.length + 1;   // columna "Baja en Registros"
+  if (ins.getLastColumn() >= vieja && String(ins.getRange(1, vieja).getValue()) === 'Baja en Registros') {
+    ins.getRange(1, vieja, Math.max(ins.getMaxRows(), 1), 1).clearDataValidations().clearContent().clearFormat();
+  }
+  props_().setProperty('RUBROS_V13', '1');
 }
 
 // ---------------------------------------------------------------- un producto (alta o edición)
@@ -287,7 +301,7 @@ function guardarProducto_(body) {
       throw new Error('"' + actual.nombre + '" ya tiene movimientos: no se le cambia el nombre (desactivalo y creá uno nuevo)');
     }
     const rubro = RUBROS_SANIDAD.indexOf(x.rubro) !== -1 ? x.rubro : '';
-    if (!rubro) throw new Error('elegí el stock (Medicamentos, Insumos IATF o Semen)');
+    if (!rubro) throw new Error('elegí el stock (Medicamentos, Materiales sanitarios o Semen)');
     const num = (v, que, cero) => {
       if (v === '' || v == null) return '';
       const n = Number(v);
@@ -298,7 +312,7 @@ function guardarProducto_(body) {
     const fila = [nombre, texto_(x.unidad, 20) || 'frasco', '', num(x.minimo, 'stock mínimo', true), x.activo !== false, false, false, '', 'Sanidad',
       rubro, cont, cont === '' ? '' : (x.unidadContenido === 'un' ? 'un' : 'ml'),
       texto_(x.principio, 80), texto_(x.indicacion, 80), texto_(x.laboratorio, 80), texto_(x.proveedor, 80),
-      num(x.dosisBase, 'dosis base'), num(x.pesoBase, 'peso base'), x.bajaManual === true];
+      num(x.dosisBase, 'dosis base'), num(x.pesoBase, 'peso base')];
     let n = 0;
     if (actual) {
       const nombres = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
@@ -310,4 +324,10 @@ function guardarProducto_(body) {
     reconstruirStock_(ss);
     return { ok: true, producto: leerInsumos_(ss).find((i) => i.nombre === nombre) };
   });
+}
+
+/** Producto de IATF: la Indicación "Reproducción" de la planilla de inventario (hormonas, dispositivos,
+ *  vainas, guante de tacto, semen). Es una etiqueta para filtrar, no un stock. */
+function esIatf_(i) {
+  return /REPRODUC/i.test(String(i.indicacion || ''));
 }

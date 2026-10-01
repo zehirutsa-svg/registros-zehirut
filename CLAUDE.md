@@ -155,11 +155,19 @@ Tarjeta en Stocks debajo de Combustible; permisos = columna Combustible. Código
 - Excel: Resumen (horas por unidad de negocio, litros, l/h por máquina) + una hoja por máquina con el
   formato de "Hora Tractor" de la planilla de rendición.
 
-## Cuarto módulo: Sanidad (armado 30/09/2026, sin stock inicial todavía)
+## Cuarto módulo: Sanidad (armado 30/09/2026; stocks reorganizados 01/10/2026)
 
-Stock del depósito sanitario (uno solo, sin estancia). **Tres stocks separados** = columna "Rubro" de Insumos:
-Medicamentos, Insumos IATF (hormonas, dispositivos, aplicador, vainas, guante de tacto) y Semen (pajuelas).
-Cada uno es una tarjeta en Stocks; permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
+Stock del depósito sanitario (uno solo, sin estancia). **Tres stocks = columna "Rubro" de Insumos, y el rubro dice
+CÓMO se descuenta** (decisión 01/10: nunca mezclar en un stock ítems que bajan de formas distintas):
+- 🧴 **Medicamentos** (ícono `docs/icons/vacuna.svg`): todo lo que se aplica a animales, incluidas hormonas y
+  Progestar. El uso llega solo desde la app de la estancia; acá no hay Consumo (el script lo rechaza).
+- **Materiales sanitarios** (`icons/materiales.svg`): alcohol, jeringas, guantes (latex y de tacto), Bagodryl,
+  vainas, aplicador DIB. Consumo a mano acá; no se ofrecen en la app de la estancia (se mandan inactivos).
+- 🧬 **Semen** (pajuelas): ingresos y conteos; el descuento por Servicios de IATF queda para más adelante.
+- **IATF no es un stock: es la Indicación "Reproducción"** (planilla de inventario). Botón "🏷 IATF" al lado del
+  buscador y chip IATF en la tarjeta; columna "Uso" en el Excel. "Insumos IATF" y la casilla "Baja en
+  Registros" existieron 30/09 y se migraron una vez (migrarRubrosSanidad_, esquema 13).
+Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
 - Mismo motor que Stock (Módulo = "Sanidad"). Cada presentación es un producto distinto (CIDENTAL 250 ml ≠
   500 ml). Columnas "Contenido por unidad" + "Unidad del contenido" (frasco de 500 ml, caja de 100 un):
   el saldo se guarda en frascos **con decimales** y se muestra también en ml/un. Sin destinos (corrales).
@@ -170,15 +178,11 @@ Cada uno es una tarjeta en Stocks; permisos: columna **Sanidad** de Usuarios (ho
 - Lista inicial: `apps-script/Sanidad.gs` (PRODUCTOS_SANIDAD, 98 productos de la hoja INVENTARIO de la
   planilla "Inventario y stock de medicamentos"), se agrega una sola vez (esquema 7). Después se edita
   desde la app (ver "Alta y edición de productos"); cambiar "Stock" pasa un producto a otro rubro.
-- **Solo ingresos y conteos en Registros** (pedido 30/09): el uso (baja) se carga únicamente en la app de la
-  estancia; el script rechaza un Consumo manual de Sanidad. Excepción: casilla **"Baja en Registros"** (alcohol,
-  jeringas, guantes; esquema 12): esos sí llevan Consumo a mano y NO se ofrecen en la app de la estancia
-  (se mandan como inactivos). El semen se ajusta con Conteo hasta el descuento por Servicios de IATF.
 - Ficha del producto (columnas Principio activo, Indicación, Laboratorio, Proveedor, Dosis base, Peso base
   en Insumos, de la hoja INVENTARIO; esquema 11). Pantalla: **solo aparecen las tarjetas que se buscan**
   (nombre comercial, principio activo, laboratorio, proveedor o indicación): nombre grande, principio
   activo en gris debajo, saldo y la ficha. El Ingreso trae el proveedor de la ficha.
-- Pantalla (antes): lista compacta con buscador (no tarjetas: son casi cien). Excel por rubro: Resumen +
+- Excel por rubro: Resumen +
   Movimientos, con Unidad de negocio **PATRIMONIAL** (decisión del contador), sin hoja por producto.
 - **Conexión con la app de la estancia** (`Proyectos Claude\estancia-app`, sección "Sanidad ↔ Registros
   Zehirut" de su CLAUDE.md): su servidor llama cada 15 min `accion: 'estancia'` con la clave compartida

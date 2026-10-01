@@ -391,3 +391,8 @@ label.btn { text-align: center; cursor: pointer; }
 .ficha-san dt { color: var(--gris); }
 .ficha-san dd { margin: 0; font-weight: 600; }
 .modulo .ico img { width: 55px; height: 52px; display: block; object-fit: contain; }
+/* Sanidad: buscador con el filtro 🏷 IATF al lado */
+.buscar-fila { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.buscar-fila .buscar { margin-bottom: 0; flex: 1; min-width: 0; }
+.chip-filtro { border: 2px solid var(--azul); background: #fff; color: var(--azul); border-radius: 999px; padding: 10px 14px; font: inherit; font-weight: 700; white-space: nowrap; }
+.chip-filtro.activo { background: var(--azul); color: #fff; }
