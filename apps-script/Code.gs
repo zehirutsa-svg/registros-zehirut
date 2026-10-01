@@ -35,8 +35,7 @@ const NIVELES = { '': 0, 'VER': 1, 'PROPIAS': 2, 'CARGAR': 2, 'ADMINISTRAR': 3 }
 const COLS_USUARIOS = ['Nombre', 'PIN', 'Activo'].concat(MODULOS, ['Configurar']);
 // Una sola planilla de usuarios para todo (01/10/2026): esta. ZehirutApp (biblioteca de Facturas / Fondo fijo y
 // el mail diario de comprobantes) también lee los permisos y los correos de acá. "Email" + "Recibe avisos":
-// quién recibe el mail diario. Se agregan al final de la hoja (se leen por encabezado).
-const COLS_USUARIOS_AVISOS = ['Email', 'Recibe avisos'];
+// quién recibe el mail diario. Están al final de la hoja (se leen por encabezado).
 // "Por estancia": el insumo lleva un stock separado para cada estancia (ej. Fardos).
 // "Producción propia": se produce en la estancia; sus ingresos no llevan proveedor, remito ni factura.
 // "Nombre en Tapfeed": cómo aparece el insumo en el PDF de Tapfeed (ej. "Maiz Molido DGM 1,2").
@@ -401,7 +400,7 @@ function doPost(e) {
   catch (err) { return json_({ ok: false, error: 'pedido inválido' }); }
   try {
     asegurarConfigurado_();
-    migrarUsuariosZehirut_();
+    limpiarObsoletos_();
     switch (body.accion) {
       case 'entrar': return json_(entrar_(body));
       case 'guardar': return json_(guardar_(body));
@@ -1495,67 +1494,17 @@ function zehirut_(body) {
   return { ok: true, resultado: ZA[fn].apply(null, args) };
 }
 
-// ---------------------------------------------------------------- una sola planilla de usuarios
-/** Una sola vez (01/10/2026): agrega Email y Recibe avisos a Usuarios y trae de la planilla vieja de
- *  ZehirutApp ("Usuarios - Zehirut S.A.") los correos, quién recibe el aviso y los usuarios activos que todavía
- *  no estaban acá (con sus permisos de allá). Se busca por PIN y, si no, por nombre. Si falla, reintenta en la
- *  próxima llamada. El resultado queda en la hoja Registro. */
-function migrarUsuariosZehirut_() {
-  if (props_().getProperty('USUARIOS_UNICOS')) return;
-  try { migrarUsuariosZehirutAhora_(); } catch (e) { console.error('Migración de usuarios: ' + e); }   // nunca frena la app
-}
-
-function migrarUsuariosZehirutAhora_() {
-  conLock_(() => {
-    if (props_().getProperty('USUARIOS_UNICOS')) return;
-    const ss = SpreadsheetApp.getActive();
-    const sh = ss.getSheetByName('Usuarios');
-    let enc = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map((h) => String(h).trim());
-    COLS_USUARIOS_AVISOS.forEach((t) => {
-      if (enc.indexOf(t) === -1) {
-        sh.getRange(1, enc.length + 1).setValue(t).setFontWeight('bold').setBackground('#eeeeee');
-        enc.push(t);
-      }
+// ---------------------------------------------------------------- limpieza (una sola vez)
+/** 01/10/2026, pedido del usuario: manda a la papelera lo que quedó sin uso en ZehirutApp (planilla vieja de
+ *  usuarios y hoja de combustible vieja; ver ZA.limpiarObsoletos). Corre una vez; el resultado va a Registro. */
+function limpiarObsoletos_() {
+  if (props_().getProperty('LIMPIEZA_ZEHIRUTAPP')) return;
+  try {
+    conLock_(() => {
+      if (props_().getProperty('LIMPIEZA_ZEHIRUTAPP')) return;
+      const r = ZA.limpiarObsoletos();
+      registrar_(SpreadsheetApp.getActive(), [[new Date(), 'Sistema', 'Limpieza de ZehirutApp', r, 'Aplicado', '']]);
+      props_().setProperty('LIMPIEZA_ZEHIRUTAPP', r);
     });
-    sh.getRange(2, enc.indexOf('Recibe avisos') + 1, 200, 1).insertCheckboxes();
-    const viejas = ZA.obtenerHojaUsuarios().getDataRange().getValues();
-    const si = (v) => String(v).trim().toUpperCase() === 'SI';
-    const n = sh.getLastRow();
-    const actuales = n > 1 ? sh.getRange(2, 1, n - 1, enc.length).getValues() : [];
-    const col = (t) => enc.indexOf(t);
-    const nuevas = [];
-    const hechos = [];
-    viejas.slice(1).forEach((f) => {
-      const nombre = String(f[0] || '').trim();
-      const pin = String(f[1] || '').trim();
-      if (!nombre || !pin) return;
-      const email = String(f[6] || '').trim();
-      const recibe = si(f[7]);
-      let fila = actuales.find((x) => String(x[col('PIN')]).trim() === pin) ||
-        actuales.find((x) => String(x[col('Nombre')]).trim().toUpperCase() === nombre.toUpperCase());
-      if (fila) {
-        if (email && !String(fila[col('Email')]).trim()) fila[col('Email')] = email;
-        if (recibe) fila[col('Recibe avisos')] = true;
-        if (email || recibe) hechos.push(nombre + (recibe ? ' (recibe avisos)' : ''));
-        return;
-      }
-      if (!si(f[4])) return;   // inactivo en la vieja y no está acá: no se trae
-      const valor = {
-        Nombre: nombre, PIN: pin, Activo: true, Configurar: false, Email: email, 'Recibe avisos': recibe,
-        Facturas: si(f[2]) ? (si(f[9]) ? 'Propias' : (si(f[8]) ? 'Administrar' : 'Cargar')) : (si(f[5]) ? 'Ver' : ''),
-        'Fondo fijo': si(f[10]) ? 'Cargar' : '',
-        Lluvias: si(f[3]) ? 'Cargar' : '',
-        Combustible: si(f[11]) ? 'Cargar' : (si(f[12]) ? 'Ver' : ''),
-      };
-      nuevas.push(enc.map((h) => (h in valor ? valor[h] : '')));
-      hechos.push(nombre + ' (usuario nuevo)');
-    });
-    if (actuales.length) sh.getRange(2, 1, actuales.length, enc.length).setValues(actuales);
-    if (nuevas.length) {
-      sh.getRange(n + 1, 2, nuevas.length, 1).setNumberFormat('@');
-      sh.getRange(n + 1, 1, nuevas.length, enc.length).setValues(nuevas);
-    }
-    registrar_(ss, [[new Date(), 'Sistema', 'Una sola planilla de usuarios', hechos.join(', ') || 'sin cambios', 'Aplicado', '']]);
-    props_().setProperty('USUARIOS_UNICOS', new Date().toISOString());
-  });
+  } catch (e) { console.error('Limpieza: ' + e); }   // nunca frena la app
 }
