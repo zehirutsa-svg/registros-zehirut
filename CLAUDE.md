@@ -229,16 +229,18 @@ acceso total.
   entrada (tipo | lista): la flecha vuelve ahí y después al grupo; al guardar se vuelve a la raíz.
 
 - No se copia la lógica: el script usa **ZehirutApp como biblioteca** (símbolo `ZA`, versión fija en
-  `appsscript.json`, hoy 134). Misma planilla, carpetas de Drive, clave de Gemini y permisos/PIN de la
+  `appsscript.json`, hoy 136). Misma planilla, carpetas de Drive, clave de Gemini y permisos/PIN de la
   hoja Usuarios de ZehirutApp. Lo que se carga acá aparece en ZehirutApp y al revés.
 - El cliente llama `accion:"za"` con `fn` + `args`; el script solo deja pasar las funciones de
   `ZA_PERMITIDAS` y reemplaza `"__PIN__"` por el PIN de la sesión. UI en `docs/facturas.js`.
 - **Abierto a todos (01/10/2026)**: sin modo prueba. Ve los módulos quien tiene Facturas o Fondo fijo en
   Usuarios; lo que puede hacer lo deciden los permisos de ZehirutApp. En ZehirutApp (v135) los botones de
   Comprobantes y Fondo fijo quedaron ocultos con un aviso que manda acá (su código sigue: es la biblioteca).
-- **Alta automática desde ZehirutApp** (altaDesdeZehirut_ en Code.gs): un PIN que no está en Usuarios pero sí en
-  ZehirutApp entra y se agrega a la hoja con los permisos de allá (Facturas: Cargar/Propias/Ver, Fondo fijo,
-  Lluvias, Combustible: Cargar/Ver). Stock y Sanidad vacíos. Si el nombre ya existe con otro PIN, no se toca.
+- **Una sola planilla de usuarios (01/10/2026): la hoja Usuarios de este Sheet.** ZehirutApp (biblioteca,
+  versión 136+) lee de acá los permisos (Facturas: Ver / Cargar / Propias / Administrar = además eliminar;
+  Fondo fijo: Ver; Lluvias: Cargar) y los correos del aviso diario (columnas **Email** y **Recibe avisos**).
+  La planilla vieja "Usuarios - Zehirut S.A." ya no da permisos; se leyó una vez (migrarUsuariosZehirut_) para
+  traer correos, avisos y usuarios activos que faltaban. El alta automática desde ZehirutApp se sacó.
 - **Cada vez que ZehirutApp publica versión nueva** que toque facturas/FF: subir el número de versión
   de la biblioteca en `appsscript.json`, `clasp push --force` + update-deployment.
 - Scopes nuevos (calendar.events, send_mail, scriptapp, que usa la biblioteca): el dueño corre

@@ -40,6 +40,14 @@ module.exports = function crearZA() {
 
   return {
     iniciarSesion: sesion,
+    // Planilla vieja de usuarios de ZehirutApp (para probar la migración a una sola planilla).
+    obtenerHojaUsuarios: () => ({ getDataRange: () => ({ getValues: () => [
+      ['Nombre', 'PIN', 'PuedeFacturas', 'PuedeLluvias', 'Activo', 'PuedeVerFacturas', 'Email', 'RecibeAvisos', 'PuedeEliminarFacturas', 'VerSoloPropias', 'PuedeFondoFijo', 'PuedeCombustible', 'PuedeVerCombustible'],
+      ['Enrique Delfante', '1111', 'SI', 'SI', 'SI', 'SI', 'enrique@ejemplo.com', 'SI', 'SI', 'NO', 'SI', 'SI', 'NO'],
+      ['Osmar Acosta', '2222', 'SI', 'SI', 'SI', 'SI', '', 'NO', 'NO', 'SI', 'SI', 'SI', 'NO'],
+      ['José Prueba', '5555', 'NO', 'SI', 'SI', 'NO', 'jose@ejemplo.com', 'NO', 'NO', 'NO', 'NO', 'SI', 'NO'],
+      ['Baja Prueba', '6666', 'SI', 'SI', 'NO', 'SI', '', 'NO', 'NO', 'NO', 'NO', 'NO', 'NO'],
+    ] }) }),
     procesarFactura(base64, tipo, nombre, pin) {
       sesion(pin);
       const aid = guardarArchivo(nombre, base64);
