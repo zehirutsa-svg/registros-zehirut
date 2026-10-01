@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.17.0';
+const VERSION = '1.17.1';
 
 
 const DIAS_HISTORIAL = 60;
@@ -285,7 +285,7 @@ function descripcionOp(op) {
   if (op.tipo === 'anular') return 'Anular un movimiento';
   if (op.tipo === 'factura') return 'Asociar factura ' + op.factura;
   if (op.tipo === 'lluvia') return 'Lluvia ' + op.finca + ' ' + fechaTxt(op.fecha);
-  if (op.tipo === 'horas') return 'Parte de horómetro ' + op.codigo + ' ' + fechaTxt(op.fecha);
+  if (op.tipo === 'horas') return 'Horas de ' + op.codigo + ' ' + fechaTxt(op.fecha);
   return 'Cambio';
 }
 
@@ -515,7 +515,7 @@ function tarjetasModulos() {
     if (datos && datos.horometro) {
       const partes = partesHor().filter((p) => !p.anulado);
       g.stocks.push(tarjeta('combustible', 'data-p="horometro"', '⏱️', 'Horómetro',
-        partes.length ? 'Último parte: ' + fechaTxt(partes[0].fecha) : 'Partes de tractores y generadores'));
+        partes.length ? 'Última carga de horas: ' + fechaTxt(partes[0].fecha) : 'Horas de uso de tractores y generadores'));
     }
   }
   if (puede('Sanidad', 'VER')) {

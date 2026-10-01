@@ -58,7 +58,7 @@ function htmlHorometro() {
   const vistas = {
     lista: ['Horómetro', htmlHorLista],
     maquina: [q ? q.nombre : '', htmlHorMaquina],
-    form: [hor.form && hor.form.corrige ? 'Corregir parte' : 'Parte de horómetro', htmlHorForm],
+    form: [hor.form && hor.form.corrige ? 'Corregir horas' : 'Cargar horas', htmlHorForm],
     excel: ['Bajar Excel', htmlHorExcel],
     trabajos: ['Configurar trabajos', htmlHorTrabajos],
   };
@@ -90,7 +90,7 @@ function htmlHorLista() {
       '<h3>' + esc(q.nombre) + (pend ? ' <span class="chip pend">sin enviar</span>' : '') + '</h3>' +
       '<div class="cant">' + (u ? num(u.fin, 1) : '—') + '<small>h</small></div>' +
       '<div class="det">' + (m.horas ? 'Este mes ' + num(m.horas, 1) + ' h' + (m.lh ? ' · ' + num(m.lh, 1) + ' l/h' : '') : 'Sin horas este mes') +
-      (u ? '' : '<br><span class="chip">Sin partes</span>') + '</div></button>';
+      (u ? '' : '<br><span class="chip">Sin horas cargadas</span>') + '</div></button>';
   }).join('') + '</div>' +
     '<div class="pie-stock"><button class="btn sec chico" data-a="hor" data-h="excel">📥 Bajar Excel</button>' +
     (sesion.configura ? '<button class="btn sec chico" data-a="hor" data-h="trabajos">⚙ Configurar trabajos</button>' : '') + '</div>';
@@ -135,7 +135,7 @@ function htmlHorMaquina(q) {
   const porUn = horDatos().unidadesNegocio.map((x) => [x, partes.filter((p) => !p.anulado && p.fecha >= desde && p.unidadNegocio === x)
     .reduce((a, p) => a + p.horas, 0)]).filter((x) => x[1]);
   const filas = [
-    ['Último horómetro', u ? num(u.fin, 1) + ' h (' + fechaTxt(u.fecha) + ')' : 'Sin partes todavía'],
+    ['Último horómetro', u ? num(u.fin, 1) + ' h (' + fechaTxt(u.fecha) + ')' : 'Sin horas cargadas todavía'],
     ['Horas este mes', num(m.horas, 1) + ' h' + (porUn.length ? ' (' + porUn.map(([x, h]) => x + ' ' + num(h, 1)).join(' · ') + ')' : '')],
     ['Litros cargados este mes', num(m.litros, 0) + ' L (Combustible)'],
     m.lh ? ['Litros por hora', num(m.lh, 1) + ' l/h'] : null,
@@ -143,11 +143,11 @@ function htmlHorMaquina(q) {
   const mostrar = hor.visibles || 15;
   return '<div class="form"><div class="saldo"><h3>' + esc(q.nombre) + '</h3>' +
     '<table class="detalle">' + filas.map(([a, b]) => '<tr><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table></div>' +
-    (puede('Combustible', 'CARGAR') ? '<button class="btn" style="margin:14px 0 18px" data-a="hor" data-h="nuevo">⏱️ Cargar parte</button>' : '<div style="height:14px"></div>') +
-    '<h3 style="margin:0 0 8px">Partes</h3>' +
+    (puede('Combustible', 'CARGAR') ? '<button class="btn" style="margin:14px 0 18px" data-a="hor" data-h="nuevo">⏱️ Cargar horas</button>' : '<div style="height:14px"></div>') +
+    '<h3 style="margin:0 0 8px">Horas cargadas</h3>' +
     (partes.length ? partes.slice(0, mostrar).map(htmlParte).join('') +
       (partes.length > mostrar ? '<button class="btn sec" data-a="hor" data-h="mas">Ver más</button>' : '')
-      : '<p class="vacio">Sin partes en los últimos ' + DIAS_HISTORIAL + ' días.</p>') + '</div>';
+      : '<p class="vacio">Sin horas cargadas en los últimos ' + DIAS_HISTORIAL + ' días.</p>') + '</div>';
 }
 
 function htmlParte(p) {
@@ -186,7 +186,7 @@ function htmlHorForm(q) {
   const seg = (campo, lista) => '<div class="segmento">' + lista.map((x) =>
     '<button class="neutro' + (f[campo] === x ? ' activo' : '') + '" data-a="hor" data-h="seg" data-k="' + campo + '" data-v="' + esc(x) + '">' + esc(x) + '</button>').join('') + '</div>';
   return '<div class="form">' +
-    (f.corrige ? '<div class="aviso amarillo">Estás <b>corrigiendo</b> un parte. Al guardar, el anterior queda anulado y queda este.</div>' : '') +
+    (f.corrige ? '<div class="aviso amarillo">Estás <b>corrigiendo</b> una carga de horas. Al guardar, el anterior queda anulado y queda este.</div>' : '') +
     '<div class="campo"><span class="etq">Máquina</span><div class="fecha-fila"><span class="fecha">' + esc(q.nombre) + '</span></div></div>' +
     '<div class="campo"><span class="etq">Fecha</span><div class="fecha-fila">' +
     '<button class="nav" data-a="hor" data-h="fecha" data-d="-1" aria-label="Día anterior">‹</button>' +
@@ -203,7 +203,7 @@ function htmlHorForm(q) {
     '<div class="campo"><label for="h-fin">Horómetro final</label><input class="txt grande" id="h-fin" inputmode="decimal" autocomplete="off" value="' + esc(f.fin) + '"></div></div>' +
     '<div class="equivale" id="h-horas" style="font-size:18px;margin:-4px 0 12px">' + htmlHorasCalc() + '</div>' +
     '<div class="campo"><label for="h-nota">Nota <small>(opcional)</small></label><input class="txt" id="h-nota" value="' + esc(f.nota) + '"></div>' +
-    '<button class="btn conteo" data-a="hor" data-h="guardar">Guardar parte</button></div>';
+    '<button class="btn conteo" data-a="hor" data-h="guardar">Guardar horas</button></div>';
 }
 
 function leerCamposHor() {
@@ -229,10 +229,10 @@ async function guardarParte() {
   const u = ultimoHor(f.codigo);
   if (u && !f.corrige && Math.abs(inicio - u.fin) > 0.05) {
     avisos.push(inicio > u.fin
-      ? 'El último parte terminó en <b>' + num(u.fin, 1) + '</b>: quedan <b>' + num(inicio - u.fin, 1) + ' h sin parte</b>.'
-      : 'El inicio es <b>menor</b> que el final del último parte (' + num(u.fin, 1) + '): se superponen.');
+      ? 'La última carga terminó en <b>' + num(u.fin, 1) + '</b>: quedan <b>' + num(inicio - u.fin, 1) + ' h sin cargar</b>.'
+      : 'El inicio es <b>menor</b> que el final de la última carga (' + num(u.fin, 1) + '): se superponen.');
   }
-  if (fin - inicio > 24) avisos.push('Son <b>' + num(fin - inicio, 1) + ' horas</b> en un solo parte.');
+  if (fin - inicio > 24) avisos.push('Son <b>' + num(fin - inicio, 1) + ' horas</b> en una sola carga.');
   if (avisos.length) {
     const ok = await cartel({ icono: '🤔', titulo: '¿Seguro?', si: 'Guardar igual', no: 'Revisar', html: avisos.map((a) => '<p>' + a + '</p>').join('') });
     if (!ok) return;
@@ -267,7 +267,7 @@ async function verParte(id) {
   const acciones = [];
   if (puedeAnular) acciones.push({ id: 'corregir', texto: '✏️ Corregir', cls: '' }, { id: 'anular', texto: '🗑️ Anular', cls: 'sec rojo-txt' });
   acciones.push({ id: 'cerrar', texto: 'Cerrar', cls: 'sec' });
-  const r = await cartel({ titulo: 'Parte · ' + p.maquina, acciones,
+  const r = await cartel({ titulo: 'Horas · ' + p.maquina, acciones,
     html: '<table class="detalle">' + filas.map(([a, b]) => '<tr><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table>' });
   if (r === 'corregir') {
     hor.form = { codigo: p.codigo, fecha: p.fecha, trabajo: p.trabajo, cantidad: p.cantidad == null ? '' : String(p.cantidad).replace('.', ','),
@@ -279,19 +279,19 @@ async function verParte(id) {
     window.scrollTo(0, 0);
   } else if (r === 'anular') {
     const motivo = await cartel({
-      icono: '🗑️', titulo: 'Anular parte', si: 'Anular', peligro: true,
+      icono: '🗑️', titulo: 'Anular carga de horas', si: 'Anular', peligro: true,
       html: '<p>' + esc(p.maquina) + ' · ' + fechaTxt(p.fecha) + ' · ' + num(p.horas, 1) + ' h.</p><p>No se borra: queda tachado. Si solo estaba mal un dato, usá <b>Corregir</b>.</p>',
       input: { placeholder: 'Motivo (ej. horómetro equivocado)' },
       validar: (v) => (v ? '' : 'Escribí el motivo.'),
     });
-    if (motivo) { agregarACola({ tipo: 'anular', ref: p.id, motivo }); toast('Parte anulado'); render(); }
+    if (motivo) { agregarACola({ tipo: 'anular', ref: p.id, motivo }); toast('Carga de horas anulada'); render(); }
   }
 }
 
 function htmlHorExcel() {
   if (!hor.excel) hor.excel = { desde: hoyISO().slice(0, 8) + '01', hasta: hoyISO() };
   const e = hor.excel;
-  return '<div class="form"><div class="aviso">Baja los partes del período: un <b>Resumen</b> (horas por unidad de negocio y litros por hora de cada máquina) y una hoja por máquina con el formato de "Hora Tractor".</div>' +
+  return '<div class="form"><div class="aviso">Baja las horas cargadas en el período: un <b>Resumen</b> (horas por unidad de negocio y litros por hora de cada máquina) y una hoja por máquina con el formato de "Hora Tractor".</div>' +
     '<div class="fila2"><div class="campo"><label for="hx-desde">Desde</label><input class="txt" type="date" id="hx-desde" value="' + e.desde + '" max="' + hoyISO() + '"></div>' +
     '<div class="campo"><label for="hx-hasta">Hasta</label><input class="txt" type="date" id="hx-hasta" value="' + e.hasta + '" max="' + hoyISO() + '"></div></div>' +
     '<button class="btn" data-a="hor" data-h="bajar"' + (e.bajando ? ' disabled' : '') + '>' + (e.bajando ? 'Armando el Excel…' : '📥 Bajar Excel') + '</button></div>';

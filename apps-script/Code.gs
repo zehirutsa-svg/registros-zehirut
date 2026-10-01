@@ -813,13 +813,13 @@ function guardar_(body) {
           exigir_(u, MODULO_HORAS, 'CARGAR');
           if (ref.anulado) return res('duplicado');
           if (nivel_(u, MODULO_HORAS) < NIVELES.ADMINISTRAR && (ref.usuario !== u.nombre || ref.fecha < sumarDias_(hoy, -7))) {
-            throw new Error('solo quien administra Combustible puede anular partes de otros o de hace más de 7 días');
+            throw new Error('solo quien administra Combustible puede anular horas cargadas por otros o de hace más de 7 días');
           }
           const motivo = texto_(op.motivo, 200);
           ref.anulado = true;
           if (ref.fila) shH.getRange(ref.fila, 16, 1, 2).setValues([[true, u.nombre + (motivo ? ': ' + motivo : '')]]);
           else nuevasHoras.forEach((f) => { if (f[0] === ref.id) { f[15] = true; f[16] = u.nombre + (motivo ? ': ' + motivo : ''); } });
-          res('aplicado', 'Anula parte de horómetro ' + ref.maquina + ' (' + ddmmaaaa_(ref.fecha) + ')');
+          res('aplicado', 'Anula horas de ' + ref.maquina + ' (' + ddmmaaaa_(ref.fecha) + ')');
         } else if (op.tipo === 'anular' || op.tipo === 'factura') {
           const ref = porId[texto_(op.ref, 40)];
           if (!ref) throw new Error('ese movimiento no existe');
