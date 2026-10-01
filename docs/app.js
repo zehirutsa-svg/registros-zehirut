@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.18.0';
+const VERSION = '1.19.0';
 
 
 const DIAS_HISTORIAL = 60;
@@ -341,8 +341,6 @@ const decimales = (i) => ((i.modulo || 'Stock') === 'Sanidad' ? 1 : 0);
 /** Lo que hay adentro de un saldo de Sanidad, ej. "4.250 ml" (frascos) o "300 un" (cajas). */
 const contenidoTxt = (i, cant) => (i.contenido ? num(cant * i.contenido, 0) + ' ' + i.unidadContenido : '');
 const COMBUSTIBLE_DESDE = '2026-10-01';
-// Facturas y Fondo fijo en prueba: solo los ve quien configura (lo decide el script, FACTURAS_BETA).
-const FACTURAS_PRUEBA = true;
 const OTRO_DESTINO = 'OTRO';
 
 /** Saldo de cada insumo (y estancia): el que calculó Google, corregido con lo que está en la cola. */
@@ -496,7 +494,6 @@ async function salir(forzado) {
 /** Tarjetas de cada módulo que el usuario puede ver, ya agrupadas. */
 function tarjetasModulos() {
   const g = { stocks: [], comprobantes: [], lluvias: [] };
-  const prueba = FACTURAS_PRUEBA ? ' · <span class="chip naranja">en prueba</span>' : '';
   const tarjeta = (cls, attrs, ico, titulo, sub) =>
     '<button class="modulo ' + cls + '" data-a="ir" ' + attrs + '><span class="ico">' + ico + '</span><span><b>' + titulo + '</b><small>' + sub + '</small></span></button>';
   let bajos = 0;
@@ -530,9 +527,9 @@ function tarjetasModulos() {
   }
   const za = datos && datos.za && datos.za.ok ? datos.za : null;
   // Registros contables: cargar comprobantes (factura, anticipo, pago sin factura) y ver facturas, por separado.
-  if (za && za.puedeFacturas) g.comprobantes.push(tarjeta('facturas', 'data-p="facturas" data-fv="tipo"', '🧾', 'Comprobantes', 'Factura, anticipo o pago sin factura' + prueba));
-  if (za && (za.puedeFacturas || za.puedeVerFacturas)) g.comprobantes.push(tarjeta('facturas', 'data-p="facturas" data-fv="lista"', '🔎', 'Ver facturas', 'Buscar las facturas cargadas' + prueba));
-  if (za && za.puedeFondoFijo) g.comprobantes.push(tarjeta('fondofijo', 'data-p="fondofijo"', '💵', 'Fondo fijo', 'Caja chica' + prueba));
+  if (za && za.puedeFacturas) g.comprobantes.push(tarjeta('facturas', 'data-p="facturas" data-fv="tipo"', '🧾', 'Comprobantes', 'Factura, anticipo o pago sin factura'));
+  if (za && (za.puedeFacturas || za.puedeVerFacturas)) g.comprobantes.push(tarjeta('facturas', 'data-p="facturas" data-fv="lista"', '🔎', 'Ver facturas', 'Buscar las facturas cargadas'));
+  if (za && za.puedeFondoFijo) g.comprobantes.push(tarjeta('fondofijo', 'data-p="fondofijo"', '💵', 'Fondo fijo', 'Caja chica'));
   ['Facturas', 'Fondo fijo'].filter((m) => puede(m, 'VER') && !za).forEach((m) => {
     g.comprobantes.push('<div class="modulo pronto"><span class="ico">' + ({ Facturas: '🧾', 'Fondo fijo': '💵' }[m]) +
       '</span><span><b>' + m + '</b><small>Próximamente (por ahora en ZehirutApp)</small></span></div>');
@@ -543,7 +540,6 @@ function tarjetasModulos() {
     g.lluvias.push(tarjeta('lluvias', 'data-p="lluvias"', '🌧️', 'Lluvias', ult ? 'Último registro: ' + fechaTxt(ult) : 'Registro de lluvias por sector'));
   }
   g.bajos = bajos;
-  g.prueba = za && FACTURAS_PRUEBA ? prueba : '';
   return g;
 }
 
@@ -559,7 +555,7 @@ function htmlInicio() {
   const mods = [];
   ['comprobantes', 'stocks', 'lluvias'].forEach((k) => {
     if (g[k].length > 1 && GRUPOS[k]) {
-      const extra = k === 'stocks' && g.bajos ? ' · <span class="chip alerta">' + g.bajos + ' bajo mínimo</span>' : k === 'comprobantes' ? g.prueba : '';
+      const extra = k === 'stocks' && g.bajos ? ' · <span class="chip alerta">' + g.bajos + ' bajo mínimo</span>' : '';
       mods.push('<button class="modulo grupo ' + k + '" data-a="ir" data-p="grupo" data-g="' + k + '"><span class="ico">' + GRUPOS[k].ico +
         '</span><span><b>' + GRUPOS[k].titulo + '</b><small>' + GRUPOS[k].sub + extra + '</small></span><span class="flecha">›</span></button>');
     } else mods.push.apply(mods, g[k]);

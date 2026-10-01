@@ -475,9 +475,41 @@ function entrar_(body) {
   try {
     return { ok: true, usuario: publico_(usuarioDe_(ss, body.pin)) };
   } catch (e) {
-    if (e.pinInvalido) return { ok: true, usuario: null };
-    throw e;
+    if (!e.pinInvalido) throw e;
+    const nuevo = altaDesdeZehirut_(ss, body.pin);
+    return { ok: true, usuario: nuevo ? publico_(nuevo) : null };
   }
+}
+
+/** PIN que no está en Usuarios pero sí en ZehirutApp (mismo PIN): se da de alta solo, con los permisos que
+ *  tiene allá (Facturas, Fondo fijo, Lluvias, Combustible). Stock y Sanidad quedan vacíos (los da el
+ *  administrador en la hoja). Si ya hay alguien con ese nombre (con otro PIN), no se toca: lo arregla el
+ *  administrador. El freno de PIN equivocados (usuarioDe_) ya contó este intento. */
+function altaDesdeZehirut_(ss, pin) {
+  pin = String(pin || '').trim();
+  if (!/^\d{4,8}$/.test(pin)) return null;
+  let z;
+  try { z = ZA.iniciarSesion(pin); } catch (e) { return null; }
+  if (!z || !z.ok || !String(z.nombre || '').trim()) return null;
+  return conLock_(() => {
+    const sh = ss.getSheetByName('Usuarios');
+    const enc = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map((h) => String(h).trim());
+    const n = sh.getLastRow();
+    const nombre = String(z.nombre).trim();
+    const nombres = n > 1 ? sh.getRange(2, 1, n - 1, 1).getValues().map((f) => String(f[0]).trim().toUpperCase()) : [];
+    if (nombres.indexOf(nombre.toUpperCase()) !== -1) return null;
+    const valor = {
+      Nombre: nombre, PIN: pin, Activo: true, Configurar: false,
+      Facturas: z.puedeFacturas ? (z.verSoloPropias ? 'Propias' : 'Cargar') : (z.puedeVerFacturas ? 'Ver' : ''),
+      'Fondo fijo': z.puedeFondoFijo ? 'Cargar' : '',
+      Lluvias: z.puedeLluvias ? 'Cargar' : '',
+      Combustible: z.puedeCombustible ? 'Cargar' : (z.puedeVerCombustible ? 'Ver' : ''),
+    };
+    sh.getRange(n + 1, 1, 1, enc.length).setValues([enc.map((h) => (h in valor ? valor[h] : ''))]);
+    sh.getRange(n + 1, 2).setNumberFormat('@').setValue(pin);
+    registrar_(ss, [[new Date(), nombre, 'Alta desde ZehirutApp', 'Usuario nuevo con los permisos de ZehirutApp', 'Aplicado', '']]);
+    return leerUsuarios_(ss).find((u) => u.pin === pin) || null;
+  });
 }
 
 // ---------------------------------------------------------------- utilidades de fechas
@@ -1445,11 +1477,9 @@ function autorizar() {
 // mismo porque es el mismo código. Al publicar una versión nueva de ZehirutApp, subir "version" de
 // la biblioteca en appsscript.json.
 //
-// Mientras se prueba (FACTURAS_BETA), solo lo ve quien tiene tildado Configurar o está en
-// FACTURAS_PROBADORES; los demás siguen cargando en ZehirutApp. Lo que puede hacer cada uno lo
-// deciden igual los permisos de ZehirutApp (Osmar: solo las suyas, sin eliminar).
-const FACTURAS_BETA = true;
-const FACTURAS_PROBADORES = ['Osmar Acosta'];
+// Abierto a todos desde el 01/10/2026 (antes en prueba): lo ve quien tiene Facturas o Fondo fijo en la
+// hoja Usuarios; lo que puede hacer cada uno lo deciden los permisos de ZehirutApp. En ZehirutApp esos
+// módulos quedaron ocultos (su código sigue, porque es esta biblioteca).
 
 // Funciones de ZehirutApp que la app puede usar. En los argumentos, "__PIN__" se reemplaza por el
 // PIN de la sesión (cada función lo espera en una posición distinta).
@@ -1463,7 +1493,7 @@ const ZA_PERMITIDAS = {
 };
 
 function facturasVisibles_(u) {
-  return FACTURAS_BETA ? (!!u.configura || FACTURAS_PROBADORES.includes(u.nombre)) : (nivel_(u, 'Facturas') >= NIVELES.VER || nivel_(u, 'Fondo fijo') >= NIVELES.VER);
+  return nivel_(u, 'Facturas') >= NIVELES.VER || nivel_(u, 'Fondo fijo') >= NIVELES.VER;
 }
 
 /** Sesión de ZehirutApp (qué puede hacer en Facturas / Fondo fijo), guardada 10 minutos para que

@@ -14,8 +14,13 @@ module.exports = function crearZA() {
   const id = () => Number('2609' + String(1000000 + ++sec).slice(1));
   const hoy = () => { const d = new Date(); return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear(); };
   const sesion = (pin) => {
-    const u = { '1111': 'Enrique Delfante', '2222': 'Osmar Acosta' }[String(pin)];
+    // 4444: usuaria que existe solo en ZehirutApp (prueba el alta automática): solo ve facturas y combustible.
+    const u = { '1111': 'Enrique Delfante', '2222': 'Osmar Acosta', '4444': 'Natalia Prueba' }[String(pin)];
     if (!u) throw new Error('PIN inválido.');
+    if (pin === '4444') {
+      return { ok: true, nombre: u, puedeFacturas: false, puedeLluvias: false, puedeVerFacturas: true, puedeEliminarFacturas: false,
+        verSoloPropias: false, puedeFondoFijo: false, puedeCombustible: false, puedeVerCombustible: true };
+    }
     return { ok: true, nombre: u, puedeFacturas: true, puedeLluvias: true, puedeVerFacturas: true, puedeEliminarFacturas: pin === '1111',
       verSoloPropias: pin === '2222', puedeFondoFijo: true, puedeCombustible: false, puedeVerCombustible: false };
   };

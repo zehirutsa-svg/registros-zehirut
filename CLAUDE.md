@@ -219,7 +219,7 @@ Ya existe en ZehirutApp (`Lluvias.js`: planilla "Registro de Lluvias Zehirut S.A
 estancia, ID AAAAMMDDFINCASECTOR, resumen año / temporada set-ago). Se integra acá; Osmar con
 acceso total.
 
-## Facturas y Fondo fijo (en prueba desde 30/09/2026, sin apagar ZehirutApp)
+## Facturas y Fondo fijo (abiertos a todos desde 01/10/2026; en ZehirutApp quedaron ocultos)
 
 - **Navegación (pedido 01/10/2026):** en el inicio el grupo se llama **Registros contables** (antes Comprobantes) y
   tiene tres tarjetas: **Comprobantes** (abre "Carga de comprobantes": Factura, Anticipo a proveedor, Pago sin
@@ -233,10 +233,12 @@ acceso total.
   hoja Usuarios de ZehirutApp. Lo que se carga acá aparece en ZehirutApp y al revés.
 - El cliente llama `accion:"za"` con `fn` + `args`; el script solo deja pasar las funciones de
   `ZA_PERMITIDAS` y reemplaza `"__PIN__"` por el PIN de la sesión. UI en `docs/facturas.js`.
-- **Prueba**: `FACTURAS_BETA = true` (Code.gs) → solo quien tiene "Configurar" o está en
-  `FACTURAS_PROBADORES` (hoy Osmar, desde 30/09) ve los módulos;
-  `FACTURAS_PRUEBA = true` (app.js) → chip "en prueba". Para abrir a todos: ambos en false, dar
-  permisos Facturas / Fondo fijo en Usuarios y recién ahí apagar esos módulos en ZehirutApp.
+- **Abierto a todos (01/10/2026)**: sin modo prueba. Ve los módulos quien tiene Facturas o Fondo fijo en
+  Usuarios; lo que puede hacer lo deciden los permisos de ZehirutApp. En ZehirutApp (v135) los botones de
+  Comprobantes y Fondo fijo quedaron ocultos con un aviso que manda acá (su código sigue: es la biblioteca).
+- **Alta automática desde ZehirutApp** (altaDesdeZehirut_ en Code.gs): un PIN que no está en Usuarios pero sí en
+  ZehirutApp entra y se agrega a la hoja con los permisos de allá (Facturas: Cargar/Propias/Ver, Fondo fijo,
+  Lluvias, Combustible: Cargar/Ver). Stock y Sanidad vacíos. Si el nombre ya existe con otro PIN, no se toca.
 - **Cada vez que ZehirutApp publica versión nueva** que toque facturas/FF: subir el número de versión
   de la biblioteca en `appsscript.json`, `clasp push --force` + update-deployment.
 - Scopes nuevos (calendar.events, send_mail, scriptapp, que usa la biblioteca): el dueño corre
