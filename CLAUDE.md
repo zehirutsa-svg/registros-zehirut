@@ -229,8 +229,9 @@ acceso total.
   entrada (tipo | lista): la flecha vuelve ahí y después al grupo; al guardar se vuelve a la raíz.
 
 - No se copia la lógica: el script usa **ZehirutApp como biblioteca** (símbolo `ZA`, versión fija en
-  `appsscript.json`, hoy 136). Misma planilla, carpetas de Drive, clave de Gemini y permisos/PIN de la
-  hoja Usuarios de ZehirutApp. Lo que se carga acá aparece en ZehirutApp y al revés.
+  `appsscript.json`, hoy 136). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
+  salen de la hoja Usuarios de ESTE Sheet (ver "Una sola planilla de usuarios"). La web de ZehirutApp quedó
+  apagada (v137: solo muestra un botón a Registros); el proyecto sigue como biblioteca y para el mail diario. Lo que se carga acá aparece en ZehirutApp y al revés.
 - El cliente llama `accion:"za"` con `fn` + `args`; el script solo deja pasar las funciones de
   `ZA_PERMITIDAS` y reemplaza `"__PIN__"` por el PIN de la sesión. UI en `docs/facturas.js`.
 - **Abierto a todos (01/10/2026)**: sin modo prueba. Ve los módulos quien tiene Facturas o Fondo fijo en
