@@ -137,7 +137,9 @@ renombrados "VIEJO - NO USAR…"; la conexión no puede editar el texto de un do
   = "Tapfeed (usuario)", ID `TF-AAAA-MM-DD-<insumo>`), guarda el detalle por corral en la hoja
   **Tapfeed** y el PDF en la carpeta "1 Tapfeed" (Drive id 1ZybVBnxzMW_9OixfT_ut9GuvKtQbagH1).
   Si el día ya estaba: la app avisa y "Reemplazar" anula los consumos anteriores del día.
-- Insumos ↔ Tapfeed por la columna "Nombre en Tapfeed" de la hoja Insumos (solo se edita en la hoja).
+- Insumos ↔ Tapfeed por la columna "Nombre en Tapfeed" de la hoja Insumos (solo se edita en la hoja). **Puede
+  tener varios nombres separados por punto y coma** (Tapfeed renombra: el 01/10 "Concentrado Desarrollo" pasó a
+  "Concen Desarrollo"; agregado solo con agregarNombreTapfeed_). La coma no sirve de separador ("Maiz Molido DGM 1,2").
 - Carga inicial (ingresos 2025/2026 y consumo del 21/09, sin PDF: acumulado de la tarea menos los PDF
   22–27): CSV "Registros Zehirut - carga inicial.csv" en la carpeta "Confinamiento ZEHIRUT"; el script
   lo importa solo en doGet y lo renombra "(importado)". Los datos no van al repo (es público).

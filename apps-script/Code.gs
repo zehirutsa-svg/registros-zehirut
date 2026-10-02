@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '13';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '14';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
@@ -62,7 +62,7 @@ const TIPOS_MOV = ['Ingreso', 'Consumo', 'Conteo'];
 const INSUMOS_INICIALES = [
   ['Fardos', 'fardo', '', '', true, true, true, '', 'Stock', '', '', ''],
   ['Maíz molido', 'kg', 1, '', true, false, false, 'Maiz Molido DGM 1,2', 'Stock', '', '', ''],
-  ['Concentrado Desarrollo', 'bolsa', 40, '', true, false, false, 'Concentrado Desarrollo', 'Stock', '', '', ''],
+  ['Concentrado Desarrollo', 'bolsa', 40, '', true, false, false, 'Concentrado Desarrollo; Concen Desarrollo', 'Stock', '', '', ''],
   ['Balanceado Pre destete', 'bolsa', 40, '', true, false, false, 'Balan Pre destete', 'Stock', '', '', ''],
   ['Suplemento E-PRO 35', 'bolsa', 40, '', true, false, false, '', 'Stock', '', '', ''],
   ['Concentrado Beef 1.000 M', 'bolsa', 40, '', true, false, false, '', 'Stock', '', '', ''],
@@ -181,6 +181,7 @@ function configurar() {
   asegurarSanidad_(ss, ins, usu);
   asegurarHorometro_(ss);
   asegurarRecorrida_(ss);
+  agregarNombreTapfeed_(ins, 'Concentrado Desarrollo', 'Concen Desarrollo');   // Tapfeed lo renombró (02/10/2026)
   asegurarFichaSanidad_(ss, ins);
   migrarRubrosSanidad_(ss, ins);
   agregarTrabajos_(ss, 'TRABAJOS_V10', ['Aserraje', 'Trabajos de limpieza']);
@@ -344,6 +345,20 @@ function asegurarSanidad_(ss, ins, usu) {
     usu.getRange(2, col, 200, 1).setDataValidation(SpreadsheetApp.newDataValidation()
       .requireValueInList(['Administrar', 'Cargar', 'Ver'], true).setAllowInvalid(false).build());
   }
+}
+
+/** Agrega un nombre de Tapfeed a un insumo (sin borrar los que ya tiene), si todavía no lo tiene. */
+function agregarNombreTapfeed_(ins, insumo, nombreTf) {
+  const col = COLS_INSUMOS.indexOf('Nombre en Tapfeed') + 1;
+  const n = ins.getLastRow();
+  if (n < 2) return;
+  const nombres = ins.getRange(2, 1, n - 1, 1).getValues();
+  const fila = nombres.findIndex((f) => String(f[0]).trim() === insumo);
+  if (fila === -1) return;
+  const celda = ins.getRange(fila + 2, col);
+  const actuales = String(celda.getValue() || '').split(';').map((x) => x.trim()).filter(Boolean);
+  if (actuales.some((x) => x.toUpperCase() === nombreTf.toUpperCase())) return;
+  celda.setValue(actuales.concat([nombreTf]).join('; '));
 }
 
 function leerMaquinas_(ss) {
@@ -1098,10 +1113,11 @@ function cargarTapfeed_(body) {
   const corrales = Array.isArray(d.corrales) ? d.corrales : [];
   if (!total.length || !corrales.length) throw new Error('el informe no trae datos');
   const porTapfeed = {};
-  leerInsumos_(ss).forEach((i) => { if (i.tapfeed) porTapfeed[i.tapfeed.toUpperCase()] = i; });
+  // Varios nombres por insumo, separados por punto y coma (Tapfeed a veces renombra los ingredientes).
+  leerInsumos_(ss).forEach((i) => String(i.tapfeed || '').split(';').forEach((n) => { if (n.trim()) porTapfeed[n.trim().toUpperCase()] = i; }));
   const desconocidos = total.filter((t) => !porTapfeed[String(t.nombre).trim().toUpperCase()]).map((t) => t.nombre);
   if (desconocidos.length) {
-    throw new Error('no sé a qué insumo corresponde: ' + desconocidos.join(', ') + '. Poné ese nombre en la columna "Nombre en Tapfeed" de la hoja Insumos.');
+    throw new Error('no sé a qué insumo corresponde: ' + desconocidos.join(', ') + '. Agregá ese nombre en la columna "Nombre en Tapfeed" de la hoja Insumos (varios, separados por punto y coma).');
   }
   return conLock_(() => {
     const ya = diasTapfeed_(ss).indexOf(fecha) !== -1;

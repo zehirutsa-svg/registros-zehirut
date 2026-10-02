@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.19.1';
+const VERSION = '1.19.2';
 
 
 const DIAS_HISTORIAL = 60;
@@ -1188,7 +1188,7 @@ function htmlTapfeed() {
   h += '<div class="tarjeta"><div style="font-size:20px;font-weight:800">' + fechaTxt(tf.r.desde, true) + '</div>' +
     '<div style="color:var(--gris)">' + tf.r.corrales.length + ' corrales · ' + num(cabezas, 0) + ' cabezas · ' + esc(tf.archivo.name) + '</div>' +
     '<table class="detalle" style="margin-top:10px">' + tf.r.total.map((t) => {
-      const i = ins.find((x) => x.tapfeed && x.tapfeed.toUpperCase() === t.nombre.toUpperCase());
+      const i = ins.find((x) => esDeTapfeed(x, t.nombre));
       const cant = i && i.kgUnidad && i.unidad !== 'kg' ? ' = ' + num(t.kg / i.kgUnidad, 1) + ' ' + unidadTxt(i.unidad, 2) : '';
       return '<tr><td>' + esc(i ? i.nombre : t.nombre) + '</td><td><b>' + num(t.kg, 0) + ' kg</b>' + esc(cant) + '</td></tr>';
     }).join('') + '</table></div>';
@@ -1197,6 +1197,10 @@ function htmlTapfeed() {
     '<button class="btn sec" data-a="tfOtro">Elegir otro PDF</button></div></div>';
   return h;
 }
+
+/** Un insumo puede tener varios nombres en Tapfeed, separados por punto y coma (Tapfeed a veces los
+ *  renombra, ej. "Concentrado Desarrollo" → "Concen Desarrollo"; la coma no sirve: "Maiz Molido DGM 1,2"). */
+const esDeTapfeed = (i, nombre) => String(i.tapfeed || '').split(';').some((x) => x.trim() && x.trim().toUpperCase() === String(nombre).trim().toUpperCase());
 
 async function tfLeer(archivo) {
   ui.tf = { estado: 'leyendo', archivo };
@@ -1207,8 +1211,8 @@ async function tfLeer(archivo) {
     const problemas = problemasTapfeed(r);
     const ins = stockDatos().insumos;
     r.total.forEach((t) => {
-      if (!ins.some((i) => i.tapfeed && i.tapfeed.toUpperCase() === t.nombre.toUpperCase())) {
-        problemas.push('"' + t.nombre + '" no corresponde a ningún insumo: poné ese nombre en la columna "Nombre en Tapfeed" de la hoja Insumos.');
+      if (!ins.some((i) => esDeTapfeed(i, t.nombre))) {
+        problemas.push('"' + t.nombre + '" no corresponde a ningún insumo: agregá ese nombre en la columna "Nombre en Tapfeed" de la hoja Insumos (si ya tiene otro, separalos con punto y coma).');
       }
     });
     if (r.desde && r.desde > hoyISO()) problemas.push('la fecha del informe es futura.');
