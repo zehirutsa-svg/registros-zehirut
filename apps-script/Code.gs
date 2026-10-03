@@ -148,10 +148,27 @@ const ESPERADO_INSUMOS = ['Silo micropicado Gatton', 'Maíz molido', 'Balanceado
 const ESPERADO_INICIAL = [
   ['Desmamantes C6O', 'C6O', '', '', 6.6, 0.5, 2.4, '', '', '', '', 'Dieta C6O (peso de referencia 190 kg)'],
   ['Machos C6P', 'C6P', '', '', 11.6, 2, '', 1.1, '', '', '', 'Dieta C6P (peso de referencia 277,5 kg)'],
-  ['Toretones C4/C5 – autoconsumo BEEF', '', 160, '28/09/2026', 23.4, 5.1, '', '', 1.04, '', '', 'Ración Beef 1.000 M (peso de referencia 470 kg)'],
-  ['Toretones C4/C5 – Concentrado Desarrollo', '', 790, '28/09/2026', 28.2, '', '', 1.85, '', '', '', 'Desarrollo 0,5 % del PV + silo, al peso medio de 370 kg'],
-  ['Hembras C6P', '', 853, '', '', '', '', '', '', 0.3, 5.97, 'E-PRO 35 (tope 300 g) + fardo, al peso medio de 226 kg'],
+  // El silo del autoconsumo sale de otro lado (no del stock de Gatton): sin silo (03/10/2026).
+  ['Toretones C4/C5 – autoconsumo BEEF', '', 160, '28/09/2026', '', 5.1, '', '', 1.04, '', '', 'Ración Beef 1.000 M (peso de referencia 470 kg). Silo: de otro lado, no cuenta'],
+  ['Toretones C4/C5 – Concentrado Desarrollo', '', 790, '28/09/2026', '', '', '', 1.85, '', '', '', 'Desarrollo 0,5 % del PV, al peso medio de 370 kg. Silo: de otro lado, no cuenta'],
+  ['Hembras C6P – E-PRO 35', '', 853, '', '', '', '', '', '', 0.3, '', 'E-PRO 35 (tope 300 g), al peso medio de 226 kg'],
+  ['Hembras C6P – fardo', '', 853, '07/10/2026', '', '', '', '', '', '', 5.97, 'Fardo al peso medio de 226 kg. Empiezan a mitad de la semana del 05/10: ajustar "Desde"'],
 ];
+// Una sola vez (03/10/2026): la hoja ya creada pasa a los valores de arriba (silo de toretones fuera; hembras
+// separadas en E-PRO y fardo, el fardo recién desde el 07/10). Solo toca las filas de toretones y hembras.
+function ajustarConsumoEsperado_(h) {
+  const props = props_();
+  if (props.getProperty('esperadoAjuste1')) return;
+  const n = h.getLastRow();
+  const datos = h.getRange(1, 1, n, h.getLastColumn()).getValues();
+  const filas = [];
+  datos.forEach((f, i) => { if (/^(Toretones|Hembras)/.test(String(f[0]).trim())) filas.push(i + 1); });
+  filas.reverse().forEach((r) => h.deleteRow(r));
+  const nuevas = ESPERADO_INICIAL.filter((f) => /^(Toretones|Hembras)/.test(f[0]));
+  h.insertRowsAfter(3, nuevas.length);
+  h.getRange(4, 1, nuevas.length, nuevas[0].length).setValues(nuevas);
+  props.setProperty('esperadoAjuste1', '1');
+}
 const SECTORES_POR_FINCA = {
   'LA PRUDENCIA': ['A', 'C', 'D', 'F'],
   'LA PACIENCIA': ['A', 'B', 'C', 'E', 'F'],
@@ -1369,6 +1386,7 @@ function leerDatosBase_() {
   }
 
   let h = db.getSheetByName(HOJA_ESPERADO);
+  if (h) ajustarConsumoEsperado_(h);
   if (!h) {
     h = db.insertSheet(HOJA_ESPERADO);
     const enc = ['Grupo', 'Categoría (cabezas de Tapfeed)', 'Cabezas', 'Desde'].concat(ESPERADO_INSUMOS, ['Nota']);
