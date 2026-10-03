@@ -329,6 +329,35 @@ function importarCargaInicial_(ss) {
   archivo.setName(CARGA_INICIAL.replace('.csv', ' (importado).csv'));
 }
 
+/** Una sola vez (pedido 03/10/2026): el ajuste para sincerar el stock de Fardos se cargó como Consumo el
+ *  02/10. Se anula y en su lugar queda un Conteo por estancia con el mismo saldo de ese día. */
+function fardosAjusteAConteo_(ss) {
+  const props = props_();
+  if (props.getProperty('fardosConteo1')) return;
+  conLock_(() => {
+    const fecha = '2026-10-02';
+    const movs = leerMovimientos_(ss).filter((m) => !m.anulado);
+    const ajustes = movs.filter((m) => m.insumo === 'Fardos' && m.tipo === 'Consumo' && m.fecha === fecha);
+    if (!ajustes.length) { props.setProperty('fardosConteo1', 'sin consumos'); return; }
+    const insumos = leerInsumos_(ss);
+    const saldos = calcularStock_(insumos, movs.filter((m) => m.fecha <= fecha));
+    const ahora = new Date();
+    let ts = Math.max.apply(null, movs.map((m) => m.ts).concat([ahora.getTime()]));
+    const sh = ss.getSheetByName('Movimientos');
+    ajustes.forEach((m) => sh.getRange(m.fila, 16, 1, 2).setValues([[true, 'Pasado a conteo (ajuste de stock, no fue consumo)']]));
+    const filas = ESTANCIAS.map((e) => {
+      const x = saldos[claveStock_('Fardos', e)];
+      return filaMov_(['AJ-' + fecha + '-Fardos-' + e, fecha, 'Conteo', 'Fardos', x ? x.cantidad : 0, 'fardo', '', '', '', '', '',
+        'Ajuste de stock (antes cargado como consumo)', ajustes[0].usuario, '', ahora, false, '', ++ts, e]);
+    });
+    sh.getRange(sh.getLastRow() + 1, 1, filas.length, COLS_MOV.length).setValues(filas);
+    registrar_(ss, [[ahora, 'Sistema', 'Fardos: ajuste a conteo', ajustes.length + ' consumos anulados; conteos ' +
+      filas.map((f) => nombreEstancia_(f[18]) + ' ' + f[4]).join(', '), 'Aplicado', '']]);
+    reconstruirStock_(ss);
+    props.setProperty('fardosConteo1', ahora.toISOString());
+  });
+}
+
 /** Versión 6: Combustible. Columna "Módulo" en Insumos (Stock para los de antes), Nafta y
  *  Diesel (los agrega asegurarTapfeed_ desde INSUMOS_INICIALES), columnas nuevas de Movimientos
  *  y las hojas Máquinas y Trabajos con sus listas iniciales. */
@@ -434,6 +463,7 @@ function conLock_(fn) {
 function doGet() {
   asegurarConfigurado_();
   importarCargaInicial_(SpreadsheetApp.getActive());
+  fardosAjusteAConteo_(SpreadsheetApp.getActive());
   publicarDatosInforme_(SpreadsheetApp.getActive());
   const url = SpreadsheetApp.getActive().getUrl();
   return HtmlService.createHtmlOutput(
