@@ -141,33 +141,40 @@ const INFORME_ACUM_DESDE = '2026-09-21';  // inicio del confinamiento (consumo a
 const DATOS_BASE_ID = '1N3COBD95uByGGjO72KsL8FphIiRFz9-Y0FAOaVdnceY';
 const HOJA_ESPERADO = 'Consumo esperado';
 const PARAM_KG_FARDO = 'Kg por fardo (estimado)';
-// Valores iniciales (Proyeccion_comida_60_dias.xlsx, hojas Dietas y Grupos). Después se editan en la hoja.
-// Con Categoría, las cabezas salen de Tapfeed (corrales de esa categoría en la hoja Corrales).
-const ESPERADO_INSUMOS = ['Silo micropicado Gatton', 'Maíz molido', 'Balanceado Pre destete', 'Concentrado Desarrollo',
+const PARAM_FUERA_INFORME = 'Insumos fuera del informe (separados por ;)';
+// Valores iniciales (Proyeccion_comida_60_dias.xlsx, hojas Dietas y Grupos, con los ajustes del usuario del 03/10/2026).
+// Después se editan en la hoja. Con Categoría, las cabezas salen de Tapfeed (corrales de esa categoría en Corrales).
+const ESPERADO_INSUMOS = ['Silo micropicado Gatton', 'Maíz molido', 'Maíz quebrado', 'Balanceado Pre destete', 'Concentrado Desarrollo',
   'Concentrado Beef 1.000 M', 'Suplemento E-PRO 35', 'Fardos'];
 const ESPERADO_INICIAL = [
-  ['Desmamantes C6O', 'C6O', '', '', 6.6, 0.5, 2.4, '', '', '', '', 'Dieta C6O (peso de referencia 190 kg)'],
-  ['Machos C6P', 'C6P', '', '', 11.6, 2, '', 1.1, '', '', '', 'Dieta C6P (peso de referencia 277,5 kg)'],
-  // El silo del autoconsumo sale de otro lado (no del stock de Gatton): sin silo (03/10/2026).
-  ['Toretones C4/C5 – autoconsumo BEEF', '', 160, '28/09/2026', '', 5.1, '', '', 1.04, '', '', 'Ración Beef 1.000 M (peso de referencia 470 kg). Silo: de otro lado, no cuenta'],
-  ['Toretones C4/C5 – Concentrado Desarrollo', '', 790, '28/09/2026', '', '', '', 1.85, '', '', '', 'Desarrollo 0,5 % del PV, al peso medio de 370 kg. Silo: de otro lado, no cuenta'],
-  ['Hembras C6P – E-PRO 35', '', 853, '', '', '', '', '', '', 0.3, '', 'E-PRO 35 (tope 300 g), al peso medio de 226 kg'],
-  ['Hembras C6P – fardo', '', 853, '07/10/2026', '', '', '', '', '', '', 5.97, 'Fardo al peso medio de 226 kg. Empiezan a mitad de la semana del 05/10: ajustar "Desde"'],
+  ['Desmamantes C6O', 'C6O', '', '', 6.6, 0.5, '', 2.4, '', '', '', '', 'Dieta C6O (peso de referencia 190 kg)'],
+  ['Machos C6P', 'C6P', '', '', 11.6, 2, '', '', 1.1, '', '', '', 'Dieta C6P (peso de referencia 277,5 kg)'],
+  // El silo del autoconsumo sale de otro lado (no del stock de Gatton); los BEEF comen maíz quebrado, no molido.
+  ['Toretones C4/C5 – autoconsumo BEEF', '', 160, '28/09/2026', '', '', 5.1, '', '', 1.04, '', '', 'Ración Beef 1.000 M (peso de referencia 470 kg) con maíz quebrado. Silo: de otro lado, no cuenta'],
+  ['Toretones C4/C5 – Concentrado Desarrollo', '', 790, '28/09/2026', '', '', '', '', 1.85, '', '', '', 'Desarrollo 0,5 % del PV, al peso medio de 370 kg. Silo: de otro lado, no cuenta'],
+  ['Hembras C6P – E-PRO 35', '', 853, '', '', '', '', '', '', '', 0.3, '', 'E-PRO 35 (tope 300 g), al peso medio de 226 kg'],
+  ['Hembras C6P – fardo', '', 853, '', '', '', '', '', '', '', '', 3.17, 'Unos 9 fardos por día (6 a 9) a 300 kg = 2.700 kg ÷ 853 cabezas. Todavía no se empezó a dar'],
 ];
-// Una sola vez (03/10/2026): la hoja ya creada pasa a los valores de arriba (silo de toretones fuera; hembras
-// separadas en E-PRO y fardo, el fardo recién desde el 07/10). Solo toca las filas de toretones y hembras.
+const ESPERADO_NOTA = 'Kg tal cual por cabeza y por día (Fardos también en kg; los kg por fardo están en Parámetros). Con Categoría, ' +
+  'las cabezas salen del último Tapfeed (corrales de esa categoría en la hoja Corrales); si no, de la columna Cabezas. "Desde" es ' +
+  'opcional. Los nombres de las columnas de insumos tienen que ser los de Registros.';
+
+/** Escribe la hoja "Consumo esperado" entera con los valores de arriba. */
+function escribirConsumoEsperado_(h) {
+  const enc = ['Grupo', 'Categoría (cabezas de Tapfeed)', 'Cabezas', 'Desde'].concat(ESPERADO_INSUMOS, ['Nota']);
+  h.clear();
+  h.getRange(1, 1, 1, enc.length).setValues([enc]).setFontWeight('bold').setBackground('#eeeeee').setWrap(true);
+  h.getRange(2, 1, ESPERADO_INICIAL.length, enc.length).setValues(ESPERADO_INICIAL);
+  h.getRange(ESPERADO_INICIAL.length + 3, 1).setValue(ESPERADO_NOTA);
+  h.setFrozenRows(1);
+}
+
+// Una sola vez (03/10/2026, segundo ajuste): columna Maíz quebrado (BEEF), fardo de hembras ~9 fardos/día sin "Desde".
 function ajustarConsumoEsperado_(h) {
   const props = props_();
-  if (props.getProperty('esperadoAjuste1')) return;
-  const n = h.getLastRow();
-  const datos = h.getRange(1, 1, n, h.getLastColumn()).getValues();
-  const filas = [];
-  datos.forEach((f, i) => { if (/^(Toretones|Hembras)/.test(String(f[0]).trim())) filas.push(i + 1); });
-  filas.reverse().forEach((r) => h.deleteRow(r));
-  const nuevas = ESPERADO_INICIAL.filter((f) => /^(Toretones|Hembras)/.test(f[0]));
-  h.insertRowsAfter(3, nuevas.length);
-  h.getRange(4, 1, nuevas.length, nuevas[0].length).setValues(nuevas);
-  props.setProperty('esperadoAjuste1', '1');
+  if (props.getProperty('esperadoAjuste2')) return;
+  escribirConsumoEsperado_(h);
+  props.setProperty('esperadoAjuste2', '1');
 }
 const SECTORES_POR_FINCA = {
   'LA PRUDENCIA': ['A', 'C', 'D', 'F'],
@@ -1323,7 +1330,7 @@ function publicarDatosInforme_(ss) {
     });
 
     // Stock por día de TODOS los insumos de Stock (no solo los del confinamiento).
-    const ingStock = insumos.filter((i) => i.activo && i.modulo === 'Stock').map((i) => i.nombre);
+    const ingStock = insumos.filter((i) => i.activo && i.modulo === 'Stock' && (base.fuera || []).indexOf(i.nombre) === -1).map((i) => i.nombre);
     const consumoDia = {};   // insumo|fecha -> kg (todos los destinos)
     movs.filter((m) => m.tipo === 'Consumo').forEach((m) => {
       const k = m.insumo + '|' + m.fecha;
@@ -1382,7 +1389,7 @@ function publicarDatosInforme_(ss) {
     Object.keys(saldos).map((k) => saldos[k]).forEach((x) => {
       const i = porNombre[x.insumo];
       // Solo los insumos de Stock: la tarea lee ~100 filas por hoja y Sanidad son casi cien productos.
-      if (!i || !i.activo || i.modulo !== 'Stock') return;
+      if (!i || !i.activo || i.modulo !== 'Stock' || (base.fuera || []).indexOf(i.nombre) !== -1) return;
 
       stock.push([x.insumo, x.estancia ? nombreEstancia_(x.estancia) : '', Math.round(x.cantidad * 100) / 100, i.unidad, i.kgUnidad || i.unidad === 'kg' ? r0(kgDe(x.insumo, x.cantidad)) : '']);
     });
@@ -1433,19 +1440,18 @@ function leerDatosBase_() {
     const fila = filas.find((f) => String(f[0]).trim() === PARAM_KG_FARDO);
     if (fila) r.kgFardo = Number(fila[1]) || 0;
     else { par.appendRow([PARAM_KG_FARDO, 300]); r.kgFardo = 300; }
+    // Insumos de Stock que no van en el informe (ej. Semilla de Gatton), separados por punto y coma.
+    const fuera = filas.find((f) => String(f[0]).trim() === PARAM_FUERA_INFORME);
+    if (fuera) r.fuera = String(fuera[1] || '').split(';').map((x) => x.trim()).filter(Boolean);
+    else { par.appendRow([PARAM_FUERA_INFORME, 'Semilla de Gatton']); r.fuera = ['Semilla de Gatton']; }
   }
 
   let h = db.getSheetByName(HOJA_ESPERADO);
   if (h) ajustarConsumoEsperado_(h);
   if (!h) {
     h = db.insertSheet(HOJA_ESPERADO);
-    const enc = ['Grupo', 'Categoría (cabezas de Tapfeed)', 'Cabezas', 'Desde'].concat(ESPERADO_INSUMOS, ['Nota']);
-    h.getRange(1, 1, 1, enc.length).setValues([enc]).setFontWeight('bold').setBackground('#eeeeee').setWrap(true);
-    h.getRange(2, 1, ESPERADO_INICIAL.length, enc.length).setValues(ESPERADO_INICIAL);
-    h.getRange(ESPERADO_INICIAL.length + 3, 1).setValue('Kg tal cual por cabeza y por día (Fardos también en kg; los kg por fardo están en ' +
-      'Parámetros). Con Categoría, las cabezas salen del último Tapfeed (corrales de esa categoría en la hoja Corrales); ' +
-      'si no, de la columna Cabezas. "Desde" es opcional. Los nombres de las columnas de insumos tienen que ser los de Registros.');
-    h.setFrozenRows(1);
+    escribirConsumoEsperado_(h);
+    props_().setProperty('esperadoAjuste2', '1');
   }
   const datos = h.getDataRange().getValues();
   const enc = datos[0].map((x) => String(x).trim());
