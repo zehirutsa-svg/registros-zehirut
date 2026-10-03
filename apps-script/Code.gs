@@ -143,6 +143,9 @@ const HOJA_ESPERADO = 'Consumo esperado';
 const PARAM_KG_FARDO = 'Kg por fardo (estimado)';   // ya no se usa: los fardos se cuentan por unidad (03/10/2026)
 const PARAM_FUERA_INFORME = 'Insumos fuera del informe (separados por ;)';
 // Insumos con stock por estancia (Fardos): el informe muestra solo esta estancia (pedido 03/10/2026).
+// Orden de la tabla Stock del informe (pedido 03/10/2026). Los insumos que no están acá van al final.
+const ORDEN_STOCK_INFORME = ['Balanceado Pre destete', 'Concentrado Desarrollo', 'Concentrado Beef 1.000 M', 'Suplemento E-PRO 35',
+  'Maíz molido', 'Maíz quebrado', 'Silo micropicado Gatton', 'Fardos'];
 const PARAM_ESTANCIA_INFORME = 'Estancia de los insumos por estancia (Fardos)';
 // Valores iniciales (Proyeccion_comida_60_dias.xlsx, hojas Dietas y Grupos, con los ajustes del usuario del 03/10/2026).
 // Después se editan en la hoja. Con Categoría, las cabezas salen de Tapfeed (corrales de esa categoría en Corrales).
@@ -372,16 +375,16 @@ function fardosAjusteAConteo_(ss) {
  *  (las creó la conexión de la tarea; la de Claude no las puede borrar). Solo si el nombre empieza con "(reemplazado". */
 function papeleraInformesViejos_() {
   const props = props_();
-  if (props.getProperty('papeleraInf0210c')) return;
+  if (props.getProperty('papeleraInf0210d')) return;
   // 1AJY…: fardos en kg; 1hzQ…: fardos de las dos estancias (reemplazados; solo La Paciencia desde 03/10).
   ['1Nza1NT4Zg31IE2OaFJAkefPkukoMZ-wa', '11TNiKi3JOgsVRJR5RRNAkZ5KW10CEQ9R', '1AJYInHIJJfi2d_l_n5c7ffhuA1mQ4uVH',
-    '1hzQsruV3-XAAq0DOzZEmjQiFhICdW3qR'].forEach((id) => {
+    '1hzQsruV3-XAAq0DOzZEmjQiFhICdW3qR', '1mrxn0Ebq5UfwUB-27_w_z5XssNPwDBj1'].forEach((id) => {
     try {
       const f = DriveApp.getFileById(id);
       if (!f.isTrashed() && /02 OCT 26\.pdf$/.test(f.getName())) f.setTrashed(true);
     } catch (e) { console.error('No se pudo mandar a la papelera ' + id + ': ' + e); }
   });
-  props.setProperty('papeleraInf0210c', '1');
+  props.setProperty('papeleraInf0210d', '1');
 }
 
 /** Una sola vez (03/10/2026): la bolsa de E-PRO 35 es de 30 kg, no de 40. Corrige Insumos y los kg de sus movimientos. */
@@ -1356,7 +1359,8 @@ function publicarDatosInforme_(ss) {
     const deLaEstancia = (m) => !base.estancia || !(porNombre[m.insumo] || {}).porEstancia || m.estancia === base.estancia;
     const movsInf = movs.filter(deLaEstancia);
     // Stock por día de TODOS los insumos de Stock (no solo los del confinamiento).
-    const ingStock = insumos.filter((i) => i.activo && i.modulo === 'Stock' && (base.fuera || []).indexOf(i.nombre) === -1).map((i) => i.nombre);
+    const ingStock = insumos.filter((i) => i.activo && i.modulo === 'Stock' && (base.fuera || []).indexOf(i.nombre) === -1).map((i) => i.nombre)
+      .sort((a, b) => { const p = (n) => { const k = ORDEN_STOCK_INFORME.indexOf(n); return k === -1 ? 99 : k; }; return p(a) - p(b); });
     const consumoDia = {};   // insumo|fecha -> kg (todos los destinos)
     movsInf.filter((m) => m.tipo === 'Consumo').forEach((m) => {
       const k = m.insumo + '|' + m.fecha;
