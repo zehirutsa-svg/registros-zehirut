@@ -370,14 +370,15 @@ function fardosAjusteAConteo_(ss) {
  *  (las creó la conexión de la tarea; la de Claude no las puede borrar). Solo si el nombre empieza con "(reemplazado". */
 function papeleraInformesViejos_() {
   const props = props_();
-  if (props.getProperty('papeleraInf0210')) return;
-  ['1Nza1NT4Zg31IE2OaFJAkefPkukoMZ-wa', '11TNiKi3JOgsVRJR5RRNAkZ5KW10CEQ9R'].forEach((id) => {
+  if (props.getProperty('papeleraInf0210b')) return;
+  // 1AJY…: el informe del 02/10 con los fardos en kg (reemplazado por el de fardos por unidad).
+  ['1Nza1NT4Zg31IE2OaFJAkefPkukoMZ-wa', '11TNiKi3JOgsVRJR5RRNAkZ5KW10CEQ9R', '1AJYInHIJJfi2d_l_n5c7ffhuA1mQ4uVH'].forEach((id) => {
     try {
       const f = DriveApp.getFileById(id);
-      if (f.getName().indexOf('(reemplazado') === 0) f.setTrashed(true);
+      if (!f.isTrashed() && /02 OCT 26\.pdf$/.test(f.getName())) f.setTrashed(true);
     } catch (e) { console.error('No se pudo mandar a la papelera ' + id + ': ' + e); }
   });
-  props.setProperty('papeleraInf0210', '1');
+  props.setProperty('papeleraInf0210b', '1');
 }
 
 /** Una sola vez (03/10/2026): la bolsa de E-PRO 35 es de 30 kg, no de 40. Corrige Insumos y los kg de sus movimientos. */
