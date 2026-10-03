@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.20.1';
+const VERSION = '1.20.2';
 
 
 const DIAS_HISTORIAL = 60;
@@ -1335,7 +1335,7 @@ function htmlConfig() {
 }
 
 /** Sanidad: alta o edición de UN producto (desde "➕ Nuevo producto" o la ficha). Solo quien tiene
- *  Configurar; necesita señal. Un producto con movimientos no cambia de nombre (lo controla el script). */
+ *  Configurar; necesita señal. Un Medicamento con movimientos no cambia de nombre (lo controla el script). */
 function productoForm(i) {
   const v = (x) => (x == null ? '' : String(x).replace('.', ','));
   return i ? { original: i.nombre, nombre: i.nombre, principio: i.principio || '', rubro: i.rubro, unidad: i.unidad, contenido: v(i.contenido),
@@ -1387,6 +1387,8 @@ async function guardarProducto() {
     // Se ve enseguida; los datos completos bajan después.
     const s = datos && datos.stock;
     if (s && r.producto) s.insumos = s.insumos.filter((i) => i.nombre !== (p.original || r.producto.nombre)).concat([r.producto]);
+    // Cambio de nombre (Semen, Materiales): el script renombró sus movimientos; acá también, hasta que bajen los datos.
+    if (s && r.producto && p.original && p.original !== r.producto.nombre) s.movimientos.forEach((m) => { if (m.insumo === p.original) m.insumo = r.producto.nombre; });
     toast(p.original ? '✓ Producto guardado' : '✓ Producto creado', 3000);
     ui.prod = null;
     ui.rubro = r.producto ? r.producto.rubro : ui.rubro;

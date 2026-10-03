@@ -201,8 +201,9 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
   el saldo se guarda en frascos **con decimales** y se muestra también en ml/un. Sin destinos (corrales).
 - **Alta y edición de productos, de a uno** (pedido 30/09, la lista larga de Configurar era engorrosa): "➕ Nuevo
   producto" al pie de cada stock y "✏️ Editar datos del producto" en la ficha (solo con Configurar; acción
-  'producto' → guardarProducto_ en Sanidad.gs, escribe solo esa fila). Un producto con movimientos no cambia
-  de nombre (lo nombran los movimientos y la app de la estancia): se desactiva y se crea otro.
+  'producto' → guardarProducto_ en Sanidad.gs, escribe solo esa fila). Cambio de nombre con movimientos (03/10):
+  en Semen y Materiales sanitarios se renombran también sus movimientos (columna Insumo); en Medicamentos no
+  (la app de la estancia lo nombra así): se desactiva y se crea otro.
 - Lista inicial: `apps-script/Sanidad.gs` (PRODUCTOS_SANIDAD, 98 productos de la hoja INVENTARIO de la
   planilla "Inventario y stock de medicamentos"), se agrega una sola vez (esquema 7). Después se edita
   desde la app (ver "Alta y edición de productos"); cambiar "Stock" pasa un producto a otro rubro.

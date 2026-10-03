@@ -280,8 +280,9 @@ function migrarRubrosSanidad_(ss, ins) {
 
 // ---------------------------------------------------------------- un producto (alta o edición)
 // Desde la ficha del producto ("✏️ Editar datos") o "➕ Nuevo producto" (solo quien tiene Configurar).
-// Se escribe solo su fila de Insumos. Un producto con movimientos no cambia de nombre: los
-// movimientos y la app de la estancia lo nombran así (se desactiva y se crea otro).
+// Se escribe solo su fila de Insumos. Cambiar el nombre de un producto con movimientos: en Semen y
+// Materiales sanitarios se renombran también sus movimientos (no pasan por la app de la estancia);
+// en Medicamentos no, porque la estancia lo nombra así (se desactiva y se crea otro).
 function guardarProducto_(body) {
   const ss = SpreadsheetApp.getActive();
   const u = usuarioDe_(ss, body.pin);
@@ -297,8 +298,9 @@ function guardarProducto_(body) {
     if (original && !actual) throw new Error('ese producto ya no existe');
     const otro = insumos.find((i) => i.nombre.toUpperCase() === nombre.toUpperCase() && i !== actual);
     if (otro) throw new Error('ya existe "' + otro.nombre + '"' + (otro.modulo === 'Sanidad' ? ' en ' + otro.rubro : ''));
-    if (actual && nombre !== actual.nombre && leerMovimientos_(ss).some((m) => m.insumo === actual.nombre)) {
-      throw new Error('"' + actual.nombre + '" ya tiene movimientos: no se le cambia el nombre (desactivalo y creá uno nuevo)');
+    const movsViejos = actual && nombre !== actual.nombre ? leerMovimientos_(ss).filter((m) => m.insumo === actual.nombre) : [];
+    if (movsViejos.length && actual.rubro === 'Medicamentos') {
+      throw new Error('"' + actual.nombre + '" ya tiene movimientos y la app de la estancia lo nombra así: no se le cambia el nombre (desactivalo y creá uno nuevo)');
     }
     const rubro = RUBROS_SANIDAD.indexOf(x.rubro) !== -1 ? x.rubro : '';
     if (!rubro) throw new Error('elegí el stock (Medicamentos, Materiales sanitarios o Semen)');
@@ -320,7 +322,14 @@ function guardarProducto_(body) {
     }
     if (n >= 2) sh.getRange(n, 1, 1, COLS_INSUMOS.length).setValues([fila]);
     else sh.getRange(sh.getLastRow() + 1, 1, 1, COLS_INSUMOS.length).setValues([fila]);   // las casillas ya están (200 filas)
-    registrar_(ss, [[new Date(), u.nombre, actual ? 'Editar producto' : 'Nuevo producto', nombre + ' (' + rubro + ')', 'Aplicado', '']]);
+    if (movsViejos.length) {
+      // Renombrar en Movimientos (columna Insumo), fila por fila: son pocas.
+      const shM = ss.getSheetByName('Movimientos');
+      const col = COLS_MOV.indexOf('Insumo') + 1;
+      movsViejos.forEach((m) => shM.getRange(m.fila, col).setValue(nombre));
+    }
+    registrar_(ss, [[new Date(), u.nombre, actual ? 'Editar producto' : 'Nuevo producto', nombre + ' (' + rubro + ')' +
+      (movsViejos.length ? ' — antes "' + actual.nombre + '", ' + movsViejos.length + ' movimientos renombrados' : ''), 'Aplicado', '']]);
     reconstruirStock_(ss);
     return { ok: true, producto: leerInsumos_(ss).find((i) => i.nombre === nombre) };
   });
