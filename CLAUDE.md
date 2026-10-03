@@ -126,8 +126,17 @@ La tarea (Cowork, "Informe confinamiento ZEHIRUT", trig_014qydevJNGPz1BWHB7ZbT1v
 instrucciones **por título exacto** "Instrucciones tarea diaria - Informe confinamiento" (ignora "VIEJO…").
 Para cambiarlas: crear un doc nuevo con ese título y renombrar el anterior "VIEJO - NO USAR - … vN"
 (no editar la tarea: reenviarla por RemoteTrigger exige mandar ~90 KB de config, riesgoso).
-Instrucciones de la tarea (v3): Google Doc id 1FlKEzFKtSPwaExD55js1bl0HwKCZQGyJ790bOmez7vg (v1 y v2 quedaron
-renombrados "VIEJO - NO USAR…"; la conexión no puede editar el texto de un doc existente, solo crear).
+Instrucciones de la tarea (v4, 03/10/2026): Google Doc id 1e5ApSXN5mvE3H1etbjmp8y_v1wtPxYoawalFNwVjuhc (v1, v2 y v3
+quedaron renombrados "VIEJO - NO USAR…"; la conexión no puede editar el texto de un doc existente, solo crear).
+
+**Stock del informe (pedido 03/10/2026):** "Stock por día" trae TODOS los insumos activos de Stock (no solo los de
+Tapfeed) y los **días de stock = saldo ÷ consumo esperado** (ya no ÷ promedio 7 días; el promedio queda como
+referencia y se sacó "Consumo últimos 7 días"). Consumo esperado = hoja **"Consumo esperado"** de Datos base
+confinamiento (la edita el usuario; la creó el script con ESPERADO_INICIAL, de Proyeccion_comida_60_dias.xlsx): un
+grupo por fila, kg tal cual por cabeza y día por insumo (columnas = nombre exacto del insumo). Con "Categoría", las
+cabezas salen del último Tapfeed (corrales de esa categoría en la hoja Corrales); si no, columna Cabezas; "Desde"
+opcional. Valores fijos por cabeza (no se escalan por peso). Fardos en kg con "Kg por fardo (estimado)" de
+Parámetros (300). Código: leerDatosBase_ y publicarDatosInforme_.
 
 - Botón "Subir informe Tapfeed" al pie de Stock (solo casilla Configurar). El PDF "Uso de ingredientes
   por grupo" se lee EN LA APP con pdf.js (cdnjs, se baja al usarlo): período, corrales (cabezas) y kg

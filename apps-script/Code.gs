@@ -135,6 +135,23 @@ const INFORME_PLANILLA_ID = '18sle8JEHOrayTQhC0dX5UIf-FsW6rFm2RLpTSgQ3aEo';
 const INFORME_DIAS = 10;                 // días que se publican (la tarea lee ~100 filas por hoja)
 const INFORME_INICIO = '2026-09-28';      // desde acá se avisan los días sin Tapfeed
 const INFORME_ACUM_DESDE = '2026-09-21';  // inicio del confinamiento (consumo acumulado)
+// "Datos base confinamiento" (misma carpeta; la edita el usuario): Corrales (categoría de cada corral),
+// Parámetros y "Consumo esperado" (la dieta de cada grupo, en kg tal cual por cabeza y día). Con el
+// consumo esperado se calculan los días de stock (pedido del usuario 03/10/2026).
+const DATOS_BASE_ID = '1N3COBD95uByGGjO72KsL8FphIiRFz9-Y0FAOaVdnceY';
+const HOJA_ESPERADO = 'Consumo esperado';
+const PARAM_KG_FARDO = 'Kg por fardo (estimado)';
+// Valores iniciales (Proyeccion_comida_60_dias.xlsx, hojas Dietas y Grupos). Después se editan en la hoja.
+// Con Categoría, las cabezas salen de Tapfeed (corrales de esa categoría en la hoja Corrales).
+const ESPERADO_INSUMOS = ['Silo micropicado Gatton', 'Maíz molido', 'Balanceado Pre destete', 'Concentrado Desarrollo',
+  'Concentrado Beef 1.000 M', 'Suplemento E-PRO 35', 'Fardos'];
+const ESPERADO_INICIAL = [
+  ['Desmamantes C6O', 'C6O', '', '', 6.6, 0.5, 2.4, '', '', '', '', 'Dieta C6O (peso de referencia 190 kg)'],
+  ['Machos C6P', 'C6P', '', '', 11.6, 2, '', 1.1, '', '', '', 'Dieta C6P (peso de referencia 277,5 kg)'],
+  ['Toretones C4/C5 – autoconsumo BEEF', '', 160, '28/09/2026', 23.4, 5.1, '', '', 1.04, '', '', 'Ración Beef 1.000 M (peso de referencia 470 kg)'],
+  ['Toretones C4/C5 – Concentrado Desarrollo', '', 790, '28/09/2026', 28.2, '', '', 1.85, '', '', '', 'Desarrollo 0,5 % del PV + silo, al peso medio de 370 kg'],
+  ['Hembras C6P', '', 853, '', '', '', '', '', '', 0.3, 5.97, 'E-PRO 35 (tope 300 g) + fardo, al peso medio de 226 kg'],
+];
 const SECTORES_POR_FINCA = {
   'LA PRUDENCIA': ['A', 'C', 'D', 'F'],
   'LA PACIENCIA': ['A', 'B', 'C', 'E', 'F'],
@@ -1177,8 +1194,8 @@ function cargarTapfeed_(body) {
 // La tarea lee esta planilla con una herramienta que devuelve solo ~100 filas por hoja: por eso
 // acá va todo YA CALCULADO y corto (últimos INFORME_DIAS días), no el historial completo.
 //   Resumen              — actualización, último día con Tapfeed, días faltantes
-//   Stock por día        — por día e ingrediente del confinamiento: consumo, acumulado, 7 días,
-//                          promedio, saldo y días de stock (todo en kg)
+//   Stock por día        — por día y por cada insumo de Stock: consumo, acumulado, promedio 7 días,
+//                          consumo esperado (dietas), saldo y días de stock = saldo ÷ esperado (todo en kg)
 //   Corrales por día     — por día y corral: cabezas, kg tal cual y kg MS (Tapfeed)
 //   Ingredientes por día — por día e ingrediente: kg tal cual y kg MS (Tapfeed)
 //   Stock actual         — saldo de hoy de todos los insumos
@@ -1189,9 +1206,15 @@ function publicarDatosInforme_(ss) {
     const insumos = leerInsumos_(ss);
     const porNombre = {};
     insumos.forEach((i) => { porNombre[i.nombre] = i; });
+    // Dietas, categoría de cada corral y kg por fardo (de "Datos base confinamiento"). Si no se puede
+    // leer, el informe sale igual, sin consumo esperado, y queda anotado en Resumen.
+    let base = { grupos: [], categoria: {}, kgFardo: 0, error: '' };
+    try { base = leerDatosBase_(); } catch (e) { base.error = String(e.message || e); }
     const kgDe = (insumo, cant) => {
       const i = porNombre[insumo] || {};
-      return i.kgUnidad ? cant * i.kgUnidad : (i.unidad === 'kg' ? cant : 0);
+      if (i.kgUnidad) return cant * i.kgUnidad;
+      if (i.unidad === 'kg') return cant;
+      return i.unidad === 'fardo' ? cant * base.kgFardo : 0;
     };
     const r0 = (n) => Math.round(n);
     const hoy = Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd');
@@ -1232,26 +1255,46 @@ function publicarDatosInforme_(ss) {
       Object.keys(pi).sort().forEach((i) => ingred.push([ddmmaaaa_(f), i, r0(pi[i].kg), r0(pi[i].ms)]));
     });
 
-    // Stock por día de los ingredientes del confinamiento (los que tienen nombre en Tapfeed).
-    const ingConfi = insumos.filter((i) => i.tapfeed).map((i) => i.nombre);
+    // Stock por día de TODOS los insumos de Stock (no solo los del confinamiento).
+    const ingStock = insumos.filter((i) => i.activo && i.modulo === 'Stock').map((i) => i.nombre);
     const consumoDia = {};   // insumo|fecha -> kg (todos los destinos)
     movs.filter((m) => m.tipo === 'Consumo').forEach((m) => {
       const k = m.insumo + '|' + m.fecha;
       consumoDia[k] = (consumoDia[k] || 0) + kgDe(m.insumo, m.cantidad);
     });
-    const orden = movs.slice().sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.ts - b.ts));
-    const saldoAl = (insumo, fecha) => {
-      let s = 0;
-      orden.forEach((m) => {
-        if (m.insumo !== insumo || m.fecha > fecha) return;
-        if (m.tipo === 'Conteo') s = m.cantidad; else if (m.tipo === 'Ingreso') s += m.cantidad; else if (m.tipo === 'Consumo') s -= m.cantidad;
-      });
-      return kgDe(insumo, s);
+    // Saldo al final de un día, sumando las estancias (Fardos lleva un stock por estancia).
+    const saldosAl = (fecha) => {
+      const s = calcularStock_(insumos, movs.filter((m) => m.fecha <= fecha));
+      const r = {};
+      Object.keys(s).forEach((k) => { r[s[k].insumo] = (r[s[k].insumo] || 0) + kgDe(s[k].insumo, s[k].cantidad); });
+      return r;
     };
-    const stockDia = [['Fecha', 'Ingrediente', 'Consumo del día kg', 'Consumo acumulado kg (desde 21/09/2026)', 'Consumo últimos 7 días kg',
-      'Promedio diario 7 días kg', 'Saldo kg', 'Días de stock']];
+    // Consumo esperado de un día: kg por cabeza de cada grupo × cabezas. Los grupos con Categoría toman
+    // las cabezas del último Tapfeed hasta ese día (corrales de esa categoría en la hoja Corrales).
+    const esperadoAl = (fecha) => {
+      const diaTf = diasTf.filter((d) => d <= fecha).pop();
+      const cabCat = {};
+      const vistos = {};
+      tf.filter((t) => t.fecha === diaTf).forEach((t) => {   // una fila por corral e ingrediente
+        if (vistos[t.corral]) return;
+        vistos[t.corral] = true;
+        const cat = base.categoria[t.corral];
+        if (cat) cabCat[cat] = (cabCat[cat] || 0) + t.cabezas;
+      });
+      const r = {};
+      base.grupos.forEach((g) => {
+        if (g.desde && fecha < g.desde) return;
+        const cab = g.categoria ? (cabCat[g.categoria] || 0) : g.cabezas;
+        Object.keys(g.kg).forEach((ins) => { r[ins] = (r[ins] || 0) + g.kg[ins] * cab; });
+      });
+      return r;
+    };
+    const stockDia = [['Fecha', 'Ingrediente', 'Consumo del día kg', 'Consumo acumulado kg (desde 21/09/2026)',
+      'Promedio diario 7 días kg', 'Consumo esperado kg/día', 'Saldo kg', 'Días de stock']];
     for (let f = desde; f <= hoy; f = sumarDias_(f, 1)) {
-      ingConfi.forEach((ins) => {
+      const saldos = saldosAl(f);
+      const esperado = esperadoAl(f);
+      ingStock.forEach((ins) => {
         let acum = 0;
         let siete = 0;
         Object.keys(consumoDia).forEach((k) => {
@@ -1260,10 +1303,10 @@ function publicarDatosInforme_(ss) {
           if (p[1] >= INFORME_ACUM_DESDE) acum += consumoDia[k];
           if (p[1] > sumarDias_(f, -7)) siete += consumoDia[k];
         });
-        const prom = siete / 7;
-        const saldo = saldoAl(ins, f);
-        stockDia.push([ddmmaaaa_(f), ins, r0(consumoDia[ins + '|' + f] || 0), r0(acum), r0(siete), r0(prom), r0(saldo),
-          prom > 0 ? Math.floor(saldo / prom) : '—']);
+        const saldo = saldos[ins] || 0;
+        const esp = esperado[ins] || 0;
+        stockDia.push([ddmmaaaa_(f), ins, r0(consumoDia[ins + '|' + f] || 0), r0(acum), r0(siete / 7), r0(esp), r0(saldo),
+          esp > 0 ? Math.max(0, Math.floor(saldo / esp)) : '—']);
       });
     }
 
@@ -1285,7 +1328,10 @@ function publicarDatosInforme_(ss) {
       ['Días con Tapfeed en ese período', diasTf.filter((f) => f >= desde).map(ddmmaaaa_).join(', ') || 'ninguno'],
       ['Último día con Tapfeed', diasTf.length ? ddmmaaaa_(diasTf[diasTf.length - 1]) : 'ninguno'],
       ['Días sin Tapfeed desde ' + ddmmaaaa_(INFORME_INICIO) + ' hasta ayer', faltan.join(', ') || 'ninguno'],
-      ['Unidades', 'Todo en kg, redondeado. Consumo = confinamiento (Tapfeed) + otros destinos (autoconsumo, cargado en la app).'],
+      ['Unidades', 'Todo en kg, redondeado. Consumo = confinamiento (Tapfeed) + otros destinos (autoconsumo, cargado en la app).' +
+        (base.kgFardo ? ' Fardos a ' + base.kgFardo + ' kg por fardo (estimado).' : '')],
+      ['Consumo esperado', base.error ? 'NO SE PUDO CALCULAR: ' + base.error
+        : 'Según las dietas de la hoja "' + HOJA_ESPERADO + '" de Datos base confinamiento (kg por cabeza × cabezas; confinamiento con las cabezas de Tapfeed). Días de stock = saldo ÷ consumo esperado.'],
     ]);
     escribir('Stock por día', stockDia);
     escribir('Corrales por día', corrales);
@@ -1299,6 +1345,57 @@ function publicarDatosInforme_(ss) {
     // Nunca frena una carga: si falla, queda anotado y se reintenta con el próximo cambio.
     console.error('No se pudo actualizar la planilla del informe: ' + e);
   }
+}
+
+/** De "Datos base confinamiento": la categoría de cada corral (hoja Corrales), los kg por fardo (Parámetros)
+ *  y los grupos con su dieta (hoja "Consumo esperado"). Las dos últimas se crean la primera vez. */
+function leerDatosBase_() {
+  const db = SpreadsheetApp.openById(DATOS_BASE_ID);
+  const r = { grupos: [], categoria: {}, kgFardo: 0, error: '' };
+
+  const cor = db.getSheetByName('Corrales');
+  if (cor && cor.getLastRow() > 1) {
+    cor.getRange(2, 1, cor.getLastRow() - 1, 3).getValues().forEach((f) => {
+      if (String(f[0]).trim() && String(f[2]).trim()) r.categoria[String(f[0]).trim()] = String(f[2]).trim();
+    });
+  }
+
+  const par = db.getSheetByName('Parámetros');
+  if (par) {
+    const filas = par.getLastRow() > 0 ? par.getRange(1, 1, par.getLastRow(), 2).getValues() : [];
+    const fila = filas.find((f) => String(f[0]).trim() === PARAM_KG_FARDO);
+    if (fila) r.kgFardo = Number(fila[1]) || 0;
+    else { par.appendRow([PARAM_KG_FARDO, 300]); r.kgFardo = 300; }
+  }
+
+  let h = db.getSheetByName(HOJA_ESPERADO);
+  if (!h) {
+    h = db.insertSheet(HOJA_ESPERADO);
+    const enc = ['Grupo', 'Categoría (cabezas de Tapfeed)', 'Cabezas', 'Desde'].concat(ESPERADO_INSUMOS, ['Nota']);
+    h.getRange(1, 1, 1, enc.length).setValues([enc]).setFontWeight('bold').setBackground('#eeeeee').setWrap(true);
+    h.getRange(2, 1, ESPERADO_INICIAL.length, enc.length).setValues(ESPERADO_INICIAL);
+    h.getRange(ESPERADO_INICIAL.length + 3, 1).setValue('Kg tal cual por cabeza y por día (Fardos también en kg; los kg por fardo están en ' +
+      'Parámetros). Con Categoría, las cabezas salen del último Tapfeed (corrales de esa categoría en la hoja Corrales); ' +
+      'si no, de la columna Cabezas. "Desde" es opcional. Los nombres de las columnas de insumos tienen que ser los de Registros.');
+    h.setFrozenRows(1);
+  }
+  const datos = h.getDataRange().getValues();
+  const enc = datos[0].map((x) => String(x).trim());
+  datos.slice(1).forEach((f) => {
+    const grupo = String(f[0]).trim();
+    const categoria = String(f[1]).trim();
+    const cabezas = Number(f[2]) || 0;
+    if (!grupo || (!categoria && !cabezas)) return;
+    const kg = {};
+    enc.forEach((ins, c) => {
+      if (c < 4 || !ins || ins === 'Nota') return;
+      const v = Number(String(f[c]).replace(',', '.'));
+      if (v > 0) kg[ins] = v;
+    });
+    const desde = f[3] ? iso_(f[3]) : '';
+    r.grupos.push({ grupo, categoria, cabezas, desde: esFecha_(desde) ? desde : '', kg });
+  });
+  return r;
 }
 
 // ---------------------------------------------------------------- Excel (Stock / Combustible)

@@ -65,7 +65,7 @@ class Rango {
   }
 }
 ['setFontWeight', 'setBackground', 'setBackgrounds', 'setNumberFormat', 'setHorizontalAlignment', 'merge', 'setBorder',
-  'setVerticalAlignment', 'setFontSize', 'setDataValidation', 'insertCheckboxes', 'setNote'].forEach((m) => { Rango.prototype[m] = function () { return this; }; });
+  'setVerticalAlignment', 'setFontSize', 'setDataValidation', 'insertCheckboxes', 'setNote', 'setWrap'].forEach((m) => { Rango.prototype[m] = function () { return this; }; });
 
 class Hoja {
   constructor(nombre) { this.nombre = nombre; this.celdas = []; }
@@ -74,7 +74,7 @@ class Hoja {
     while (this.celdas.length && !(this.celdas[this.celdas.length - 1] || []).some((x) => x !== '' && x !== undefined)) this.celdas.pop();
   }
   getLastRow() { this.recortar(); return this.celdas.length; }
-  getLastColumn() { return Math.max(0, ...this.celdas.map((f) => (f || []).length)); }
+  getLastColumn() { return Math.max(0, ...Array.from(this.celdas, (f) => (f || []).length)); }
   getRange(f, c, nf, nc) {
     if (typeof f === 'string') {
       // 'A2:H2' como en Google; 'A:B' (columnas enteras) solo se usa para dar formato.
@@ -88,6 +88,7 @@ class Hoja {
   }
   getDataRange() { return new Rango(this, 1, 1, this.getLastRow(), this.getLastColumn()); }
   clear() { this.celdas = []; }
+  appendRow(fila) { this.getRange(this.getLastRow() + 1, 1, 1, fila.length).setValues([fila]); return this; }
 }
 Hoja.prototype.setName = function (n) { this.nombre = n; return this; };
 ['setFrozenRows', 'setFrozenColumns', 'setColumnWidth', 'setColumnWidths', 'autoResizeColumns', 'setRowHeight'].forEach((m) => { Hoja.prototype[m] = function () { return this; }; });
@@ -108,11 +109,16 @@ const libro = nuevoLibro(['Hoja 1'], 'https://docs.google.com/spreadsheets/d/PRU
 const libroLluvias = nuevoLibro(['Lluvias'], 'https://docs.google.com/spreadsheets/d/LLUVIAS');
 // "datos para el informe" (la planilla que lee la tarea diaria de Claude)
 const libroInforme = nuevoLibro(['Hoja 1'], 'https://docs.google.com/spreadsheets/d/INFORME');
+// "Datos base confinamiento" (Corrales y Parámetros; la hoja "Consumo esperado" la crea el script)
+const libroBase = nuevoLibro(['Corrales', 'Parámetros'], 'https://docs.google.com/spreadsheets/d/BASE');
+libroBase.getSheetByName('Corrales').getRange(1, 1, 13, 3).setValues([['Corral (nombre en Tapfeed)', 'Descripción', 'Categoría']]
+  .concat([1, 2, 3, 4, 5, 6, 7].map((n) => ['Corral ' + n, '', 'C6O']), [8, 9, 10, 11, 12].map((n) => ['Corral ' + n, '', 'C6P'])));
+libroBase.getSheetByName('Parámetros').getRange(1, 1, 2, 2).setValues([['Parámetro', 'Valor'], ['Alerta de stock (días o menos)', 10]]);
 libroLluvias.getSheetByName('Lluvias').getRange(1, 1, 1, 7).setValues([['ID', 'Finca', 'Sector', 'Fecha', 'mm', 'Usuario', 'Fecha carga']]);
 
 const validacion = { requireValueInList() { return this; }, setAllowInvalid() { return this; }, build() { return {}; } };
 const contexto = {
-  SpreadsheetApp: { flush() {}, create: (n) => { ultimoExcel = nuevoLibro(['Hoja 1'], 'excel'); ultimoExcel.nombre = n; ultimoExcel.getId = () => 'EXCEL'; return ultimoExcel; }, getActive: () => libro, openById: (id) => (id === '1DXk0c3HOAsjoPwmfZzqSCUEZ9ByAOL9XlkmRdEBT7Ds' ? libroLluvias : libroInforme), newDataValidation: () => validacion },
+  SpreadsheetApp: { flush() {}, create: (n) => { ultimoExcel = nuevoLibro(['Hoja 1'], 'excel'); ultimoExcel.nombre = n; ultimoExcel.getId = () => 'EXCEL'; return ultimoExcel; }, getActive: () => libro, openById: (id) => (id === '1DXk0c3HOAsjoPwmfZzqSCUEZ9ByAOL9XlkmRdEBT7Ds' ? libroLluvias : id === '1N3COBD95uByGGjO72KsL8FphIiRFz9-Y0FAOaVdnceY' ? libroBase : libroInforme), newDataValidation: () => validacion },
   UrlFetchApp: { fetch: () => ({ getResponseCode: () => 200, getBlob: () => ({ getBytes: () => [80, 75] }) }) },
   ScriptApp: { getOAuthToken: () => 'x' },
   Utilities: { DigestAlgorithm: { SHA_256: 'sha256' }, computeDigest: (alg, txt) => [...require('crypto').createHash(alg).update(String(txt)).digest()], base64Encode: (b) => Buffer.from(b).toString('base64'), formatDate, newBlob: (bytes, tipo, nombre) => ({ nombre, bytes }), base64Decode: (b) => Buffer.from(b, 'base64') },
@@ -169,6 +175,8 @@ const codigo = fs.readdirSync(carpetaGs).filter((f) => f.endsWith('.gs')).sort()
   .map((f) => fs.readFileSync(path.join(carpetaGs, f), 'utf8')).join('\n');
 vm.runInContext(codigo + '\nthis.__api = { doPost, doGet };', contexto);
 const api = contexto.__api;
+// EXPONER=1: para pruebas con un script propio (require de este archivo).
+if (process.env.EXPONER) module.exports = { contexto, libro, libroInforme, libroBase };
 api.doGet();   // primera apertura: prepara la planilla
 
 // PIN de prueba (en Google se cargan a mano en la hoja Usuarios).
@@ -206,6 +214,7 @@ http.createServer((req, res) => {
     libro.hojas.forEach((h) => { todas[h.nombre] = h.celdas; });
     todas['(planilla Lluvias)'] = libroLluvias.hojas[0].celdas;
     libroInforme.hojas.forEach((h) => { todas['(informe) ' + h.nombre] = h.celdas; });
+    libroBase.hojas.forEach((h) => { todas['(datos base) ' + h.nombre] = h.celdas; });
     res.end(JSON.stringify(todas, null, 1));
     return;
   }
