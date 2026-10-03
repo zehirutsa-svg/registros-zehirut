@@ -207,9 +207,12 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
   planilla "Inventario y stock de medicamentos"), se agrega una sola vez (esquema 7). Después se edita
   desde la app (ver "Alta y edición de productos"); cambiar "Stock" pasa un producto a otro rubro.
 - Ficha del producto (columnas Principio activo, Indicación, Laboratorio, Proveedor, Dosis base, Peso base
-  en Insumos, de la hoja INVENTARIO; esquema 11). Pantalla: **solo aparecen las tarjetas que se buscan**
-  (nombre comercial, principio activo, laboratorio, proveedor o indicación): nombre grande, principio
-  activo en gris debajo, saldo y la ficha. El Ingreso trae el proveedor de la ficha.
+  en Insumos, de la hoja INVENTARIO; esquema 11). Pantalla (v1.20.0, 03/10; antes solo se veía lo buscado y al
+  usuario le resultó incómodo, sobre todo en Semen): **lista corta de lo que hay en stock** (saldo ≠ 0, incluye
+  negativos), una línea por producto (nombre, principio activo en gris, saldo), alfabética; tocándola se abre
+  la ficha. Los que están en cero, detrás de "Ver también sin stock (N)". El buscador (nombre comercial,
+  principio activo, laboratorio, proveedor o indicación) filtra y, buscando, muestra también los en cero.
+  El Ingreso trae el proveedor de la ficha.
 - Excel por rubro: Resumen +
   Movimientos, con Unidad de negocio **PATRIMONIAL** (decisión del contador), sin hoja por producto.
 - **Conexión con la app de la estancia** (`Proyectos Claude\estancia-app`, sección "Sanidad ↔ Registros

@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.19.2';
+const VERSION = '1.20.0';
 
 
 const DIAS_HISTORIAL = 60;
@@ -56,6 +56,7 @@ const ui = {
   modStock: 'Stock',    // módulo que se está viendo con el recorrido de stock: Stock | Combustible | Sanidad
   rubro: null,          // en Sanidad: Medicamentos | Materiales sanitarios | Semen
   filtroIatf: false,    // en Sanidad: mostrar solo lo de IATF
+  sinStockSan: false,   // en Sanidad: mostrar también los productos en cero
   vistaStock: 'lista',  // lista | ficha | form | sinFactura | config
   insumoVer: null,      // insumo de la ficha abierta
   movsVisibles: 15,
@@ -676,9 +677,8 @@ function htmlEstadoEstancia() {
     (e.ultima ? ' (última actualización ' + haceCuanto(e.ultima) + ')' : ' (todavía no se conectó)') + '.</p>' + errores;
 }
 
-/** Sanidad: son muchos productos, así que va en lista (no en tarjetas), con un buscador. */
-/** Sanidad: son casi cien productos, así que no se muestran todos: solo los que se buscan (por
- *  nombre comercial, principio activo, laboratorio, proveedor o indicación), en tarjetas con su ficha. */
+/** Sanidad: son casi cien productos, así que van en lista corta (nombre y saldo) con un buscador
+ *  (nombre comercial, principio activo, laboratorio, proveedor o indicación); la ficha se abre al tocar. */
 function htmlListaSanidad(ins, s, c7) {
   if (!ins.length) return '<p class="vacio">Todavía no hay productos en ' + esc(ui.rubro) + '.</p>';
   const bajos = ins.filter((i) => infoInsumo(i, s, c7).bajo).length;
@@ -715,25 +715,35 @@ function fichaSanidad(i) {
   ].filter((x) => x[1]);
 }
 
+/** Lista corta de Sanidad: una línea por producto (nombre y saldo); tocándola se abre la ficha.
+ *  Sin buscar se ven los que tienen stock (y los negativos); los que están en cero, a pedido. */
 function htmlResultadosSanidad() {
   const q = String(ui.buscarSan || '').trim().toUpperCase();
-  if (!q && !ui.filtroIatf) return '<p class="vacio" style="padding:20px 8px">Escribí para buscar un producto' + (ui.rubro !== 'Semen' ? ', o tocá 🏷 IATF.' : '.') + '</p>';
   const s = saldos();
   const c7 = consumo7();
   const ins = insumosMod().filter((i) => (i.activo || (s[i.nombre] && s[i.nombre].cantidad)) && (!ui.filtroIatf || esIatf(i)) &&
-    [i.nombre, i.principio, i.laboratorio, i.proveedor, i.indicacion].join(' ').toUpperCase().indexOf(q) !== -1);
-  if (!ins.length) return '<p class="vacio">No hay productos' + (q ? ' con "' + esc(ui.buscarSan.trim()) + '"' : '') + (ui.filtroIatf ? ' de IATF' : '') + '.</p>';
-  return ins.slice(0, 30).map((i) => {
+    (!q || [i.nombre, i.principio, i.laboratorio, i.proveedor, i.indicacion].join(' ').toUpperCase().indexOf(q) !== -1))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  const filtro = (q ? ' con "' + esc(ui.buscarSan.trim()) + '"' : '') + (ui.filtroIatf ? ' de IATF' : '');
+  if (!ins.length) return '<p class="vacio">No hay productos' + filtro + '.</p>';
+  const conStock = ins.filter((i) => (s[i.nombre] || {}).cantidad);
+  const enCero = ins.filter((i) => !(s[i.nombre] || {}).cantidad);
+  // Buscando se ve todo lo que coincide; sin buscar, lo que está en cero queda detrás de un botón.
+  const verCero = q || ui.sinStockSan;
+  const fila = (i) => {
     const n = infoInsumo(i, s, c7);
-    const chips = [n.x.pendiente ? '<span class="chip pend">sin enviar</span>' : '', n.bajo ? '<span class="chip alerta">Bajo el mínimo</span>' : '',
-      n.x.cantidad < 0 ? '<span class="chip alerta">Saldo negativo</span>' : '', !n.x.ultimoConteo ? '<span class="chip">Sin conteo inicial</span>' : ''].filter(Boolean);
-    return '<button class="saldo tarjeta-san ' + n.cls + '" data-a="verInsumo" data-i="' + esc(i.nombre) + '">' +
-      '<div class="cab"><div><h3>' + esc(i.nombre) + (esIatf(i) && ui.rubro !== 'Semen' ? ' <span class="chip azul">IATF</span>' : '') + '</h3>' + (i.principio ? '<div class="sub">' + esc(lindo(i.principio)) + '</div>' : '') + '</div>' +
-      '<div class="cant-san"><b class="' + (n.x.cantidad < 0 ? 'rojo' : '') + '">' + num(n.x.cantidad, 1) + '</b> ' + esc(unidadTxt(i.unidad, n.x.cantidad)) +
-      (n.kg && n.x.cantidad ? '<small>' + esc(n.kg) + '</small>' : '') + '</div></div>' +
-      '<dl class="ficha-san">' + fichaSanidad(i).map(([a, b]) => '<dt>' + esc(a) + '</dt><dd>' + esc(b) + '</dd>').join('') + '</dl>' +
-      (chips.length ? '<div>' + chips.join(' ') + '</div>' : '') + '</button>';
-  }).join('') + (ins.length > 30 ? '<p class="vacio">Hay ' + ins.length + ' productos: escribí más para achicar la búsqueda.</p>' : '');
+    return '<button class="fila-san ' + n.cls + '" data-a="verInsumo" data-i="' + esc(i.nombre) + '">' +
+      '<span class="nom">' + esc(i.nombre) + (esIatf(i) && ui.rubro !== 'Semen' ? ' <span class="chip azul">IATF</span>' : '') +
+      (i.principio ? '<small>' + esc(lindo(i.principio)) + '</small>' : '') + '</span>' +
+      '<span class="val"><b class="' + (n.x.cantidad < 0 ? 'rojo' : '') + '">' + num(n.x.cantidad, 1) + '</b> ' + esc(unidadTxt(i.unidad, n.x.cantidad)) +
+      (n.kg && n.x.cantidad ? '<small>' + esc(n.kg) + '</small>' : '') + '</span></button>';
+  };
+  return (conStock.length ? '<div class="lista-san">' + conStock.map(fila).join('') + '</div>'
+    : '<p class="vacio">No hay productos con stock' + filtro + '.</p>') +
+    (enCero.length ? (verCero
+      ? '<h4 class="tit-cero">Sin stock (' + enCero.length + ')</h4><div class="lista-san">' + enCero.map(fila).join('') + '</div>' +
+        (q ? '' : '<button class="link-cero" data-a="sinStockSan">Ocultar los que están sin stock</button>')
+      : '<button class="link-cero" data-a="sinStockSan">Ver también sin stock (' + enCero.length + ')</button>') : '');
 }
 
 
@@ -1688,7 +1698,7 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'ir':
-      if (b.dataset.p === 'stock') { ui.modStock = b.dataset.m || 'Stock'; ui.rubro = b.dataset.r || null; ui.excel = null; ui.buscarSan = ''; ui.filtroIatf = false; }
+      if (b.dataset.p === 'stock') { ui.modStock = b.dataset.m || 'Stock'; ui.rubro = b.dataset.r || null; ui.excel = null; ui.buscarSan = ''; ui.filtroIatf = false; ui.sinStockSan = false; }
       // La flecha de Stock vuelve un paso (formulario → ficha → tarjetas → inicio).
       if (ui.pantalla === 'stock' && b.dataset.p === 'inicio') { atrasStock(); break; }
       if (ui.pantalla === 'facturas' && b.dataset.p === 'inicio' && atrasFacturas()) break;
@@ -1757,6 +1767,7 @@ document.addEventListener('click', (e) => {
       render();
       break;
     case 'cfgGuardar': cfgGuardar(b.dataset.cfg); break;
+    case 'sinStockSan': ui.sinStockSan = !ui.sinStockSan; $('#res-san').innerHTML = htmlResultadosSanidad(); break;
     case 'filtroIatf': ui.filtroIatf = !ui.filtroIatf; b.classList.toggle('activo', ui.filtroIatf); $('#res-san').innerHTML = htmlResultadosSanidad(); break;
     case 'nuevoProducto': ui.prod = productoForm(null); ui.vistaStock = 'producto'; render(); window.scrollTo(0, 0); break;
     case 'editarProducto': ui.prod = productoForm(stockDatos().insumos.find((x) => x.nombre === ui.insumoVer)); ui.vistaStock = 'producto'; render(); window.scrollTo(0, 0); break;
