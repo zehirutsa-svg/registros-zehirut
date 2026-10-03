@@ -64,7 +64,7 @@ const INSUMOS_INICIALES = [
   ['Maíz molido', 'kg', 1, '', true, false, false, 'Maiz Molido DGM 1,2', 'Stock', '', '', ''],
   ['Concentrado Desarrollo', 'bolsa', 40, '', true, false, false, 'Concentrado Desarrollo; Concen Desarrollo', 'Stock', '', '', ''],
   ['Balanceado Pre destete', 'bolsa', 40, '', true, false, false, 'Balan Pre destete', 'Stock', '', '', ''],
-  ['Suplemento E-PRO 35', 'bolsa', 40, '', true, false, false, '', 'Stock', '', '', ''],
+  ['Suplemento E-PRO 35', 'bolsa', 30, '', true, false, false, '', 'Stock', '', '', ''],
   ['Concentrado Beef 1.000 M', 'bolsa', 40, '', true, false, false, '', 'Stock', '', '', ''],
   ['Silo micropicado Gatton', 'kg', 1, '', true, false, false, 'Micropicado Gatton', 'Stock', '', '', ''],
   ['Maíz quebrado', 'kg', 1, '', true, false, false, '', 'Stock', '', '', ''],
@@ -358,6 +358,25 @@ function fardosAjusteAConteo_(ss) {
   });
 }
 
+/** Una sola vez (03/10/2026): la bolsa de E-PRO 35 es de 30 kg, no de 40. Corrige Insumos y los kg de sus movimientos. */
+function eproBolsa30_(ss) {
+  const props = props_();
+  if (props.getProperty('eproBolsa30')) return;
+  conLock_(() => {
+    const insumo = 'Suplemento E-PRO 35';
+    const ins = ss.getSheetByName('Insumos');
+    const n = ins.getLastRow();
+    const fila = n > 1 ? ins.getRange(2, 1, n - 1, 1).getValues().findIndex((f) => String(f[0]).trim() === insumo) : -1;
+    if (fila !== -1) ins.getRange(fila + 2, COLS_INSUMOS.indexOf('Kg por unidad') + 1).setValue(30);
+    const sh = ss.getSheetByName('Movimientos');
+    const movs = leerMovimientos_(ss).filter((m) => m.insumo === insumo);
+    movs.forEach((m) => sh.getRange(m.fila, COLS_MOV.indexOf('Kg') + 1).setValue(Math.round(m.cantidad * 30 * 100) / 100));
+    registrar_(ss, [[new Date(), 'Sistema', 'E-PRO 35: bolsa de 30 kg', movs.length + ' movimientos recalculados', 'Aplicado', '']]);
+    reconstruirStock_(ss);
+    props.setProperty('eproBolsa30', '1');
+  });
+}
+
 /** Versión 6: Combustible. Columna "Módulo" en Insumos (Stock para los de antes), Nafta y
  *  Diesel (los agrega asegurarTapfeed_ desde INSUMOS_INICIALES), columnas nuevas de Movimientos
  *  y las hojas Máquinas y Trabajos con sus listas iniciales. */
@@ -464,6 +483,7 @@ function doGet() {
   asegurarConfigurado_();
   importarCargaInicial_(SpreadsheetApp.getActive());
   fardosAjusteAConteo_(SpreadsheetApp.getActive());
+  eproBolsa30_(SpreadsheetApp.getActive());
   publicarDatosInforme_(SpreadsheetApp.getActive());
   const url = SpreadsheetApp.getActive().getUrl();
   return HtmlService.createHtmlOutput(

@@ -79,7 +79,7 @@ Insumos (editables, se pueden agregar nuevos):
 | Maíz molido | kg (a granel) | 1 |
 | Concentrado Desarrollo | bolsa | 40 |
 | Balanceado Pre destete | bolsa | 40 |
-| Suplemento E-PRO 35 | bolsa | 40 |
+| Suplemento E-PRO 35 | bolsa | 30 (corregido 03/10/2026) |
 | Concentrado Beef 1.000 M | bolsa | 40 |
 
 Silo micropicado Gatton: se suma como insumo (kg) para la integración con Tapfeed (28/09).
