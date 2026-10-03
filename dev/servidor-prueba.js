@@ -89,6 +89,7 @@ class Hoja {
   getDataRange() { return new Rango(this, 1, 1, this.getLastRow(), this.getLastColumn()); }
   clear() { this.celdas = []; }
   appendRow(fila) { this.getRange(this.getLastRow() + 1, 1, 1, fila.length).setValues([fila]); return this; }
+  deleteRow(r) { this.celdas.splice(r - 1, 1); return this; }
 }
 Hoja.prototype.setName = function (n) { this.nombre = n; return this; };
 ['setFrozenRows', 'setFrozenColumns', 'setColumnWidth', 'setColumnWidths', 'autoResizeColumns', 'setRowHeight'].forEach((m) => { Hoja.prototype[m] = function () { return this; }; });
@@ -114,6 +115,7 @@ const libroBase = nuevoLibro(['Corrales', 'Parámetros'], 'https://docs.google.c
 libroBase.getSheetByName('Corrales').getRange(1, 1, 13, 3).setValues([['Corral (nombre en Tapfeed)', 'Descripción', 'Categoría']]
   .concat([1, 2, 3, 4, 5, 6, 7].map((n) => ['Corral ' + n, '', 'C6O']), [8, 9, 10, 11, 12].map((n) => ['Corral ' + n, '', 'C6P'])));
 libroBase.getSheetByName('Parámetros').getRange(1, 1, 2, 2).setValues([['Parámetro', 'Valor'], ['Alerta de stock (días o menos)', 10]]);
+libroBase.getSheetByName('Parámetros').appendRow(['Kg por fardo (estimado)', 300]);
 libroLluvias.getSheetByName('Lluvias').getRange(1, 1, 1, 7).setValues([['ID', 'Finca', 'Sector', 'Fecha', 'mm', 'Usuario', 'Fecha carga']]);
 
 const validacion = { requireValueInList() { return this; }, setAllowInvalid() { return this; }, build() { return {}; } };
