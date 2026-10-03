@@ -255,6 +255,29 @@ function asegurarFichaSanidad_(ss, ins) {
  *  sanitarios (consumo a mano). Lo de IATF queda como Indicación "Reproducción". Se borra la columna
  *  "Baja en Registros" (versión 12), que pasa a ser el rubro. Una sola vez. */
 const MATERIALES_V13 = /^(ALCOHOL|JERINGA|GUANTE|VAINAS|APLICADOR DIB|BAGODRYL)/i;
+/** Esquema 15 (pedido 03/10/2026): desactivar de una vez los productos de Semen con stock 0, para que no
+ *  aparezcan (siguen en la hoja y el buscador los encuentra para reactivarlos). Corre una sola vez. */
+function desactivarSemenEnCero_(ss, ins) {
+  if (props_().getProperty('SEMEN_CERO_V15')) return;
+  const n = ins.getLastRow();
+  if (n > 1) {
+    const saldos = calcularStock_(leerInsumos_(ss), leerMovimientos_(ss));
+    const cRubro = COLS_INSUMOS.indexOf('Rubro');
+    const cActivo = COLS_INSUMOS.indexOf('Activo');
+    const filas = ins.getRange(2, 1, n - 1, COLS_INSUMOS.length).getValues();
+    const apagados = [];
+    filas.forEach((f, k) => {
+      const nombre = String(f[0]).trim();
+      if (String(f[8]).trim() !== 'Sanidad' || String(f[cRubro]).trim() !== 'Semen' || f[cActivo] !== true) return;
+      if (saldos[nombre] && saldos[nombre].cantidad) return;
+      ins.getRange(k + 2, cActivo + 1).setValue(false);
+      apagados.push(nombre);
+    });
+    if (apagados.length) registrar_(ss, [[new Date(), 'Sistema', 'Desactivar semen en 0', apagados.join(', '), 'Aplicado', '']]);
+  }
+  props_().setProperty('SEMEN_CERO_V15', '1');
+}
+
 function migrarRubrosSanidad_(ss, ins) {
   if (props_().getProperty('RUBROS_V13')) return;
   const n = ins.getLastRow();

@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.20.2';
+const VERSION = '1.20.3';
 
 
 const DIAS_HISTORIAL = 60;
@@ -680,7 +680,7 @@ function htmlEstadoEstancia() {
 /** Sanidad: son casi cien productos, así que van en lista corta (nombre y saldo) con un buscador
  *  (nombre comercial, principio activo, laboratorio, proveedor o indicación); la ficha se abre al tocar. */
 function htmlListaSanidad(ins, s, c7) {
-  if (!ins.length) return '<p class="vacio">Todavía no hay productos en ' + esc(ui.rubro) + '.</p>';
+  if (!insumosMod().length) return '<p class="vacio">Todavía no hay productos en ' + esc(ui.rubro) + '.</p>';
   const bajos = ins.filter((i) => infoInsumo(i, s, c7).bajo).length;
   return htmlEstadoEstancia() +
     '<div class="buscar-fila"><input class="txt buscar" id="buscar-san" type="search" placeholder="' + (ui.rubro === 'Semen' ? '🔍 Toro o cabaña…' : '🔍 Nombre, principio activo, laboratorio…') + '" autocomplete="off" value="' + esc(ui.buscarSan || '') + '">' +
@@ -724,11 +724,12 @@ function htmlResultadosSanidad() {
   const q = String(ui.buscarSan || '').trim().toUpperCase();
   const s = saldos();
   const c7 = consumo7();
-  const ins = insumosMod().filter((i) => (i.activo || (s[i.nombre] && s[i.nombre].cantidad)) && (!ui.filtroIatf || esIatf(i)) &&
+  // Buscando aparecen también los desactivados (para poder abrirlos y reactivarlos).
+  const ins = insumosMod().filter((i) => (q || i.activo || (s[i.nombre] && s[i.nombre].cantidad)) && (!ui.filtroIatf || esIatf(i)) &&
     (!q || [i.nombre, i.principio, i.laboratorio, i.proveedor, i.indicacion].join(' ').toUpperCase().indexOf(q) !== -1))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
   const filtro = (q ? ' con "' + esc(ui.buscarSan.trim()) + '"' : '') + (ui.filtroIatf ? ' de IATF' : '');
-  if (!ins.length) return '<p class="vacio">No hay productos' + filtro + '.</p>';
+  if (!ins.length) return '<p class="vacio">No hay productos' + (filtro || ' con stock') + '.</p>';
   const conStock = ins.filter((i) => (s[i.nombre] || {}).cantidad);
   const enCero = ins.filter((i) => !(s[i.nombre] || {}).cantidad);
   // Buscando se ve todo lo que coincide; sin buscar, lo que está en cero queda detrás de un botón.
@@ -738,6 +739,7 @@ function htmlResultadosSanidad() {
     const sub = esSemen(i) ? i.laboratorio : i.principio; // en Semen todo es semen: va la cabaña
     return '<button class="fila-san ' + n.cls + '" data-a="verInsumo" data-i="' + esc(i.nombre) + '">' +
       '<span class="nom">' + esc(i.nombre) + (esIatf(i) && ui.rubro !== 'Semen' ? ' <span class="chip azul">IATF</span>' : '') +
+      (!i.activo ? ' <span class="chip">Desactivado</span>' : '') +
       (sub ? '<small>' + esc(lindo(sub)) + '</small>' : '') + '</span>' +
       '<span class="val"><b class="' + (n.x.cantidad < 0 ? 'rojo' : '') + '">' + num(n.x.cantidad, 1) + '</b> ' + esc(unidadTxt(i.unidad, n.x.cantidad)) +
       (n.kg && n.x.cantidad ? '<small>' + esc(n.kg) + '</small>' : '') + '</span></button>';
