@@ -210,7 +210,7 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
 - Ficha del producto (columnas Principio activo, Indicación, Laboratorio, Proveedor, Dosis base, Peso base
   en Insumos, de la hoja INVENTARIO; esquema 11). Pantalla (v1.20.0, 03/10; antes solo se veía lo buscado y al
   usuario le resultó incómodo, sobre todo en Semen): **lista corta de lo que hay en stock** (saldo ≠ 0, incluye
-  negativos), una línea por producto (nombre, principio activo en gris, saldo), alfabética; tocándola se abre
+  negativos), una línea por producto (nombre, en gris principio activo · proveedor, saldo), alfabética; tocándola se abre
   la ficha. Los que están en cero, detrás de "Ver también sin stock (N)". El buscador (nombre comercial,
   principio activo, laboratorio, proveedor o indicación) filtra y, buscando, muestra también los en cero y los
   desactivados (chip "Desactivado", para reactivarlos desde la ficha). Desactivado y en cero = no aparece.

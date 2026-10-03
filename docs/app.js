@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.20.4';
+const VERSION = '1.20.5';
 
 
 const DIAS_HISTORIAL = 60;
@@ -736,8 +736,8 @@ function htmlResultadosSanidad() {
   const verCero = q || ui.sinStockSan;
   const fila = (i) => {
     const n = infoInsumo(i, s, c7);
-    // En Semen todo es semen: va la cabaña y el proveedor.
-    const sub = (esSemen(i) ? [i.laboratorio, i.proveedor] : [i.principio]).filter(Boolean).map(lindo).join(' · ');
+    // Línea gris: principio activo (en Semen, que todo es semen, la cabaña) y el proveedor.
+    const sub = [esSemen(i) ? i.laboratorio : i.principio, i.proveedor].filter(Boolean).map(lindo).join(' · ');
     return '<button class="fila-san ' + n.cls + '" data-a="verInsumo" data-i="' + esc(i.nombre) + '">' +
       '<span class="nom">' + esc(i.nombre) + (esIatf(i) && ui.rubro !== 'Semen' ? ' <span class="chip azul">IATF</span>' : '') +
       (!i.activo ? ' <span class="chip">Desactivado</span>' : '') +
