@@ -135,7 +135,7 @@ referencia y se sacó "Consumo últimos 7 días"). Consumo esperado = hoja **"Co
 confinamiento (la edita el usuario; la creó el script con ESPERADO_INICIAL, de Proyeccion_comida_60_dias.xlsx): un
 grupo por fila, kg tal cual por cabeza y día por insumo (columnas = nombre exacto del insumo). Con "Categoría", las
 cabezas salen del último Tapfeed (corrales de esa categoría en la hoja Corrales); si no, columna Cabezas; "Desde"
-opcional. Valores fijos por cabeza (no se escalan por peso). **Fardos por UNIDAD, nunca en kg** (columna Unidad en Stock por día; fila de fardo = total del grupo con Cabezas 1, 9 fardos/día). Silo del autoconsumo de toretones: sale de otro lado, NO va (03/10). Hembras separadas en E-PRO y fardo (fardo ~9 fardos/día = 3,17 kg/cab). Toretones BEEF comen maíz QUEBRADO (no molido). Parámetro "Insumos fuera del informe" (hoy Semilla de Gatton). (El parámetro "Kg por fardo" se eliminó el 03/10.)
+opcional. Valores fijos por cabeza (no se escalan por peso). **Fardos por UNIDAD, nunca en kg** (columna Unidad en Stock por día; fila de fardo = total del grupo con Cabezas 1, 9 fardos/día). Silo del autoconsumo de toretones: sale de otro lado, NO va (03/10). Hembras separadas en E-PRO y fardo (fardo ~9 fardos/día = 3,17 kg/cab). Toretones BEEF comen maíz QUEBRADO (no molido). Parámetro "Insumos fuera del informe" (hoy Semilla de Gatton). Parámetro "Estancia de los insumos por estancia (Fardos)" = La Paciencia: el informe muestra solo esos fardos. (El parámetro "Kg por fardo" se eliminó el 03/10.)
 Parámetros (300). Código: leerDatosBase_ y publicarDatosInforme_.
 
 - Botón "Subir informe Tapfeed" al pie de Stock (solo casilla Configurar). El PDF "Uso de ingredientes

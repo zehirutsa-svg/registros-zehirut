@@ -142,6 +142,8 @@ const DATOS_BASE_ID = '1N3COBD95uByGGjO72KsL8FphIiRFz9-Y0FAOaVdnceY';
 const HOJA_ESPERADO = 'Consumo esperado';
 const PARAM_KG_FARDO = 'Kg por fardo (estimado)';   // ya no se usa: los fardos se cuentan por unidad (03/10/2026)
 const PARAM_FUERA_INFORME = 'Insumos fuera del informe (separados por ;)';
+// Insumos con stock por estancia (Fardos): el informe muestra solo esta estancia (pedido 03/10/2026).
+const PARAM_ESTANCIA_INFORME = 'Estancia de los insumos por estancia (Fardos)';
 // Valores iniciales (Proyeccion_comida_60_dias.xlsx, hojas Dietas y Grupos, con los ajustes del usuario del 03/10/2026).
 // Después se editan en la hoja. Con Categoría, las cabezas salen de Tapfeed (corrales de esa categoría en Corrales).
 const ESPERADO_INSUMOS = ['Silo micropicado Gatton', 'Maíz molido', 'Maíz quebrado', 'Balanceado Pre destete', 'Concentrado Desarrollo',
@@ -370,15 +372,16 @@ function fardosAjusteAConteo_(ss) {
  *  (las creó la conexión de la tarea; la de Claude no las puede borrar). Solo si el nombre empieza con "(reemplazado". */
 function papeleraInformesViejos_() {
   const props = props_();
-  if (props.getProperty('papeleraInf0210b')) return;
-  // 1AJY…: el informe del 02/10 con los fardos en kg (reemplazado por el de fardos por unidad).
-  ['1Nza1NT4Zg31IE2OaFJAkefPkukoMZ-wa', '11TNiKi3JOgsVRJR5RRNAkZ5KW10CEQ9R', '1AJYInHIJJfi2d_l_n5c7ffhuA1mQ4uVH'].forEach((id) => {
+  if (props.getProperty('papeleraInf0210c')) return;
+  // 1AJY…: fardos en kg; 1hzQ…: fardos de las dos estancias (reemplazados; solo La Paciencia desde 03/10).
+  ['1Nza1NT4Zg31IE2OaFJAkefPkukoMZ-wa', '11TNiKi3JOgsVRJR5RRNAkZ5KW10CEQ9R', '1AJYInHIJJfi2d_l_n5c7ffhuA1mQ4uVH',
+    '1hzQsruV3-XAAq0DOzZEmjQiFhICdW3qR'].forEach((id) => {
     try {
       const f = DriveApp.getFileById(id);
       if (!f.isTrashed() && /02 OCT 26\.pdf$/.test(f.getName())) f.setTrashed(true);
     } catch (e) { console.error('No se pudo mandar a la papelera ' + id + ': ' + e); }
   });
-  props.setProperty('papeleraInf0210b', '1');
+  props.setProperty('papeleraInf0210c', '1');
 }
 
 /** Una sola vez (03/10/2026): la bolsa de E-PRO 35 es de 30 kg, no de 40. Corrige Insumos y los kg de sus movimientos. */
@@ -1349,18 +1352,21 @@ function publicarDatosInforme_(ss) {
       Object.keys(pi).sort().forEach((i) => ingred.push([ddmmaaaa_(f), i, r0(pi[i].kg), r0(pi[i].ms)]));
     });
 
+    // Insumos por estancia (Fardos): en el informe solo cuenta la estancia del parámetro (si no hay, todas).
+    const deLaEstancia = (m) => !base.estancia || !(porNombre[m.insumo] || {}).porEstancia || m.estancia === base.estancia;
+    const movsInf = movs.filter(deLaEstancia);
     // Stock por día de TODOS los insumos de Stock (no solo los del confinamiento).
     const ingStock = insumos.filter((i) => i.activo && i.modulo === 'Stock' && (base.fuera || []).indexOf(i.nombre) === -1).map((i) => i.nombre);
     const consumoDia = {};   // insumo|fecha -> kg (todos los destinos)
-    movs.filter((m) => m.tipo === 'Consumo').forEach((m) => {
+    movsInf.filter((m) => m.tipo === 'Consumo').forEach((m) => {
       const k = m.insumo + '|' + m.fecha;
       consumoDia[k] = (consumoDia[k] || 0) + cantRep(m.insumo, m.cantidad);
     });
     // Saldo al final de un día, sumando las estancias (Fardos lleva un stock por estancia).
     const saldosAl = (fecha) => {
-      const s = calcularStock_(insumos, movs.filter((m) => m.fecha <= fecha));
+      const s = calcularStock_(insumos, movsInf.filter((m) => m.fecha <= fecha));
       const r = {};
-      Object.keys(s).forEach((k) => { r[s[k].insumo] = (r[s[k].insumo] || 0) + cantRep(s[k].insumo, s[k].cantidad); });
+      Object.keys(s).filter((k) => !base.estancia || !s[k].estancia || s[k].estancia === base.estancia).forEach((k) => { r[s[k].insumo] = (r[s[k].insumo] || 0) + cantRep(s[k].insumo, s[k].cantidad); });
       return r;
     };
     // Consumo esperado de un día: kg por cabeza de cada grupo × cabezas. Los grupos con Categoría toman
@@ -1410,6 +1416,7 @@ function publicarDatosInforme_(ss) {
       const i = porNombre[x.insumo];
       // Solo los insumos de Stock: la tarea lee ~100 filas por hoja y Sanidad son casi cien productos.
       if (!i || !i.activo || i.modulo !== 'Stock' || (base.fuera || []).indexOf(i.nombre) !== -1) return;
+      if (base.estancia && x.estancia && x.estancia !== base.estancia) return;
 
       stock.push([x.insumo, x.estancia ? nombreEstancia_(x.estancia) : '', Math.round(x.cantidad * 100) / 100, i.unidad, i.kgUnidad || i.unidad === 'kg' ? r0(kgDe(x.insumo, x.cantidad)) : '']);
     });
@@ -1422,7 +1429,8 @@ function publicarDatosInforme_(ss) {
       ['Días con Tapfeed en ese período', diasTf.filter((f) => f >= desde).map(ddmmaaaa_).join(', ') || 'ninguno'],
       ['Último día con Tapfeed', diasTf.length ? ddmmaaaa_(diasTf[diasTf.length - 1]) : 'ninguno'],
       ['Días sin Tapfeed desde ' + ddmmaaaa_(INFORME_INICIO) + ' hasta ayer', faltan.join(', ') || 'ninguno'],
-      ['Unidades', 'En kg, redondeado, salvo lo que se cuenta por unidad (Fardos: en fardos); ver columna Unidad de Stock por día. Consumo = confinamiento (Tapfeed) + otros destinos (autoconsumo, cargado en la app).'],
+      ['Unidades', 'En kg, redondeado, salvo lo que se cuenta por unidad (Fardos: en fardos); ver columna Unidad de Stock por día.' +
+        (base.estancia ? ' Fardos: solo ' + nombreEstancia_(base.estancia) + '.' : '') + ' Consumo = confinamiento (Tapfeed) + otros destinos (autoconsumo, cargado en la app).'],
       ['Consumo esperado', base.error ? 'NO SE PUDO CALCULAR: ' + base.error
         : 'Según las dietas de la hoja "' + HOJA_ESPERADO + '" de Datos base confinamiento (cantidad por cabeza × cabezas; confinamiento con las cabezas de Tapfeed). Días de stock = saldo ÷ consumo esperado.'],
     ]);
@@ -1463,6 +1471,9 @@ function leerDatosBase_() {
     const fuera = filas.find((f) => String(f[0]).trim() === PARAM_FUERA_INFORME);
     if (fuera) r.fuera = String(fuera[1] || '').split(';').map((x) => x.trim()).filter(Boolean);
     else { par.appendRow([PARAM_FUERA_INFORME, 'Semilla de Gatton']); r.fuera = ['Semilla de Gatton']; }
+    const est = filas.find((f) => String(f[0]).trim() === PARAM_ESTANCIA_INFORME);
+    if (est) r.estancia = String(est[1] || '').trim().toUpperCase();
+    else { par.appendRow([PARAM_ESTANCIA_INFORME, 'La Paciencia']); r.estancia = 'LA PACIENCIA'; }
   }
 
   let h = db.getSheetByName(HOJA_ESPERADO);
