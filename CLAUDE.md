@@ -215,7 +215,7 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
   principio activo, laboratorio, proveedor o indicación) filtra y, buscando, muestra también los en cero y los
   desactivados (chip "Desactivado", para reactivarlos desde la ficha). Desactivado y en cero = no aparece.
   Esquema 15 (03/10, una sola vez, propiedad SEMEN_CERO_V15): se desactivaron los Semen con stock 0.
-  **En Semen** (v1.20.1) la línea gris es la cabaña (columna Laboratorio, que en Semen se llama "Cabaña" en la
+  **En Semen** (v1.20.1/.4) la línea gris es cabaña · proveedor (columna Laboratorio, que en Semen se llama "Cabaña" en la
   ficha y el formulario), y un producto nuevo arranca en pajuela / un (en los otros stocks, frasco / ml).
   El Ingreso trae el proveedor de la ficha.
 - Excel por rubro: Resumen +

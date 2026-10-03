@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.20.3';
+const VERSION = '1.20.4';
 
 
 const DIAS_HISTORIAL = 60;
@@ -736,11 +736,12 @@ function htmlResultadosSanidad() {
   const verCero = q || ui.sinStockSan;
   const fila = (i) => {
     const n = infoInsumo(i, s, c7);
-    const sub = esSemen(i) ? i.laboratorio : i.principio; // en Semen todo es semen: va la cabaña
+    // En Semen todo es semen: va la cabaña y el proveedor.
+    const sub = (esSemen(i) ? [i.laboratorio, i.proveedor] : [i.principio]).filter(Boolean).map(lindo).join(' · ');
     return '<button class="fila-san ' + n.cls + '" data-a="verInsumo" data-i="' + esc(i.nombre) + '">' +
       '<span class="nom">' + esc(i.nombre) + (esIatf(i) && ui.rubro !== 'Semen' ? ' <span class="chip azul">IATF</span>' : '') +
       (!i.activo ? ' <span class="chip">Desactivado</span>' : '') +
-      (sub ? '<small>' + esc(lindo(sub)) + '</small>' : '') + '</span>' +
+      (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' +
       '<span class="val"><b class="' + (n.x.cantidad < 0 ? 'rojo' : '') + '">' + num(n.x.cantidad, 1) + '</b> ' + esc(unidadTxt(i.unidad, n.x.cantidad)) +
       (n.kg && n.x.cantidad ? '<small>' + esc(n.kg) + '</small>' : '') + '</span></button>';
   };
