@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.20.0';
+const VERSION = '1.20.1';
 
 
 const DIAS_HISTORIAL = 60;
@@ -683,7 +683,7 @@ function htmlListaSanidad(ins, s, c7) {
   if (!ins.length) return '<p class="vacio">Todavía no hay productos en ' + esc(ui.rubro) + '.</p>';
   const bajos = ins.filter((i) => infoInsumo(i, s, c7).bajo).length;
   return htmlEstadoEstancia() +
-    '<div class="buscar-fila"><input class="txt buscar" id="buscar-san" type="search" placeholder="🔍 Nombre, principio activo, laboratorio…" autocomplete="off" value="' + esc(ui.buscarSan || '') + '">' +
+    '<div class="buscar-fila"><input class="txt buscar" id="buscar-san" type="search" placeholder="' + (ui.rubro === 'Semen' ? '🔍 Toro o cabaña…' : '🔍 Nombre, principio activo, laboratorio…') + '" autocomplete="off" value="' + esc(ui.buscarSan || '') + '">' +
     (ui.rubro !== 'Semen' ? '<button class="chip-filtro' + (ui.filtroIatf ? ' activo' : '') + '" data-a="filtroIatf">🏷 IATF</button>' : '') + '</div>' +
     '<div id="res-san">' + htmlResultadosSanidad() + '</div>' +
     '<p class="nota-estancia" style="margin-top:12px">' + ins.length + ' productos en ' + esc(ui.rubro) +
@@ -695,7 +695,7 @@ function lindo(t) {
   const s = String(t || '').trim();
   if (!s || s !== s.toUpperCase()) return s;
   return s.split(/(\s+|\/|,)/).map((p, n) => (n && /^(Y|E|O|DE|DEL|LA|EL|CON)$/.test(p) ? p.toLowerCase()
-    : /^[A-ZÁÉÍÓÚÑ]{4,}$/.test(p) ? p.charAt(0) + p.slice(1).toLowerCase() : p)).join('');
+    : /^([A-ZÁÉÍÓÚÑ]{4,}|LAS|LOS|SAN)$/.test(p) ? p.charAt(0) + p.slice(1).toLowerCase() : p)).join('');
 }
 
 /** Dosis base, ej. "4 ml cada 500 kg" (la planilla la da por kg de peso vivo). */
@@ -704,11 +704,14 @@ function dosisTxt(i) {
   return num(i.dosisBase) + ' ' + (i.unidadContenido || 'un') + (i.pesoBase ? ' cada ' + num(i.pesoBase, 0) + ' kg' : '');
 }
 
+/** En Semen el "Laboratorio" es la cabaña o centro genético. */
+const esSemen = (i) => i.rubro === 'Semen';
+
 /** Datos del producto, ordenados como la planilla de inventario. */
 function fichaSanidad(i) {
   return [
     ['Indicación', lindo(i.indicacion)],
-    ['Laboratorio', lindo(i.laboratorio)],
+    [esSemen(i) ? 'Cabaña' : 'Laboratorio', lindo(i.laboratorio)],
     ['Proveedor', lindo(i.proveedor)],
     ['Dosis', dosisTxt(i)],
     ['Presentación', i.contenido ? i.unidad + ' de ' + num(i.contenido) + ' ' + i.unidadContenido : i.unidad],
@@ -732,9 +735,10 @@ function htmlResultadosSanidad() {
   const verCero = q || ui.sinStockSan;
   const fila = (i) => {
     const n = infoInsumo(i, s, c7);
+    const sub = esSemen(i) ? i.laboratorio : i.principio; // en Semen todo es semen: va la cabaña
     return '<button class="fila-san ' + n.cls + '" data-a="verInsumo" data-i="' + esc(i.nombre) + '">' +
       '<span class="nom">' + esc(i.nombre) + (esIatf(i) && ui.rubro !== 'Semen' ? ' <span class="chip azul">IATF</span>' : '') +
-      (i.principio ? '<small>' + esc(lindo(i.principio)) + '</small>' : '') + '</span>' +
+      (sub ? '<small>' + esc(lindo(sub)) + '</small>' : '') + '</span>' +
       '<span class="val"><b class="' + (n.x.cantidad < 0 ? 'rojo' : '') + '">' + num(n.x.cantidad, 1) + '</b> ' + esc(unidadTxt(i.unidad, n.x.cantidad)) +
       (n.kg && n.x.cantidad ? '<small>' + esc(n.kg) + '</small>' : '') + '</span></button>';
   };
@@ -1337,9 +1341,12 @@ function productoForm(i) {
   return i ? { original: i.nombre, nombre: i.nombre, principio: i.principio || '', rubro: i.rubro, unidad: i.unidad, contenido: v(i.contenido),
     unidadContenido: i.unidadContenido || 'ml', indicacion: i.indicacion || '', laboratorio: i.laboratorio || '', proveedor: i.proveedor || '',
     dosisBase: v(i.dosisBase), pesoBase: v(i.pesoBase), minimo: v(i.minimo), activo: !!i.activo }
-    : { original: '', nombre: '', principio: '', rubro: ui.rubro, unidad: 'frasco', contenido: '', unidadContenido: 'ml', indicacion: '',
-      laboratorio: '', proveedor: '', dosisBase: '', pesoBase: '', minimo: '', activo: true };
+    : Object.assign({ original: '', nombre: '', principio: '', rubro: ui.rubro, contenido: '', indicacion: '',
+      laboratorio: '', proveedor: '', dosisBase: '', pesoBase: '', minimo: '', activo: true }, unidadesPorDefecto(ui.rubro));
 }
+
+/** Unidades con que arranca un producto nuevo: el semen va en pajuelas (un), lo demás en frascos (ml). */
+const unidadesPorDefecto = (rubro) => (rubro === 'Semen' ? { unidad: 'pajuela', unidadContenido: 'un' } : { unidad: 'frasco', unidadContenido: 'ml' });
 
 function htmlProducto() {
   const p = ui.prod;
@@ -1355,7 +1362,7 @@ function htmlProducto() {
     '<div class="fila2">' + sel('rubro', 'Stock', RUBROS_SANIDAD.map((r) => r[0])) + sel('unidad', 'Se guarda en', UNIDADES_SAN) + '</div>' +
     '<div class="fila2">' + txt('contenido', 'Contenido <small>(opc.)</small>', dec) + sel('unidadContenido', 'ml / un', ['ml', 'un']) + '</div>' +
     txt('indicacion', 'Indicación <small>(opcional)</small>') +
-    '<div class="fila2">' + txt('laboratorio', 'Laboratorio <small>(opc.)</small>') + txt('proveedor', 'Proveedor <small>(opc.)</small>') + '</div>' +
+    '<div class="fila2">' + txt('laboratorio', (p.rubro === 'Semen' ? 'Cabaña' : 'Laboratorio') + ' <small>(opc.)</small>') + txt('proveedor', 'Proveedor <small>(opc.)</small>') + '</div>' +
     '<div class="fila2">' + txt('dosisBase', 'Dosis base <small>(opc.)</small>', dec) + txt('pesoBase', 'Cada … kg <small>(opc.)</small>', dec) + '</div>' +
     txt('minimo', 'Stock mínimo <small>(opcional)</small>', dec) +
     '<div style="margin:6px 0 16px">' + chk('activo', 'Activo', '') +
@@ -1673,6 +1680,8 @@ function despuesDeRender() {
   document.querySelectorAll('[data-prod]').forEach((el) => {
     el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', () => {
       ui.prod[el.dataset.prod] = el.type === 'checkbox' ? el.checked : el.value;
+      // Producto nuevo al que se le cambia el stock: toma las unidades de ese stock (pajuela/un en Semen).
+      if (el.dataset.prod === 'rubro' && !ui.prod.original) { Object.assign(ui.prod, unidadesPorDefecto(el.value)); render(); }
     });
   });
   document.querySelectorAll('[data-cfg][data-k]').forEach((el) => {

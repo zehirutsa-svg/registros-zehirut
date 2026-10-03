@@ -212,6 +212,8 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
   negativos), una línea por producto (nombre, principio activo en gris, saldo), alfabética; tocándola se abre
   la ficha. Los que están en cero, detrás de "Ver también sin stock (N)". El buscador (nombre comercial,
   principio activo, laboratorio, proveedor o indicación) filtra y, buscando, muestra también los en cero.
+  **En Semen** (v1.20.1) la línea gris es la cabaña (columna Laboratorio, que en Semen se llama "Cabaña" en la
+  ficha y el formulario), y un producto nuevo arranca en pajuela / un (en los otros stocks, frasco / ml).
   El Ingreso trae el proveedor de la ficha.
 - Excel por rubro: Resumen +
   Movimientos, con Unidad de negocio **PATRIMONIAL** (decisión del contador), sin hoja por producto.
