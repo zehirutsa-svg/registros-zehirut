@@ -278,6 +278,53 @@ function desactivarSemenEnCero_(ss, ins) {
   props_().setProperty('SEMEN_CERO_V15', '1');
 }
 
+/** Esquema 16 (pedido 03/10/2026): factura Genetyx S.A. 001-001-0005446 (kit IATF, entregado el 22/09/2026).
+ *  Crea los productos que falten y carga, por producto, un Conteo 0 (stock inicial: desde ahí cuentan los
+ *  consumos de la app de la estancia) y el Ingreso. El semen de la factura ya estaba cargado. Corre una sola vez. */
+const FACTURA_GENETYX = [
+  // [Producto, Rubro, Unidad, Contenido, Unidad del contenido, Principio activo, Dosis base, Ingreso]
+  ['REPRO ONE 0,5 g (DISPOSITIVO)', 'Medicamentos', 'paquete', 10, 'un', 'PROGESTERONA - DIV', 1, 140],
+  ['SYNCROGEN 100 ml', 'Medicamentos', 'frasco', 100, 'ml', 'PROSTAGLANDINA - CLOPROSTENOL', '', 28],
+  ['CIPION 10 ml', 'Medicamentos', 'frasco', 10, 'ml', 'CIPIONATO DE ESTRADIOL', '', 70],
+  ['INDUSCIO 50 ml', 'Medicamentos', 'frasco', 50, 'ml', 'BENZOATO DE ESTRADIOL', '', 56],
+  ['ECGEN 5000 UI', 'Medicamentos', 'frasco', '', '', 'ECG', '', 112],
+  ['MAXRELIN 50 ml', 'Medicamentos', 'frasco', 50, 'ml', 'GnRH', '', 28],
+  ['APLICADOR DIV-P4', RUBRO_MATERIALES, 'unidad', '', '', '', '', 3],
+];
+
+function cargarFacturaGenetyx_(ss, ins) {
+  if (props_().getProperty('GENETYX_V16')) return;
+  const fecha = '2026-09-22';
+  const proveedor = 'GENETYX S.A.';
+  const factura = '001-001-0005446';
+  const usuario = 'Enrique Delfante';
+  const existentes = {};
+  leerInsumos_(ss).forEach((i) => { existentes[i.nombre.toUpperCase()] = i.nombre; });
+  const nuevosProd = [];
+  const movs = [];
+  const ahora = new Date();
+  let ts = new Date(2026, 8, 22, 12, 0, 0).getTime();
+  FACTURA_GENETYX.forEach((p, k) => {
+    const nombre = existentes[p[0].toUpperCase()] || p[0];
+    if (!existentes[p[0].toUpperCase()]) {
+      nuevosProd.push([nombre, p[2], '', '', true, false, false, '', 'Sanidad', p[1], p[3], p[4],
+        p[5], 'REPRODUCCIÓN', '', proveedor, p[6], '']);
+    }
+    const id = 'GTX5446-' + (k + 1);
+    const hora = Utilities.formatDate(new Date(ts), ZONA, 'dd/MM/yyyy HH:mm:ss');
+    movs.push([id + '-C', fecha, 'Conteo', nombre, 0, p[2], '', '', '', '', '', 'Stock inicial (producto nuevo, factura Genetyx)',
+      usuario, hora, ahora, false, '', ts++, '', '', '', '', '']);
+    movs.push([id + '-I', fecha, 'Ingreso', nombre, p[7], p[2], '', '', proveedor, '', factura, 'Kit IATF (entregado 22/09/2026)',
+      usuario, hora, ahora, false, '', ts++, '', '', '', '', '']);
+  });
+  if (nuevosProd.length) ins.getRange(ins.getLastRow() + 1, 1, nuevosProd.length, COLS_INSUMOS.length).setValues(nuevosProd);
+  const shM = ss.getSheetByName('Movimientos');
+  shM.getRange(shM.getLastRow() + 1, 1, movs.length, COLS_MOV.length).setValues(movs);
+  registrar_(ss, [[ahora, 'Sistema', 'Factura Genetyx ' + factura, nuevosProd.length + ' productos nuevos, ' +
+    FACTURA_GENETYX.length + ' ingresos del ' + ddmmaaaa_(fecha), 'Aplicado', '']]);
+  props_().setProperty('GENETYX_V16', '1');
+}
+
 function migrarRubrosSanidad_(ss, ins) {
   if (props_().getProperty('RUBROS_V13')) return;
   const n = ins.getLastRow();

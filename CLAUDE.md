@@ -215,6 +215,9 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
   principio activo, laboratorio, proveedor o indicación) filtra y, buscando, muestra también los en cero y los
   desactivados (chip "Desactivado", para reactivarlos desde la ficha). Desactivado y en cero = no aparece.
   Esquema 15 (03/10, una sola vez, propiedad SEMEN_CERO_V15): se desactivaron los Semen con stock 0.
+  Esquema 16 (03/10, una sola vez, propiedad GENETYX_V16): factura Genetyx 001-001-0005446 (kit IATF entregado
+  22/09/2026): 7 productos nuevos (FACTURA_GENETYX en Sanidad.gs) con Conteo 0 + Ingreso del 22/09 (IDs GTX5446-n-C/I).
+  Unidad "paquete" (Repro One, paquete de 10 dispositivos) agregada a UNIDADES_SAN.
   **En Semen** (v1.20.1/.4) la línea gris es cabaña · proveedor (columna Laboratorio, que en Semen se llama "Cabaña" en la
   ficha y el formulario), y un producto nuevo arranca en pajuela / un (en los otros stocks, frasco / ml).
   El Ingreso trae el proveedor de la ficha.
