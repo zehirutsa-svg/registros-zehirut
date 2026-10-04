@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.20.6';
+const VERSION = '1.20.7';
 
 
 const DIAS_HISTORIAL = 60;
@@ -1348,6 +1348,60 @@ function productoForm(i) {
       laboratorio: '', proveedor: '', dosisBase: '', pesoBase: '', minimo: '', activo: true }, unidadesPorDefecto(ui.rubro));
 }
 
+/** Principio activo: desplegable con los que ya existen + "Nuevo…" (04/10/2026). La app de la estancia
+ *  agrupa las hormonas de IATF por principio activo: un "Bucerelina" mal escrito quedaría fuera de su
+ *  droga. Elegirlo de la lista evita el error; uno de verdad nuevo se escribe una vez y queda en la lista. */
+const PRINCIPIO_NUEVO = '__nuevo__';
+const normPrincipio = (t) => String(t || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9]/g, '');
+
+function principiosExistentes() {
+  const vistos = {};
+  stockDatos().insumos.forEach((i) => {
+    const t = String(i.principio || '').trim();
+    if (t && !vistos[normPrincipio(t)]) vistos[normPrincipio(t)] = t;
+  });
+  return Object.values(vistos).sort((a, b) => a.localeCompare(b, 'es'));
+}
+
+function campoPrincipio(p) {
+  const lista = principiosExistentes();
+  const actual = String(p.principio || '').trim();
+  if (actual && !p.principioNuevo && lista.indexOf(actual) === -1) lista.push(actual);
+  const opc = (v, etq, si) => '<option value="' + esc(v) + '"' + (si ? ' selected' : '') + '>' + esc(etq) + '</option>';
+  let h = '<div class="campo"><label for="p-principio-sel">Principio activo <small>(opcional)</small></label>' +
+    '<select class="txt" id="p-principio-sel" data-principio-sel>' + opc('', '— Sin principio activo —', !actual && !p.principioNuevo) +
+    lista.map((x) => opc(x, lindo(x), !p.principioNuevo && x === actual)).join('') +
+    opc(PRINCIPIO_NUEVO, '+ Nuevo…', p.principioNuevo) + '</select></div>';
+  if (p.principioNuevo) {
+    h += '<div class="campo"><label for="p-principio">Nuevo principio activo</label><input class="txt" id="p-principio" data-prod="principio" value="' +
+      esc(p.principio) + '" autocomplete="off" placeholder="Solo si no está en la lista"></div>';
+  }
+  return h;
+}
+
+/** Un principio nuevo igual o muy parecido a uno que ya existe: devuelve el existente (o null). */
+function principioParecido(t) {
+  const n = normPrincipio(t);
+  if (!n) return null;
+  const dist = (a, b) => {
+    const d = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+      let prev = d[0];
+      d[0] = i;
+      for (let j = 1; j <= b.length; j++) {
+        const tmp = d[j];
+        d[j] = Math.min(d[j] + 1, d[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+        prev = tmp;
+      }
+    }
+    return d[b.length];
+  };
+  return principiosExistentes().find((x) => {
+    const m = normPrincipio(x);
+    return m === n || dist(m, n) <= 2 || (n.length >= 5 && (m.indexOf(n) !== -1 || n.indexOf(m) !== -1));
+  }) || null;
+}
+
 /** Unidades con que arranca un producto nuevo: el semen va en pajuelas (un), lo demás en frascos (ml). */
 const unidadesPorDefecto = (rubro) => (rubro === 'Semen' ? { unidad: 'pajuela', unidadContenido: 'un' } : { unidad: 'frasco', unidadContenido: 'ml' });
 
@@ -1361,7 +1415,7 @@ function htmlProducto() {
     (ayuda ? ' <small style="color:var(--gris)">' + ayuda + '</small>' : '') + '</label>';
   const dec = ' inputmode="decimal" autocomplete="off"';
   return '<div class="form">' +
-    txt('nombre', 'Nombre comercial') + txt('principio', 'Principio activo <small>(opcional)</small>') +
+    txt('nombre', 'Nombre comercial') + campoPrincipio(p) +
     '<div class="fila2">' + sel('rubro', 'Stock', RUBROS_SANIDAD.map((r) => r[0])) + sel('unidad', 'Se guarda en', UNIDADES_SAN) + '</div>' +
     '<div class="fila2">' + txt('contenido', 'Contenido <small>(opc.)</small>', dec) + sel('unidadContenido', 'ml / un', ['ml', 'un']) + '</div>' +
     txt('indicacion', 'Indicación <small>(opcional)</small>') +
@@ -1378,8 +1432,18 @@ async function guardarProducto() {
   const p = ui.prod;
   if (!String(p.nombre).trim()) { toast('Escribí el nombre comercial.', 3000); return; }
   if (!navigator.onLine) { toast('Sin señal: los cambios de productos necesitan señal.', 3500); return; }
+  if (p.principioNuevo) {
+    // Nuevo principio activo: si ya existe (o es muy parecido) se usa el de la lista, para no duplicarlo.
+    const t = String(p.principio || '').trim();
+    if (!t) { toast('Escribí el nuevo principio activo, o elegí uno de la lista.', 3500); return; }
+    const igual = principioParecido(t);
+    if (igual && (normPrincipio(igual) === normPrincipio(t) ||
+        confirm('¿No es "' + lindo(igual) + '", que ya está en la lista?\n\nAceptar: usar "' + lindo(igual) + '".\nCancelar: guardar "' + t + '" como nuevo.'))) {
+      p.principio = igual;
+    }
+  }
   const n = (x) => (String(x).trim() ? leerNumero(x) : '');
-  const prod = { nombre: String(p.nombre).trim(), principio: p.principio.trim(), rubro: p.rubro, unidad: p.unidad, contenido: n(p.contenido),
+  const prod = { nombre: String(p.nombre).trim(), principio: String(p.principio || '').trim(), rubro: p.rubro, unidad: p.unidad, contenido: n(p.contenido),
     unidadContenido: p.unidadContenido, indicacion: p.indicacion.trim(), laboratorio: p.laboratorio.trim(), proveedor: p.proveedor.trim(),
     dosisBase: n(p.dosisBase), pesoBase: n(p.pesoBase), minimo: n(p.minimo), activo: !!p.activo };
   if (['contenido', 'dosisBase', 'pesoBase', 'minimo'].some((k) => prod[k] !== '' && !(prod[k] >= 0))) { toast('Revisá los números.', 3000); return; }
@@ -1688,6 +1752,13 @@ function despuesDeRender() {
       // Producto nuevo al que se le cambia el stock: toma las unidades de ese stock (pajuela/un en Semen).
       if (el.dataset.prod === 'rubro' && !ui.prod.original) { Object.assign(ui.prod, unidadesPorDefecto(el.value)); render(); }
     });
+  });
+  const ps = $('[data-principio-sel]');
+  if (ps) ps.addEventListener('change', () => {
+    ui.prod.principioNuevo = ps.value === PRINCIPIO_NUEVO;
+    ui.prod.principio = ui.prod.principioNuevo ? '' : ps.value;
+    render();
+    if (ui.prod.principioNuevo) { const t = $('#p-principio'); if (t) t.focus(); }
   });
   document.querySelectorAll('[data-cfg][data-k]').forEach((el) => {
     el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', () => {

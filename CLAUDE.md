@@ -207,6 +207,12 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
 - Lista inicial: `apps-script/Sanidad.gs` (PRODUCTOS_SANIDAD, 98 productos de la hoja INVENTARIO de la
   planilla "Inventario y stock de medicamentos"), se agrega una sola vez (esquema 7). Después se edita
   desde la app (ver "Alta y edición de productos"); cambiar "Stock" pasa un producto a otro rubro.
+- **Principio activo = desplegable** (v1.20.7, 04/10/2026): en el alta/edición de producto se elige de los
+  principios que ya existen, o "+ Nuevo…" para escribir uno de verdad nuevo; al guardar, si es igual o muy
+  parecido a uno de la lista (sin acentos ni espacios, hasta 2 letras de diferencia, o uno contiene al otro)
+  ofrece usar el existente (`principioParecido`). Motivo: la app de la estancia agrupa las hormonas de IATF
+  por principio activo — un "Bucerelina" mal escrito quedaría fuera de la fila "Buserelina GnRH". El
+  principio "GnRH" pasó a "Buserelina GnRH" en el esquema 18 (mismo día).
 - Ficha del producto (columnas Principio activo, Indicación, Laboratorio, Proveedor, Dosis base, Peso base
   en Insumos, de la hoja INVENTARIO; esquema 11). Pantalla (v1.20.0, 03/10; antes solo se veía lo buscado y al
   usuario le resultó incómodo, sobre todo en Semen): **lista corta de lo que hay en stock** (saldo ≠ 0, incluye
