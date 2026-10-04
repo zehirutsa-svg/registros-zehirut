@@ -110,7 +110,7 @@ const PRODUCTOS_SANIDAD = [
 // compartida (propiedad CLAVE_ESTANCIA del script, nunca en el código: el repositorio es público):
 //   manda  { accion: 'estancia', clave, desde, hasta, consumos: [{ fecha, producto, unidad: ml|un, total, animales }] }
 //          (total por día y producto de los últimos 30 días, ya sumado)
-//   recibe { productos: [...] } — la lista de Sanidad, para el desplegable de allá.
+//   recibe { productos: [...] } — la lista de Sanidad (con principio activo y stock), para los desplegables de allá.
 // Cada día × producto es UN consumo con ID "SAN-AAAA-MM-DD-<producto>", que se reescribe en cada
 // llamada (si allá se corrige o se borra una sanidad, acá se corrige solo). Cuenta recién desde el
 // primer conteo del producto (su stock inicial): lo aplicado antes ya está en ese conteo.
@@ -137,9 +137,13 @@ function estancia_(body) {
   return conLock_(() => {
     const insumos = leerInsumos_(ss).filter((i) => i.modulo === 'Sanidad');
     const r = aplicarConsumosEstancia_(ss, insumos, body);
+    // Saldo actual (después de aplicar los consumos): la estancia lo usa para ofrecer en Alta de
+    // Servicio solo las drogas con stock, agrupadas por principio activo (pedido 04/10/2026).
+    const saldos = calcularStock_(insumos, leerMovimientos_(ss));
     return {
       ok: true, cambios: r.cambios, errores: r.errores,
       productos: insumos.map((i) => ({ nombre: i.nombre, rubro: i.rubro, unidad: i.unidad, contenido: i.contenido, unidadContenido: i.unidadContenido,
+        principio: i.principio, stock: saldos[i.nombre] ? saldos[i.nombre].cantidad : 0,
         // Los materiales sanitarios se dan de baja a mano acá: no se ofrecen en la estancia (no van a animales).
         activo: i.activo && i.rubro !== RUBRO_MATERIALES })),
     };
