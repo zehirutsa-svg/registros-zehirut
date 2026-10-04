@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '17';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '18';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
@@ -234,6 +234,7 @@ function configurar() {
   desactivarSemenEnCero_(ss, ins);
   cargarFacturaGenetyx_(ss, ins);
   ecgenContenido_(ss, ins);
+  principioBuserelina_(ss, ins);
   agregarTrabajos_(ss, 'TRABAJOS_V10', ['Aserraje', 'Trabajos de limpieza']);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();

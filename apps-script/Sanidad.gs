@@ -82,13 +82,13 @@ const PRODUCTOS_SANIDAD = [
   ['ZURONTOP', 'Medicamentos', 'bidón', 5000, 'ml', 'FLUAZURON', 'ANTIPARASITARIO EXTERNO', 'CIBELES', 'CORONADO SRL', 1, 10],
   ['APLICADOR DIB', 'Materiales sanitarios', 'unidad', '', '', '', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 0.002, 500],
   ['BIOESTROGEN', 'Medicamentos', 'frasco', 100, 'ml', 'BENZOATO DE ESTRADIOL', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
-  ['BURESELINA', 'Medicamentos', 'frasco', 50, 'ml', 'GnRH', 'REPRODUCCIÓN', 'ZOOVET', 'ZOOVET', 2.5, 500],
+  ['BURESELINA', 'Medicamentos', 'frasco', 50, 'ml', 'Buserelina GnRH', 'REPRODUCCIÓN', 'ZOOVET', 'ZOOVET', 2.5, 500],
   ['CRONI-CIP', 'Medicamentos', 'frasco', 100, 'ml', 'CIPIONATO DE ESTRADIOL', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
   ['ECEGON 100 ml', 'Medicamentos', 'frasco', 100, 'ml', 'ECG', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
   ['ECEGON 20 ml', 'Medicamentos', 'frasco', 20, 'ml', 'ECG', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
   ['ENZAPROST 100 ml', 'Medicamentos', 'frasco', 100, 'ml', 'PROSTAGLANDINA', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
   ['ENZAPROST 20 ml', 'Medicamentos', 'frasco', 20, 'ml', 'PROSTAGLANDINA', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2, 500],
-  ['GONAXAL', 'Medicamentos', 'frasco', 50, 'ml', 'GnRH', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2.5, 500],
+  ['GONAXAL', 'Medicamentos', 'frasco', 50, 'ml', 'Buserelina GnRH', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 2.5, 500],
   ['GUANTE DE TACTO', 'Materiales sanitarios', 'caja', 100, 'un', '', 'REPRODUCCIÓN', '', '', '', ''],
   ['PROGESTAR (DISPOSITIVO)', 'Medicamentos', 'caja', 10, 'un', 'PROGESTERONA', 'REPRODUCCIÓN', 'BIOGÉNESIS', 'CONSULTPEC SRL', 1, 500],
   ['VAINAS', 'Materiales sanitarios', 'unidad', '', '', '', 'REPRODUCCIÓN', 'MINITUBE', 'CONSULTPEC SRL', 1, 500],
@@ -292,7 +292,7 @@ const FACTURA_GENETYX = [
   ['CIPION 10 ml', 'Medicamentos', 'frasco', 10, 'ml', 'CIPIONATO DE ESTRADIOL', '', 70],
   ['INDUSCIO 50 ml', 'Medicamentos', 'frasco', 50, 'ml', 'BENZOATO DE ESTRADIOL', '', 56],
   ['ECGEN 5000 UI', 'Medicamentos', 'frasco', 25, 'ml', 'ECG', '', 112],
-  ['MAXRELIN 50 ml', 'Medicamentos', 'frasco', 50, 'ml', 'GnRH', '', 28],
+  ['MAXRELIN 50 ml', 'Medicamentos', 'frasco', 50, 'ml', 'Buserelina GnRH', '', 28],
   ['APLICADOR DIV-P4', RUBRO_MATERIALES, 'unidad', '', '', '', '', 3],
 ];
 
@@ -340,6 +340,19 @@ function ecgenContenido_(ss, ins) {
   if (k === -1) return;
   const celda = ins.getRange(k + 2, cCont + 1, 1, 2);
   if (String(celda.getValues()[0][0]).trim() === '') celda.setValues([[25, 'ml']]);
+}
+
+/** Esquema 18: el principio activo "GnRH" pasa a llamarse "Buserelina GnRH" (pedido del usuario,
+ *  04/10/2026; la app de la estancia lo toma como la misma droga en Alta de Servicio). */
+function principioBuserelina_(ss, ins) {
+  const n = ins.getLastRow();
+  if (n < 2) return;
+  const c = COLS_INSUMOS.indexOf('Principio activo') + 1;
+  const r = ins.getRange(2, c, n - 1, 1);
+  const v = r.getValues();
+  let cambios = 0;
+  v.forEach((f) => { if (String(f[0]).trim().toUpperCase() === 'GNRH') { f[0] = 'Buserelina GnRH'; cambios++; } });
+  if (cambios) r.setValues(v);
 }
 
 function migrarRubrosSanidad_(ss, ins) {
