@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.20.7';
+const VERSION = '1.20.8';
 
 
 const DIAS_HISTORIAL = 60;
@@ -617,6 +617,10 @@ function atrasStock() {
 
 /** Datos de una tarjeta/ficha (de una estancia, si el insumo va por estancia): saldo, estado
  *  y cuántos días alcanza al consumo de la última semana. */
+/** Dispositivos (DIV) y otros que vienen en paquetes/cajas de unidades: el stock se MUESTRA en unidades
+ *  (se usan de a uno), aunque se carguen por presentación (04/10/2026, pedido del usuario). */
+const enUnidades = (i) => !!(i.contenido && i.unidadContenido === 'un' && !esSemen(i));
+
 function infoInsumo(i, s, c7, estancia) {
   const k = claveSaldo(i.nombre, estancia);
   const x = s[k] || { cantidad: 0 };
@@ -626,7 +630,10 @@ function infoInsumo(i, s, c7, estancia) {
     x, prom, bajo,
     dias: prom && x.cantidad > 0 ? Math.floor(x.cantidad / prom) : null,
     cls: x.cantidad < 0 ? 'negativo' : bajo ? 'bajo' : (!x.ultimoConteo && !x.cantidad ? 'sin' : ''),
-    kg: i.contenido ? contenidoTxt(i, x.cantidad) : i.kgUnidad && i.unidad !== 'kg' ? num(x.cantidad * i.kgUnidad, 0) + ' kg' : '',
+    kg: enUnidades(i) ? num(x.cantidad, 1) + ' ' + unidadTxt(i.unidad, x.cantidad)
+      : i.contenido ? contenidoTxt(i, x.cantidad) : i.kgUnidad && i.unidad !== 'kg' ? num(x.cantidad * i.kgUnidad, 0) + ' kg' : '',
+    // Número grande que se muestra: unidades sueltas para los que vienen en paquetes (ver enUnidades).
+    ver: enUnidades(i) ? { cant: x.cantidad * i.contenido, unidad: 'un', dec: 0 } : { cant: x.cantidad, unidad: unidadTxt(i.unidad, x.cantidad), dec: null },
   };
 }
 
@@ -742,7 +749,7 @@ function htmlResultadosSanidad() {
       '<span class="nom">' + esc(i.nombre) + (esIatf(i) && ui.rubro !== 'Semen' ? ' <span class="chip azul">IATF</span>' : '') +
       (!i.activo ? ' <span class="chip">Desactivado</span>' : '') +
       (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' +
-      '<span class="val"><b class="' + (n.x.cantidad < 0 ? 'rojo' : '') + '">' + num(n.x.cantidad, 1) + '</b> ' + esc(unidadTxt(i.unidad, n.x.cantidad)) +
+      '<span class="val"><b class="' + (n.x.cantidad < 0 ? 'rojo' : '') + '">' + num(n.ver.cant, n.ver.dec == null ? 1 : n.ver.dec) + '</b> ' + esc(n.ver.unidad) +
       (n.kg && n.x.cantidad ? '<small>' + esc(n.kg) + '</small>' : '') + '</span></button>';
   };
   return (conStock.length ? '<div class="lista-san">' + conStock.map(fila).join('') + '</div>'
@@ -765,7 +772,7 @@ function cajaSaldo(i, n, titulo) {
     i.minimo != null ? ['Stock mínimo', num(i.minimo) + ' ' + unidadTxt(i.unidad, i.minimo)] : null,
   ].filter(Boolean);
   return '<div class="saldo ' + n.cls + '">' + (titulo ? '<h3>' + esc(titulo) + '</h3>' : '') +
-    '<div class="cant">' + num(n.x.cantidad, decimales(i)) + '<small>' + esc(unidadTxt(i.unidad, n.x.cantidad)) + '</small>' +
+    '<div class="cant">' + num(n.ver.cant, n.ver.dec == null ? decimales(i) : n.ver.dec) + '<small>' + esc(n.ver.unidad) + '</small>' +
     (n.x.pendiente ? ' <span class="chip pend">sin enviar</span>' : '') + '</div>' +
     (n.bajo ? '<span class="chip alerta">Bajo el mínimo</span> ' : '') + (n.x.cantidad < 0 ? '<span class="chip alerta">Saldo negativo: falta un ingreso o un conteo</span>' : '') +
     '<table class="detalle" style="margin-top:8px">' + datosFicha.map(([a, b]) => '<tr><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table></div>';

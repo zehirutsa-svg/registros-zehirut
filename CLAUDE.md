@@ -207,6 +207,10 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
 - Lista inicial: `apps-script/Sanidad.gs` (PRODUCTOS_SANIDAD, 98 productos de la hoja INVENTARIO de la
   planilla "Inventario y stock de medicamentos"), se agrega una sola vez (esquema 7). Después se edita
   desde la app (ver "Alta y edición de productos"); cambiar "Stock" pasa un producto a otro rubro.
+- **Dispositivos en unidades** (v1.20.8, 04/10/2026): un producto que viene en paquetes/cajas de
+  unidades (`contenido` + `unidadContenido` = un, sin ser semen; ej. REPRO ONE de a 10) muestra el saldo
+  en unidades sueltas ("378 un") y la presentación abajo ("37,8 paquetes"), porque se usa de a uno.
+  Ingresos y conteos se siguen cargando por presentación (`enUnidades`, `infoInsumo().ver`).
 - **Principio activo = desplegable** (v1.20.7, 04/10/2026): en el alta/edición de producto se elige de los
   principios que ya existen, o "+ Nuevo…" para escribir uno de verdad nuevo; al guardar, si es igual o muy
   parecido a uno de la lista (sin acentos ni espacios, hasta 2 letras de diferencia, o uno contiene al otro)
@@ -236,7 +240,9 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
   día × producto de 30 días y recibe la lista de productos (Registros es el dueño de la lista; allá no
   se crean productos). Acá queda un Consumo por día × producto, ID `SAN-AAAA-MM-DD-<producto>`,
   "Cargado por" = "App de la estancia", reescrito en cada llamada (en el lugar; si ya no hay
-  aplicaciones, anulado). Cuenta desde el primer conteo de cada producto. Esos consumos no se corrigen
+  aplicaciones, anulado). Cuenta desde el primer conteo de cada producto; si el producto nunca se
+  contó, desde su primer ingreso (04/10/2026: Adaptadores y semen tenían solo ingresos y no se les
+  descontaba nada). Esos consumos no se corrigen
   ni anulan desde la app (se corrigen allá). Lo que no se pudo descontar (producto desconocido, unidad
   distinta) se ve arriba de la lista y en la hoja Registro. Código en `apps-script/Sanidad.gs`.
 - **Más adelante (verlo aparte):** descontar semen y hormonas al cargar un Servicio de IATF.

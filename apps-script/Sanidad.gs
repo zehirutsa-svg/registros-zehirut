@@ -113,7 +113,8 @@ const PRODUCTOS_SANIDAD = [
 //   recibe { productos: [...] } — la lista de Sanidad (con principio activo y stock), para los desplegables de allá.
 // Cada día × producto es UN consumo con ID "SAN-AAAA-MM-DD-<producto>", que se reescribe en cada
 // llamada (si allá se corrige o se borra una sanidad, acá se corrige solo). Cuenta recién desde el
-// primer conteo del producto (su stock inicial): lo aplicado antes ya está en ese conteo.
+// primer conteo del producto (su stock inicial): lo aplicado antes ya está en ese conteo. Si el
+// producto nunca se contó, desde su primer ingreso.
 
 const PREFIJO_ESTANCIA = 'SAN-';
 const USUARIO_ESTANCIA = 'App de la estancia';
@@ -160,11 +161,15 @@ function aplicarConsumosEstancia_(ss, insumos, body) {
   const porNombre = {};
   insumos.forEach((i) => { porNombre[i.nombre.toUpperCase()] = i; });
   const movs = leerMovimientos_(ss);
-  // Stock inicial de cada producto = su primer conteo.
-  const inicio = {};
+  // Stock inicial de cada producto = su primer conteo; si nunca se contó, su primer ingreso
+  // (04/10/2026: los Adaptadores y el semen tenían solo ingresos y no se les descontaba nada).
+  const inicio = {}, primerIngreso = {};
   movs.forEach((m) => {
-    if (!m.anulado && m.tipo === 'Conteo' && (!inicio[m.insumo] || m.fecha < inicio[m.insumo])) inicio[m.insumo] = m.fecha;
+    if (m.anulado) return;
+    if (m.tipo === 'Conteo' && (!inicio[m.insumo] || m.fecha < inicio[m.insumo])) inicio[m.insumo] = m.fecha;
+    if (m.tipo === 'Ingreso' && (!primerIngreso[m.insumo] || m.fecha < primerIngreso[m.insumo])) primerIngreso[m.insumo] = m.fecha;
   });
+  Object.keys(primerIngreso).forEach((k) => { if (!inicio[k]) inicio[k] = primerIngreso[k]; });
 
   const errores = [];
   const deseados = {};
