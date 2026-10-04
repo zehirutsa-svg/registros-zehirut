@@ -287,7 +287,7 @@ const FACTURA_GENETYX = [
   ['SYNCROGEN 100 ml', 'Medicamentos', 'frasco', 100, 'ml', 'PROSTAGLANDINA - CLOPROSTENOL', '', 28],
   ['CIPION 10 ml', 'Medicamentos', 'frasco', 10, 'ml', 'CIPIONATO DE ESTRADIOL', '', 70],
   ['INDUSCIO 50 ml', 'Medicamentos', 'frasco', 50, 'ml', 'BENZOATO DE ESTRADIOL', '', 56],
-  ['ECGEN 5000 UI', 'Medicamentos', 'frasco', '', '', 'ECG', '', 112],
+  ['ECGEN 5000 UI', 'Medicamentos', 'frasco', 25, 'ml', 'ECG', '', 112],
   ['MAXRELIN 50 ml', 'Medicamentos', 'frasco', 50, 'ml', 'GnRH', '', 28],
   ['APLICADOR DIV-P4', RUBRO_MATERIALES, 'unidad', '', '', '', '', 3],
 ];
@@ -323,6 +323,19 @@ function cargarFacturaGenetyx_(ss, ins) {
   registrar_(ss, [[ahora, 'Sistema', 'Factura Genetyx ' + factura, nuevosProd.length + ' productos nuevos, ' +
     FACTURA_GENETYX.length + ' ingresos del ' + ddmmaaaa_(fecha), 'Aplicado', '']]);
   props_().setProperty('GENETYX_V16', '1');
+}
+
+/** Esquema 17: ECGEN 5000 UI se reconstituye con 25 ml de diluyente (200 UI/ml; ficha de GlobalGen, el
+ *  fabricante). Se completa el contenido si quedó vacío en el esquema 16, para descontar lo aplicado en ml. */
+function ecgenContenido_(ss, ins) {
+  const n = ins.getLastRow();
+  if (n < 2) return;
+  const cCont = COLS_INSUMOS.indexOf('Contenido por unidad');
+  const nombres = ins.getRange(2, 1, n - 1, 1).getValues();
+  const k = nombres.findIndex((f) => String(f[0]).trim().toUpperCase() === 'ECGEN 5000 UI');
+  if (k === -1) return;
+  const celda = ins.getRange(k + 2, cCont + 1, 1, 2);
+  if (String(celda.getValues()[0][0]).trim() === '') celda.setValues([[25, 'ml']]);
 }
 
 function migrarRubrosSanidad_(ss, ins) {

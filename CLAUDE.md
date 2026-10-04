@@ -218,6 +218,7 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
   Esquema 16 (03/10, una sola vez, propiedad GENETYX_V16): factura Genetyx 001-001-0005446 (kit IATF entregado
   22/09/2026): 7 productos nuevos (FACTURA_GENETYX en Sanidad.gs) con Conteo 0 + Ingreso del 22/09 (IDs GTX5446-n-C/I).
   Unidad "paquete" (Repro One, paquete de 10 dispositivos) agregada a UNIDADES_SAN.
+  Esquema 17: ECGEN 5000 UI = frasco de 25 ml (polvo + 25 ml de diluyente, 200 UI/ml, ficha GlobalGen).
   **En Semen** (v1.20.1/.4) la línea gris es cabaña · proveedor (columna Laboratorio, que en Semen se llama "Cabaña" en la
   ficha y el formulario), y un producto nuevo arranca en pajuela / un (en los otros stocks, frasco / ml).
   El Ingreso trae el proveedor de la ficha.
