@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.21.1';
+const VERSION = '1.21.2';
 
 
 const DIAS_HISTORIAL = 60;
@@ -1635,7 +1635,7 @@ async function cfgGuardar(tipo) {
 // al guardar vuelve al día cargado.
 const FINCAS = [['LA PRUDENCIA', 'La Prudencia'], ['LA PACIENCIA', 'La Paciencia']];
 // Referencia de cada sector, igual que en ZehirutApp.
-const REF_SECTOR = { 'LA PRUDENCIA': { C: 'Central', D: 'Retiro' }, 'LA PACIENCIA': { B: 'Retiro', E: 'Central' } };
+const REF_SECTOR = { 'LA PRUDENCIA': { C: 'Central', D: 'Retiro' }, 'LA PACIENCIA': { B: 'Retiro', D: 'Confi', E: 'Central' } };
 const nombreSector = (finca, s) => 'Sector ' + s + (REF_SECTOR[finca] && REF_SECTOR[finca][s] ? ' (' + REF_SECTOR[finca][s] + ')' : '');
 const MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'setiembre', 'octubre', 'noviembre', 'diciembre'];
 
