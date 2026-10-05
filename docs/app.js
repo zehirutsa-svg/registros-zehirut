@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.20.8';
+const VERSION = '1.21.0';
 
 
 const DIAS_HISTORIAL = 60;
@@ -383,13 +383,16 @@ function saldos() {
   return r;
 }
 
+/** "Ajuste de stock" (peso cargado − entregado del confinamiento): es un consumo, pero no del día. */
+const esAjusteStock = (m) => String(m.id).indexOf('AJS-') === 0;
+
 /** Consumo de los últimos 7 días (hoy incluido), por insumo y estancia. */
 function consumo7() {
   const desde = sumarDias(hoyISO(), -6);
   const r = {};
   movimientos().forEach((m) => {
     const k = claveSaldo(m.insumo, m.estancia);
-    if (!m.anulado && m.tipo === 'Consumo' && m.fecha >= desde) r[k] = (r[k] || 0) + m.cantidad;
+    if (!m.anulado && m.tipo === 'Consumo' && !esAjusteStock(m) && m.fecha >= desde) r[k] = (r[k] || 0) + m.cantidad;
   });
   return r;
 }
@@ -1007,7 +1010,9 @@ function abreviar(nombre) {
 }
 
 function htmlMov(m, conFecha) {
-  const signo = { Consumo: '−', Ingreso: '+', Conteo: '=' }[m.tipo] || '';
+  // Un ajuste de stock negativo (vuelve al stock) se muestra como +.
+  const negativo = m.tipo === 'Consumo' && m.cantidad < 0;
+  const signo = negativo ? '+' : { Consumo: '−', Ingreso: '+', Conteo: '=' }[m.tipo] || '';
   const ico = { Consumo: '⬆', Ingreso: '⬇', Conteo: '✔' }[m.tipo] || '•';
   const extra = [];
   if (m.estancia) extra.push('<span class="chip azul">' + esc(nombreEstancia(m.estancia).replace('La ', '')) + '</span>');
@@ -1023,9 +1028,9 @@ function htmlMov(m, conFecha) {
   extra.push(esc(String(m.usuario || '').split(' ')[0]));
   return '<button class="mov' + (m.anulado ? ' anulado' : '') + '" data-a="verMov" data-id="' + esc(m.id) + '">' +
     '<span class="tipo ' + m.tipo + '">' + ico + '</span>' +
-    '<span class="cuerpo"><b>' + esc(conFecha ? fechaTxt(m.fecha, true) : m.insumo) + '</b><small>' + m.tipo + ' · ' + extra.map((x) => (/^</.test(x) ? x : esc(x))).join(' · ') +
+    '<span class="cuerpo"><b>' + esc(conFecha ? fechaTxt(m.fecha, true) : m.insumo) + '</b><small>' + (esAjusteStock(m) ? 'Ajuste de stock' : m.tipo) + ' · ' + extra.map((x) => (/^</.test(x) ? x : esc(x))).join(' · ') +
     (m.pendiente ? ' <span class="chip pend">sin enviar</span>' : '') + (m.anulado ? ' <span class="chip">anulado</span>' : '') + '</small></span>' +
-    '<span class="num">' + signo + num(m.cantidad) + '<br><small style="font-weight:600;color:var(--gris)">' + esc(unidadTxt(m.unidad, m.cantidad)) + '</small></span></button>';
+    '<span class="num">' + signo + num(Math.abs(m.cantidad)) + '<br><small style="font-weight:600;color:var(--gris)">' + esc(unidadTxt(m.unidad, m.cantidad)) + '</small></span></button>';
 }
 
 async function verMov(id) {
@@ -1034,7 +1039,7 @@ async function verMov(id) {
   const insM = stockDatos().insumos.find((i) => i.nombre === m.insumo) || {};
   const san = insM.modulo === 'Sanidad';
   const filas = [
-    ['Tipo', m.tipo], ['Fecha', fechaTxt(m.fecha, true)], [san ? 'Producto' : 'Insumo', m.insumo],
+    ['Tipo', esAjusteStock(m) ? 'Ajuste de stock (' + (m.cantidad < 0 ? 'vuelve al stock' : 'consumo') + ')' : m.tipo], ['Fecha', fechaTxt(m.fecha, true)], [san ? 'Producto' : 'Insumo', m.insumo],
   ];
   if (m.estancia) filas.push(['Estancia', nombreEstancia(m.estancia)]);
   filas.push(
@@ -1143,14 +1148,27 @@ async function lineasPdf(buffer) {
 }
 
 const numTapfeed = (s) => Number(String(s).replace(/,/g, ''));
+const FECHA_AJUSTE = '2026-09-21';   // inicio del confinamiento: un informe de premezcla desde acá es el ajuste de stock
+
+/** Qué informe es, por el título: 'grupo' ("Uso de ingredientes por grupo") o 'premezcla' ("Uso ingrediente & premezcla"). */
+function tipoInformeTapfeed(lineas) {
+  if (lineas.some((l) => /Uso ingrediente\s*&\s*premezcla/i.test(l))) return 'premezcla';
+  if (lineas.some((l) => /Uso de ingredientes por grupo/i.test(l))) return 'grupo';
+  return '';
+}
+
+function periodoTapfeed(r, l) {
+  const p = l.match(/Desde (\d{2})\/(\d{2})\/(\d{4}) a (\d{2})\/(\d{2})\/(\d{4})/);
+  if (p) { r.desde = p[3] + '-' + p[2] + '-' + p[1]; r.hasta = p[6] + '-' + p[5] + '-' + p[4]; }
+  return !!p;
+}
 
 /** { desde, hasta (AAAA-MM-DD), corrales: [{ nombre, cabezas, items: [{ nombre, kg, ms }] }], total: [...] } */
 function interpretarTapfeed(lineas) {
   const r = { desde: '', hasta: '', corrales: [], total: [] };
   let grupo = null;
   lineas.forEach((l) => {
-    const p = l.match(/Desde (\d{2})\/(\d{2})\/(\d{4}) a (\d{2})\/(\d{2})\/(\d{4})/);
-    if (p) { r.desde = p[3] + '-' + p[2] + '-' + p[1]; r.hasta = p[6] + '-' + p[5] + '-' + p[4]; return; }
+    if (periodoTapfeed(r, l)) return;
     const g = l.match(/^(.+?) \((\d*)\)$/);
     if (g) {
       if (/^TOTAL$/i.test(g[1].trim())) grupo = { total: true };
@@ -1161,6 +1179,20 @@ function interpretarTapfeed(lineas) {
     if (!i || !grupo || /^Total$/i.test(i[1].trim())) return;
     const item = { nombre: i[1].trim(), kg: numTapfeed(i[2]), ms: numTapfeed(i[3]) };
     if (grupo.total) r.total.push(item); else grupo.items.push(item);
+  });
+  return r;
+}
+
+/** "Uso ingrediente & premezcla": una fila por ingrediente con Real (recuperar peso, peso cargado), Unidad,
+ *  Seca (recuperar peso, peso cargado), desviación y precio. { desde, hasta, items: [...], totalCargado } */
+function interpretarPremezcla(lineas) {
+  const r = { desde: '', hasta: '', items: [], totalCargado: null };
+  lineas.forEach((l) => {
+    if (periodoTapfeed(r, l)) return;
+    const i = l.match(/^(.+?)\s+(-?[\d,]+\.\d+)\s+(-?[\d,]+\.\d+)\s+Kg\s+(-?[\d,]+\.\d+)\s+(-?[\d,]+\.\d+)/);
+    if (!i) return;
+    if (/^Total$/i.test(i[1].trim())) { r.totalCargado = numTapfeed(i[3]); return; }
+    r.items.push({ nombre: i[1].trim(), recuperar: numTapfeed(i[2]), cargado: numTapfeed(i[3]), recuperarMs: numTapfeed(i[4]), cargadoMs: numTapfeed(i[5]) });
   });
   return r;
 }
@@ -1180,67 +1212,150 @@ function problemasTapfeed(r) {
   return p;
 }
 
+function problemasPremezcla(r) {
+  const p = [];
+  const ajusteHasta = (datos && datos.ajusteHasta) || '';
+  if (!r.desde) p.push('no se encontró el período ("Desde … a …").');
+  else if (r.desde !== r.hasta && r.desde !== FECHA_AJUSTE) {
+    p.push('el informe abarca varios días (' + fechaTxt(r.desde) + ' a ' + fechaTxt(r.hasta) + '). Exportalo de a un día (o desde el ' +
+      fechaTxt(FECHA_AJUSTE) + ', para el ajuste de stock).');
+  } else if (r.desde === r.hasta && ajusteHasta && r.desde <= ajusteHasta) {
+    p.push('el ' + fechaTxt(r.desde) + ' ya está corregido por el ajuste de stock (del ' + fechaTxt(FECHA_AJUSTE) + ' al ' + fechaTxt(ajusteHasta) +
+      '). Para cambiarlo, subí de nuevo el informe de premezcla del ' + fechaTxt(FECHA_AJUSTE) + ' al ' + fechaTxt(ajusteHasta) + '.');
+  }
+  if (!r.items.length) p.push('no se encontró ningún ingrediente.');
+  // Control: la suma de los ingredientes tiene que dar el total cargado.
+  const suma = r.items.reduce((a, x) => a + x.cargado, 0);
+  if (r.totalCargado == null) p.push('no se encontró el Total del informe.');
+  else if (Math.abs(suma - r.totalCargado) > 1) p.push('la suma de los ingredientes (' + num(suma) + ' kg) no da el total cargado (' + num(r.totalCargado) + ' kg).');
+  return p;
+}
+
 // ------ subir informe de Tapfeed (solo quien configura; necesita señal)
-// El PDF se lee acá (lector de arriba); se muestra lo encontrado y al confirmar va al script,
-// que registra un consumo por ingrediente (destino Confinamiento) y guarda el PDF en Drive.
+// El PDF se lee acá (lector de arriba); se muestra lo encontrado y al confirmar va al script.
+//  - "Uso de ingredientes por grupo" (peso entregado): detalle por corral; descuenta stock solo si ese día
+//    no tiene premezcla.
+//  - "Uso ingrediente & premezcla" (peso cargado): con esto se descuenta el stock. Si va del 21/09 a un
+//    día, es el ajuste de stock (peso cargado − consumo registrado en ese período).
 function htmlTapfeed() {
   const tf = ui.tf;
   const dias = (datos && datos.tapfeedDias) || [];
+  const diasPm = (datos && datos.premezclaDias) || [];
+  const ajusteHasta = (datos && datos.ajusteHasta) || '';
   let h = '<div class="form">';
   if (!tf || tf.estado === 'error') {
     if (tf && tf.estado === 'error') {
       h += '<div class="aviso rojo-fondo"><b>No se puede cargar este PDF:</b><ul>' + tf.problemas.map((p) => '<li>' + esc(p) + '</li>').join('') + '</ul></div>';
     }
-    h += '<div class="aviso">Elegí el PDF <b>"Uso de ingredientes por grupo"</b> de TAP Feed, de <b>un solo día</b>.</div>' +
+    h += '<div class="aviso">Cada día subí los <b>dos</b> PDF de TAP Feed de <b>un solo día</b>:<br>' +
+      '• <b>"Uso de ingredientes por grupo"</b>: lo entregado a cada corral.<br>' +
+      '• <b>"Uso ingrediente &amp; premezcla"</b>: lo cargado al mixer (con esto se descuenta el stock).</div>' +
       '<label class="btn">📄 Elegir PDF de TAP Feed<input type="file" id="tf-archivo" accept="application/pdf,.pdf" hidden></label>';
     if (dias.length) {
       const ultimo = dias[dias.length - 1];
       const faltan = [];
       for (let f = dias[0]; f < sumarDias(hoyISO(), -1); f = sumarDias(f, 1)) if (dias.indexOf(f) === -1) faltan.push(f);
+      // Premezcla: falta en los días con informe por grupo posteriores al ajuste de stock.
+      const faltanPm = dias.filter((f) => f > ajusteHasta && diasPm.indexOf(f) === -1);
       h += '<div class="tarjeta" style="margin-top:16px"><b>Último día cargado:</b> ' + fechaTxt(ultimo, true) +
-        (faltan.length ? '<br><span class="rojo"><b>Faltan:</b> ' + faltan.map((f) => fechaTxt(f)).join(', ') + '</span>' : '') + '</div>';
+        (faltan.length ? '<br><span class="rojo"><b>Faltan:</b> ' + faltan.map((f) => fechaTxt(f)).join(', ') + '</span>' : '') +
+        (faltanPm.length ? '<br><span class="rojo"><b>Falta la premezcla de:</b> ' + faltanPm.map((f) => fechaTxt(f)).join(', ') + '</span>' : '') +
+        '<br><b>Ajuste de stock:</b> ' + (ajusteHasta ? 'hecho del ' + fechaTxt(FECHA_AJUSTE) + ' al ' + fechaTxt(ajusteHasta)
+          : '<span class="rojo">falta. Subí un "Uso ingrediente &amp; premezcla" desde el ' + fechaTxt(FECHA_AJUSTE) + ' hasta el último día sin premezcla.</span>') +
+        '</div>';
     }
     return h + '</div>';
   }
-  if (tf.estado === 'leyendo' || tf.estado === 'enviando') {
-    return h + '<p class="vacio">' + (tf.estado === 'leyendo' ? 'Leyendo el PDF…' : 'Cargando en Google…') + '</p></div>';
+  if (tf.estado === 'leyendo' || tf.estado === 'enviando' || tf.estado === 'simulando') {
+    return h + '<p class="vacio">' + ({ leyendo: 'Leyendo el PDF…', enviando: 'Cargando en Google…', simulando: 'Calculando el ajuste…' })[tf.estado] + '</p></div>';
   }
-  // Vista previa de lo que se va a registrar.
   const ins = stockDatos().insumos;
+  const insDe = (nombre) => ins.find((x) => esDeTapfeed(x, nombre));
+  const enBolsas = (i, kg) => (i && i.kgUnidad && i.unidad !== 'kg' ? ' = ' + num(kg / i.kgUnidad, 1) + ' ' + unidadTxt(i.unidad, 2) : '');
+  const botones = (texto) => '<div class="acciones"><button class="btn" data-a="tfConfirmar">' + texto + '</button>' +
+    '<button class="btn sec" data-a="tfOtro">Elegir otro PDF</button></div></div>';
+  if (tf.tipo === 'ajuste') {
+    // Vista previa del ajuste (la cuenta la hace Google).
+    const s = tf.sim;
+    const signo = (n) => (n > 0 ? '+' : '') + num(n, 0);
+    h += '<div class="tarjeta"><div style="font-size:20px;font-weight:800">Ajuste de stock</div>' +
+      '<div style="color:var(--gris)">Premezcla del ' + fechaTxt(s.desde) + ' al ' + fechaTxt(s.hasta) + ' · ' + esc(tf.archivo.name) + '</div>' +
+      '<table class="detalle" style="margin-top:10px"><tr><td></td><td><small>Cargado</small></td><td><small>Registrado</small></td><td><small>Ajuste</small></td></tr>' +
+      s.filas.map((f) => '<tr><td>' + esc(f.insumo) + '</td><td>' + num(f.cargado, 0) + '</td><td>' + num(f.registrado, 0) + '</td><td><b>' + signo(f.ajuste) + '</b></td></tr>').join('') +
+      '</table><small style="color:var(--gris)">En kg. Registrado = consumo de Confinamiento que tiene la app en ese período. ' +
+      'Ajuste positivo = se descuenta del stock; negativo = vuelve al stock. Va con fecha ' + fechaTxt(s.hasta) + ' y no cambia el consumo de ese día.</small></div>';
+    if (s.anteriorHasta) h += '<div class="aviso amarillo">Ya hay un ajuste (hasta el ' + fechaTxt(s.anteriorHasta) + '). Si confirmás, <b>se reemplaza</b> por este.</div>';
+    if (s.conteos && s.conteos.length) h += '<div class="aviso amarillo">Ojo: en el período hubo conteos de ' + esc(s.conteos.join(', ')) + '. El ajuste igual cambia el saldo.</div>';
+    return h + botones('Registrar ajuste');
+  }
+  if (tf.tipo === 'premezcla') {
+    const ya = diasPm.indexOf(tf.r.desde) !== -1;
+    h += '<div class="tarjeta"><div style="font-size:20px;font-weight:800">' + fechaTxt(tf.r.desde, true) + '</div>' +
+      '<div style="color:var(--gris)">Premezcla · peso cargado · ' + esc(tf.archivo.name) + '</div>' +
+      '<table class="detalle" style="margin-top:10px">' + tf.r.items.map((t) => {
+        const i = insDe(t.nombre);
+        return '<tr><td>' + esc(i ? i.nombre : t.nombre) + '</td><td><b>' + num(t.cargado, 0) + ' kg</b>' + esc(enBolsas(i, t.cargado)) + '</td></tr>';
+      }).join('') + '</table></div>';
+    if (ya) h += '<div class="aviso amarillo">La premezcla de ese día <b>ya está cargada</b>. Si confirmás, se reemplaza por este informe.</div>';
+    else if (dias.indexOf(tf.r.desde) !== -1) h += '<div class="aviso">El stock de ese día pasa a descontarse con el <b>peso cargado</b> (hoy está con el entregado).</div>';
+    return h + botones(ya ? 'Reemplazar' : 'Confirmar y cargar');
+  }
+  // Vista previa del informe por grupo.
   const cabezas = tf.r.corrales.reduce((a, c) => a + c.cabezas, 0);
   const ya = dias.indexOf(tf.r.desde) !== -1;
   h += '<div class="tarjeta"><div style="font-size:20px;font-weight:800">' + fechaTxt(tf.r.desde, true) + '</div>' +
     '<div style="color:var(--gris)">' + tf.r.corrales.length + ' corrales · ' + num(cabezas, 0) + ' cabezas · ' + esc(tf.archivo.name) + '</div>' +
     '<table class="detalle" style="margin-top:10px">' + tf.r.total.map((t) => {
-      const i = ins.find((x) => esDeTapfeed(x, t.nombre));
-      const cant = i && i.kgUnidad && i.unidad !== 'kg' ? ' = ' + num(t.kg / i.kgUnidad, 1) + ' ' + unidadTxt(i.unidad, 2) : '';
-      return '<tr><td>' + esc(i ? i.nombre : t.nombre) + '</td><td><b>' + num(t.kg, 0) + ' kg</b>' + esc(cant) + '</td></tr>';
+      const i = insDe(t.nombre);
+      return '<tr><td>' + esc(i ? i.nombre : t.nombre) + '</td><td><b>' + num(t.kg, 0) + ' kg</b>' + esc(enBolsas(i, t.kg)) + '</td></tr>';
     }).join('') + '</table></div>';
   if (ya) h += '<div class="aviso amarillo">Ese día <b>ya está cargado</b>. Si confirmás, se reemplaza por este informe.</div>';
-  h += '<div class="acciones"><button class="btn" data-a="tfConfirmar">' + (ya ? 'Reemplazar' : 'Confirmar y cargar') + '</button>' +
-    '<button class="btn sec" data-a="tfOtro">Elegir otro PDF</button></div></div>';
-  return h;
+  if (diasPm.indexOf(tf.r.desde) !== -1) h += '<div class="aviso">Ese día ya tiene la premezcla: este informe carga solo el detalle por corral (el stock no cambia).</div>';
+  return h + botones(ya ? 'Reemplazar' : 'Confirmar y cargar');
 }
 
 /** Un insumo puede tener varios nombres en Tapfeed, separados por punto y coma (Tapfeed a veces los
  *  renombra, ej. "Concentrado Desarrollo" → "Concen Desarrollo"; la coma no sirve: "Maiz Molido DGM 1,2"). */
 const esDeTapfeed = (i, nombre) => String(i.tapfeed || '').split(';').some((x) => x.trim() && x.trim().toUpperCase() === String(nombre).trim().toUpperCase());
 
+/** El PDF en base64, para guardarlo en Drive. */
+function pdfBase64(buffer) {
+  let bin = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
 async function tfLeer(archivo) {
   ui.tf = { estado: 'leyendo', archivo };
   render();
   try {
     const buffer = await archivo.arrayBuffer();
-    const r = interpretarTapfeed(await lineasPdf(buffer.slice(0)));
-    const problemas = problemasTapfeed(r);
+    const lineas = await lineasPdf(buffer.slice(0));
+    const tipo = tipoInformeTapfeed(lineas);
+    if (!tipo) throw new Error('no es un informe que la app conozca. Tiene que ser "Uso de ingredientes por grupo" o "Uso ingrediente & premezcla".');
+    const r = tipo === 'premezcla' ? interpretarPremezcla(lineas) : interpretarTapfeed(lineas);
+    const problemas = tipo === 'premezcla' ? problemasPremezcla(r) : problemasTapfeed(r);
     const ins = stockDatos().insumos;
-    r.total.forEach((t) => {
+    (tipo === 'premezcla' ? r.items : r.total).forEach((t) => {
       if (!ins.some((i) => esDeTapfeed(i, t.nombre))) {
         problemas.push('"' + t.nombre + '" no corresponde a ningún insumo: agregá ese nombre en la columna "Nombre en Tapfeed" de la hoja Insumos (si ya tiene otro, separalos con punto y coma).');
       }
     });
-    if (r.desde && r.desde > hoyISO()) problemas.push('la fecha del informe es futura.');
-    ui.tf = problemas.length ? { estado: 'error', problemas } : { estado: 'listo', archivo, r, buffer };
+    if (r.hasta && r.hasta > hoyISO()) problemas.push('la fecha del informe es futura.');
+    if (problemas.length) {
+      ui.tf = { estado: 'error', problemas };
+    } else if (tipo === 'premezcla' && r.desde !== r.hasta) {
+      // Ajuste de stock: la cuenta (cargado − registrado) la hace Google; acá se muestra antes de confirmar.
+      if (!navigator.onLine) throw new Error('para calcular el ajuste de stock hace falta señal.');
+      ui.tf = { estado: 'simulando', archivo };
+      render();
+      const sim = await llamarUnaVez({ accion: 'premezcla', pin: sesion.pin, simular: true, datos: { desde: r.desde, hasta: r.hasta, items: r.items } });
+      if (!sim.ok) throw new Error(sim.error || 'error del servidor');
+      ui.tf = { estado: 'listo', tipo: 'ajuste', archivo, r, buffer, sim };
+    } else {
+      ui.tf = { estado: 'listo', tipo, archivo, r, buffer };
+    }
   } catch (e) {
     ui.tf = { estado: 'error', problemas: ['no se pudo leer el PDF: ' + ((e && e.message) || e)] };
   }
@@ -1250,23 +1365,25 @@ async function tfLeer(archivo) {
 async function tfConfirmar() {
   const tf = ui.tf;
   if (!navigator.onLine) { toast('Sin señal: para cargar el informe hace falta señal.', 3500); return; }
-  const ya = ((datos && datos.tapfeedDias) || []).indexOf(tf.r.desde) !== -1;
+  const premezcla = tf.tipo === 'premezcla' || tf.tipo === 'ajuste';
+  const ya = tf.tipo === 'grupo' ? ((datos && datos.tapfeedDias) || []).indexOf(tf.r.desde) !== -1
+    : tf.tipo === 'premezcla' ? ((datos && datos.premezclaDias) || []).indexOf(tf.r.desde) !== -1 : false;
   ui.tf = Object.assign({}, tf, { estado: 'enviando' });
   render();
   try {
-    let bin = '';
-    const bytes = new Uint8Array(tf.buffer);
-    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
     // Una sola vez, sin reintento: si el primero llegó y se perdió la respuesta, un reintento
     // vería el día como ya cargado y confundiría.
-    const r = await llamarUnaVez({
-      accion: 'tapfeed', pin: sesion.pin, reemplazar: ya, nombreArchivo: tf.archivo.name, pdf: btoa(bin),
-      datos: { fecha: tf.r.desde, corrales: tf.r.corrales, total: tf.r.total },
-    });
+    const base = { pin: sesion.pin, reemplazar: ya, nombreArchivo: tf.archivo.name, pdf: pdfBase64(tf.buffer) };
+    const r = await llamarUnaVez(premezcla
+      ? Object.assign(base, { accion: 'premezcla', datos: { desde: tf.r.desde, hasta: tf.r.hasta, items: tf.r.items } })
+      : Object.assign(base, { accion: 'tapfeed', datos: { fecha: tf.r.desde, corrales: tf.r.corrales, total: tf.r.total } }));
     if (!r.ok) throw new Error(r.error || 'error del servidor');
     if (r.yaCargado) throw new Error('ese día ya estaba cargado');
     ui.tf = null;
-    toast('✓ TAP Feed del ' + fechaTxt(r.fecha) + ' cargado (' + r.consumos + ' consumos)', 3500);
+    toast(tf.tipo === 'ajuste' ? '✓ Ajuste de stock del ' + fechaTxt(r.desde) + ' al ' + fechaTxt(r.hasta) + ' registrado (' + r.movimientos + ' insumos)'
+      : tf.tipo === 'premezcla' ? '✓ Premezcla del ' + fechaTxt(r.fecha) + ' cargada (' + r.consumos + ' consumos, peso cargado)'
+        : r.conPremezcla ? '✓ TAP Feed del ' + fechaTxt(r.fecha) + ' cargado (solo detalle por corral)'
+          : '✓ TAP Feed del ' + fechaTxt(r.fecha) + ' cargado (' + r.consumos + ' consumos)', 3500);
     await sincronizar();
   } catch (e) {
     ui.tf = Object.assign({}, tf, { estado: 'listo' });

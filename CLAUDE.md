@@ -146,6 +146,23 @@ Parámetros (300). Código: leerDatosBase_ y publicarDatosInforme_.
   = "Tapfeed (usuario)", ID `TF-AAAA-MM-DD-<insumo>`), guarda el detalle por corral en la hoja
   **Tapfeed** y el PDF en la carpeta "1 Tapfeed" (Drive id 1ZybVBnxzMW_9OixfT_ut9GuvKtQbagH1).
   Si el día ya estaba: la app avisa y "Reemplazar" anula los consumos anteriores del día.
+- **Stock con peso CARGADO (05/10/2026, v1.21.0).** Tapfeed da dos números distintos: "Uso ingrediente & premezcla"
+  = peso **cargado** al mixer (lo que sale del depósito) y "Uso de ingredientes por grupo" = peso **entregado** a los
+  corrales (menor: residuo en el mixer, balanza en movimiento; 04/10: 19.512 vs 19.456 kg). **Stock = cargado;
+  consumo por corral / MS = entregado.** Cada día se suben los DOS PDF por el mismo botón (la app reconoce el informe
+  por el título; el "Informe carga" de ~6 páginas se descartó: difícil de leer). Premezcla de un día (`accion:
+  'premezcla'`, cargarPremezcla_): anula los consumos `TF-<fecha>-*` del día y registra `TF-<fecha>-<insumo>-P`
+  (Nota "Tapfeed premezcla (peso cargado)"); el detalle va a la hoja **Tapfeed premezcla**. El informe por grupo de
+  un día que ya tiene premezcla solo carga el detalle por corral (no toca stock); sin premezcla descuenta con el
+  entregado (Nota "Tapfeed") y Resumen avisa "Stock del DD/MM/AAAA descontado con peso entregado (falta informe de
+  premezcla)". Columnas del PDF de premezcla (pdf.js): Ingrediente, Real recuperar / cargado, Unidad, Seca
+  recuperar / cargado, desviación, precio; control: suma = Total.
+- **Ajuste de stock**: un PDF de premezcla del 21/09 a un día X = ajuste. Por insumo: cargado − consumo de
+  Confinamiento registrado en el período (sin ajustes anteriores); la app muestra la cuenta (simular) antes de
+  confirmar. Movimiento Consumo (positivo o negativo) con ID `AJS-<X>-…`, fecha X, destino Confinamiento; suma al
+  acumulado y al saldo pero NO al consumo del día ni al promedio 7 días (esAjusteStock_). Un ajuste nuevo anula el
+  anterior. Una premezcla diaria de un día ≤ X se rechaza (rehacer el ajuste). Referencia 21–26/09: Pre destete 6 kg,
+  maíz 1 kg, silo 17 kg.
 - Insumos ↔ Tapfeed por la columna "Nombre en Tapfeed" de la hoja Insumos (solo se edita en la hoja). **Puede
   tener varios nombres separados por punto y coma** (Tapfeed renombra: el 01/10 "Concentrado Desarrollo" pasó a
   "Concen Desarrollo"; agregado solo con agregarNombreTapfeed_). La coma no sirve de separador ("Maiz Molido DGM 1,2").

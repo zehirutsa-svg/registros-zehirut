@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '18';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '19';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
@@ -51,6 +51,13 @@ const COLS_INSUMOS = ['Insumo', 'Unidad', 'Kg por unidad', 'Stock mínimo', 'Act
   'Principio activo', 'Indicación', 'Laboratorio', 'Proveedor', 'Dosis base', 'Peso base (kg)'];
 const CAMPOS_FICHA = ['principio', 'indicacion', 'laboratorio', 'proveedor', 'dosisBase', 'pesoBase'];
 const COLS_TAPFEED = ['Fecha', 'Corral', 'Cabezas', 'Insumo', 'Nombre en Tapfeed', 'Kg tal cual', 'Kg MS', 'Archivo', 'Cargado por', 'Recibido'];
+// "Uso ingrediente & premezcla" (05/10/2026): peso CARGADO al mixer por ingrediente. Con esto se descuenta el
+// stock; el informe por grupo (peso ENTREGADO a los corrales) queda para el consumo por corral.
+const COLS_PREMEZCLA = ['Fecha', 'Insumo', 'Nombre en Tapfeed', 'Kg recuperar peso', 'Kg cargado', 'Kg MS recuperar peso', 'Kg MS cargado',
+  'Archivo', 'Cargado por', 'Recibido'];
+const NOTA_TF_GRUPO = 'Tapfeed';                                   // consumo con peso entregado (informe por grupo)
+const NOTA_TF_PREMEZCLA = 'Tapfeed premezcla (peso cargado)';      // consumo con peso cargado
+const PREFIJO_AJUSTE = 'AJS-';   // "Ajuste de stock": peso cargado − consumo registrado, de un informe de premezcla de varios días
 const COLS_DESTINOS = ['Destino', 'Activo'];
 const COLS_MOV = ['ID', 'Fecha', 'Tipo', 'Insumo', 'Cantidad', 'Unidad', 'Kg', 'Destino', 'Proveedor',
   'Remito', 'Factura', 'Nota', 'Cargado por', 'Hora en el teléfono', 'Recibido', 'Anulado', 'Anulado por / motivo', 'Marca de tiempo',
@@ -314,6 +321,7 @@ function asegurarTapfeed_(ss, ins) {
   const faltan = INSUMOS_INICIALES.filter((x) => !actuales.some((f) => String(f[0]).trim() === x[0]));
   if (faltan.length) ins.getRange(ins.getLastRow() + 1, 1, faltan.length, COLS_INSUMOS.length).setValues(faltan);
   hoja_(ss, 'Tapfeed', COLS_TAPFEED).getRange('A:A').setNumberFormat('@');
+  hoja_(ss, 'Tapfeed premezcla', COLS_PREMEZCLA).getRange('A:A').setNumberFormat('@');
 }
 
 /** Importa una sola vez el CSV de carga inicial (ingresos y consumos anteriores a la app).
@@ -540,6 +548,7 @@ function doPost(e) {
       case 'datos': return json_(datos_(body));
       case 'catalogo': return json_(guardarCatalogo_(body));
       case 'tapfeed': return json_(cargarTapfeed_(body));
+      case 'premezcla': return json_(cargarPremezcla_(body));
       case 'excel': return json_(exportarExcel_(body));
       case 'za': return json_(zehirut_(body));
       case 'estancia': return json_(estancia_(body));
@@ -834,7 +843,7 @@ function reconstruirStock_(ss, movs) {
   const consumo7 = {};
   movs.forEach((m) => {
     const k = claveStock_(m.insumo, m.estancia);
-    if (!m.anulado && m.tipo === 'Consumo' && m.fecha >= desde7 && m.fecha <= hoy) consumo7[k] = (consumo7[k] || 0) + m.cantidad;
+    if (!m.anulado && m.tipo === 'Consumo' && !esAjusteStock_(m) && m.fecha >= desde7 && m.fecha <= hoy) consumo7[k] = (consumo7[k] || 0) + m.cantidad;
   });
   // "Equivale a": en kg (bolsas), o en ml / unidades sueltas en Sanidad (frascos, cajas).
   const valores = [['Insumo', 'Stock', 'Unidad', 'Equivale a', 'Consumo últimos 7 días', 'Promedio por día', 'Alcanza para (días)', 'Stock mínimo', 'Último conteo', 'Último movimiento']];
@@ -1196,7 +1205,11 @@ function datos_(body) {
       r.stock.trabajos = leerTrabajos_(ss);
     }
   }
-  if (u.configura) r.tapfeedDias = diasTapfeed_(ss).filter((f) => f >= desde);
+  if (u.configura) {
+    r.tapfeedDias = diasTapfeed_(ss).filter((f) => f >= desde);
+    r.premezclaDias = diasPremezcla_(ss).filter((f) => f >= desde);
+    r.ajusteHasta = ajusteHasta_(leerMovimientos_(ss));
+  }
   if (facturasVisibles_(u)) {
     try { r.za = sesionZA_(body.pin); } catch (e) { r.za = { ok: false, error: String(e.message || e) }; }
   }
@@ -1240,14 +1253,17 @@ function cargarTapfeed_(body) {
   return conLock_(() => {
     const ya = diasTapfeed_(ss).indexOf(fecha) !== -1;
     if (ya && !body.reemplazar) return { ok: true, yaCargado: true };
+    // Si ese día ya tiene el informe de premezcla, el stock ya está descontado con el peso cargado:
+    // el informe por grupo solo aporta el detalle por corral.
+    const conPremezcla = diasPremezcla_(ss).indexOf(fecha) !== -1;
     const ahora = new Date();
     const movs = leerMovimientos_(ss);
     const shM = ss.getSheetByName('Movimientos');
     const shT = ss.getSheetByName('Tapfeed');
     const log = [];
     if (ya) {
-      // Reemplazo: se anulan los consumos de ese día y se saca su detalle.
-      movs.filter((m) => m.id.indexOf('TF-' + fecha + '-') === 0 && !m.anulado).forEach((m) => {
+      // Reemplazo: se anulan los consumos de ese día (los del informe por grupo) y se saca su detalle.
+      movs.filter((m) => m.id.indexOf('TF-' + fecha + '-') === 0 && !m.anulado && m.nota === NOTA_TF_GRUPO).forEach((m) => {
         shM.getRange(m.fila, 16, 1, 2).setValues([[true, u.nombre + ': reemplazado por otro informe de Tapfeed']]);
       });
       const n = shT.getLastRow();
@@ -1265,16 +1281,17 @@ function cargarTapfeed_(body) {
       log.push([ahora, u.nombre, 'Tapfeed', 'No se pudo guardar el PDF: ' + e, 'Aviso', '']);
     }
     const sufijo = ya ? '-' + ahora.getTime() : '';
-    const filasMov = total.map((t, k) => {
+    const filasMov = conPremezcla ? [] : total.map((t, k) => {
       const ins = porTapfeed[String(t.nombre).trim().toUpperCase()];
       const kg = Math.round(Number(t.kg) * 100) / 100;
       const cant = ins.kgUnidad && ins.unidad !== 'kg' ? Math.round((kg / ins.kgUnidad) * 1000) / 1000 : kg;
       const id = 'TF-' + fecha + '-' + ins.nombre.replace(/[^A-Za-z0-9]+/g, '') + sufijo;
-      log.push([ahora, u.nombre, 'Tapfeed', 'Consumo ' + ins.nombre + ' ' + kg + ' kg (' + ddmmaaaa_(fecha) + ')', 'Aplicado', id]);
-      return [id, fecha, 'Consumo', ins.nombre, cant, ins.unidad, kg, 'Confinamiento', '', '', '', 'Tapfeed',
+      log.push([ahora, u.nombre, 'Tapfeed', 'Consumo ' + ins.nombre + ' ' + kg + ' kg (' + ddmmaaaa_(fecha) + ', peso entregado)', 'Aplicado', id]);
+      return [id, fecha, 'Consumo', ins.nombre, cant, ins.unidad, kg, 'Confinamiento', '', '', '', NOTA_TF_GRUPO,
         'Tapfeed (' + u.nombre + ')', '', ahora, false, '', ahora.getTime() + k, ''];
     });
-    shM.getRange(shM.getLastRow() + 1, 1, filasMov.length, COLS_MOV.length).setValues(filasMov.map(filaMov_));
+    if (conPremezcla) log.push([ahora, u.nombre, 'Tapfeed', 'Informe por grupo del ' + ddmmaaaa_(fecha) + ': solo detalle por corral (el stock ya está descontado con el informe de premezcla)', 'Aplicado', '']);
+    if (filasMov.length) shM.getRange(shM.getLastRow() + 1, 1, filasMov.length, COLS_MOV.length).setValues(filasMov.map(filaMov_));
     const filasT = [];
     corrales.forEach((c) => {
       (Array.isArray(c.items) ? c.items : []).forEach((it) => {
@@ -1284,6 +1301,170 @@ function cargarTapfeed_(body) {
       });
     });
     if (filasT.length) shT.getRange(shT.getLastRow() + 1, 1, filasT.length, COLS_TAPFEED.length).setValues(filasT);
+    registrar_(ss, log);
+    reconstruirStock_(ss);
+    publicarDatosInforme_(ss);
+    return { ok: true, fecha, consumos: filasMov.length, conPremezcla, archivo: url };
+  });
+}
+
+// ------ "Uso ingrediente & premezcla": peso CARGADO al mixer (05/10/2026)
+// Lo cargado sale del depósito: con esto se descuenta el stock. Lo entregado (informe por grupo) es menor
+// (residuo en el mixer, balanza en movimiento) y queda solo para el consumo por corral.
+// Llega leído por la app: { desde, hasta, items: [{ nombre, recuperar, cargado, recuperarMs, cargadoMs }] }.
+//  - De un día: reemplaza los consumos de Tapfeed de ese día por los del peso cargado.
+//  - Del 21/09 a un día: "Ajuste de stock" por insumo = peso cargado − consumo de Confinamiento registrado
+//    en ese período (corrige lo descontado con el peso entregado). Con simular: true solo devuelve la cuenta.
+
+function diasPremezcla_(ss) {
+  const sh = ss.getSheetByName('Tapfeed premezcla');
+  const n = sh ? sh.getLastRow() : 0;
+  if (n < 2) return [];
+  const dias = {};
+  sh.getRange(2, 1, n - 1, 1).getValues().forEach((f) => { if (f[0]) dias[iso_(f[0])] = true; });
+  return Object.keys(dias).sort();
+}
+
+const esAjusteStock_ = (m) => String(m.id).indexOf(PREFIJO_AJUSTE) === 0;
+
+/** Último día cubierto por el ajuste de stock vigente ('' si no hay). */
+function ajusteHasta_(movs) {
+  return movs.filter((m) => esAjusteStock_(m) && !m.anulado).reduce((a, m) => (m.fecha > a ? m.fecha : a), '');
+}
+
+function cargarPremezcla_(body) {
+  const ss = SpreadsheetApp.getActive();
+  const u = usuarioDe_(ss, body.pin);
+  if (!u.configura) throw new Error('solo quien configura puede cargar informes de TAP Feed');
+  const d = body.datos || {};
+  const desde = String(d.desde || '');
+  const hasta = String(d.hasta || '');
+  const hoy = Utilities.formatDate(new Date(), ZONA, 'yyyy-MM-dd');
+  if (!esFecha_(desde) || !esFecha_(hasta) || hasta < desde || hasta > hoy) throw new Error('período del informe inválido');
+  const ajuste = desde !== hasta;
+  if (ajuste && desde !== INFORME_ACUM_DESDE) {
+    throw new Error('un informe de premezcla de varios días tiene que empezar el ' + ddmmaaaa_(INFORME_ACUM_DESDE) + ' (es para el ajuste de stock). Si no, exportalo de a un día.');
+  }
+  const items = (Array.isArray(d.items) ? d.items : []).filter((t) => Number(t.cargado) || Number(t.recuperar));
+  if (!items.length) throw new Error('el informe no trae datos');
+  const porTapfeed = {};
+  leerInsumos_(ss).forEach((i) => String(i.tapfeed || '').split(';').forEach((n) => { if (n.trim()) porTapfeed[n.trim().toUpperCase()] = i; }));
+  const desconocidos = items.filter((t) => !porTapfeed[String(t.nombre).trim().toUpperCase()]).map((t) => t.nombre);
+  if (desconocidos.length) {
+    throw new Error('no sé a qué insumo corresponde: ' + desconocidos.join(', ') + '. Agregá ese nombre en la columna "Nombre en Tapfeed" de la hoja Insumos (varios, separados por punto y coma).');
+  }
+  // Kg cargados por insumo (un insumo puede venir con dos nombres de Tapfeed).
+  const cargado = {};
+  items.forEach((t) => {
+    const ins = porTapfeed[String(t.nombre).trim().toUpperCase()];
+    cargado[ins.nombre] = (cargado[ins.nombre] || 0) + (Number(t.cargado) || 0);
+  });
+  const r2 = (n) => Math.round(n * 100) / 100;
+  const insumoDe = (nombre) => leerInsumos_(ss).find((i) => i.nombre === nombre);
+  const cantDe = (ins, kg) => (ins.kgUnidad && ins.unidad !== 'kg' ? Math.round((kg / ins.kgUnidad) * 1000) / 1000 : kg);
+  const guardarPdf = (log, ahora) => {
+    try {
+      const pdf = Utilities.newBlob(Utilities.base64Decode(String(body.pdf || '')), 'application/pdf',
+        texto_(body.nombreArchivo, 120) || ('Uso premezcla ingrediente ' + desde + '.pdf'));
+      return DriveApp.getFolderById(TAPFEED_CARPETA).createFile(pdf).getUrl();
+    } catch (e) {
+      log.push([ahora, u.nombre, 'Tapfeed', 'No se pudo guardar el PDF: ' + e, 'Aviso', '']);
+      return '';
+    }
+  };
+
+  if (ajuste) {
+    // Consumo de Confinamiento registrado en el período, sin contar un ajuste anterior (se reemplaza).
+    const cuenta = () => {
+      const movs = leerMovimientos_(ss);
+      const reg = {};
+      movs.filter((m) => !m.anulado && m.tipo === 'Consumo' && m.destino === 'Confinamiento' && !esAjusteStock_(m) &&
+        m.fecha >= desde && m.fecha <= hasta).forEach((m) => {
+        const ins = insumoDe(m.insumo) || {};
+        const kg = m.kg != null ? m.kg : ins.kgUnidad ? m.cantidad * ins.kgUnidad : m.cantidad;
+        reg[m.insumo] = (reg[m.insumo] || 0) + kg;
+      });
+      const filas = Object.keys(cargado).map((n) => ({ insumo: n, cargado: r2(cargado[n]), registrado: r2(reg[n] || 0), ajuste: r2(cargado[n] - (reg[n] || 0)) }));
+      // Un conteo en el período ya fijó el saldo con lo que había: el ajuste igual corrige el acumulado.
+      const conteos = movs.filter((m) => !m.anulado && m.tipo === 'Conteo' && cargado[m.insumo] != null && m.fecha >= desde && m.fecha <= hasta)
+        .map((m) => m.insumo + ' (' + ddmmaaaa_(m.fecha) + ')');
+      const anterior = movs.filter((m) => esAjusteStock_(m) && !m.anulado);
+      return { movs, filas, conteos, anterior };
+    };
+    if (body.simular) {
+      const c = cuenta();
+      return { ok: true, ajuste: true, desde, hasta, filas: c.filas, conteos: c.conteos, anteriorHasta: ajusteHasta_(c.anterior) };
+    }
+    return conLock_(() => {
+      const c = cuenta();
+      const ahora = new Date();
+      const log = [];
+      const shM = ss.getSheetByName('Movimientos');
+      c.anterior.forEach((m) => shM.getRange(m.fila, 16, 1, 2).setValues([[true, u.nombre + ': reemplazado por el ajuste del ' + ddmmaaaa_(desde) + ' al ' + ddmmaaaa_(hasta)]]));
+      if (c.anterior.length) log.push([ahora, u.nombre, 'Tapfeed', 'Ajuste de stock anterior anulado (' + c.anterior.length + ' movimientos)', 'Aplicado', '']);
+      const url = guardarPdf(log, ahora);
+      const nota = 'Ajuste de stock: peso cargado (premezcla ' + ddmmaaaa_(desde) + ' al ' + ddmmaaaa_(hasta) + ') − consumo registrado';
+      const filasMov = c.filas.filter((f) => Math.abs(f.ajuste) >= 0.5).map((f, k) => {
+        const ins = insumoDe(f.insumo);
+        let id = PREFIJO_AJUSTE + hasta + '-' + ins.nombre.replace(/[^A-Za-z0-9]+/g, '') + '-' + ahora.getTime();
+        if (c.movs.some((m) => m.id === id)) id += '-' + k;
+        log.push([ahora, u.nombre, 'Tapfeed', 'Ajuste de stock ' + ins.nombre + ' ' + (f.ajuste > 0 ? '+' : '') + f.ajuste + ' kg (cargado ' + f.cargado +
+          ' − registrado ' + f.registrado + ', ' + ddmmaaaa_(desde) + ' al ' + ddmmaaaa_(hasta) + ')', 'Aplicado', id]);
+        return filaMov_([id, hasta, 'Consumo', ins.nombre, cantDe(ins, f.ajuste), ins.unidad, f.ajuste, 'Confinamiento', '', '', '', nota,
+          'Tapfeed (' + u.nombre + ')', '', ahora, false, '', ahora.getTime() + k, '']);
+      });
+      if (filasMov.length) shM.getRange(shM.getLastRow() + 1, 1, filasMov.length, COLS_MOV.length).setValues(filasMov);
+      registrar_(ss, log);
+      reconstruirStock_(ss);
+      publicarDatosInforme_(ss);
+      return { ok: true, ajuste: true, desde, hasta, movimientos: filasMov.length, archivo: url };
+    });
+  }
+
+  // Informe de un día.
+  const fecha = desde;
+  return conLock_(() => {
+    const movs = leerMovimientos_(ss);
+    const hastaAj = ajusteHasta_(movs);
+    if (hastaAj && fecha <= hastaAj) {
+      throw new Error('el ' + ddmmaaaa_(fecha) + ' ya está corregido por el ajuste de stock (del ' + ddmmaaaa_(INFORME_ACUM_DESDE) + ' al ' + ddmmaaaa_(hastaAj) +
+        '). Para cambiarlo, volvé a subir el informe de premezcla del ' + ddmmaaaa_(INFORME_ACUM_DESDE) + ' al ' + ddmmaaaa_(hastaAj) + '.');
+    }
+    const ya = diasPremezcla_(ss).indexOf(fecha) !== -1;
+    if (ya && !body.reemplazar) return { ok: true, yaCargado: true };
+    const ahora = new Date();
+    const shM = ss.getSheetByName('Movimientos');
+    const shP = ss.getSheetByName('Tapfeed premezcla');
+    const log = [];
+    // Los consumos de Tapfeed de ese día (del informe por grupo o de una premezcla anterior) se reemplazan.
+    const antes = movs.filter((m) => m.id.indexOf('TF-' + fecha + '-') === 0 && !m.anulado);
+    antes.forEach((m) => shM.getRange(m.fila, 16, 1, 2).setValues([[true, u.nombre + ': reemplazado por el informe de premezcla (peso cargado)']]));
+    if (antes.length) log.push([ahora, u.nombre, 'Tapfeed', 'Premezcla del ' + ddmmaaaa_(fecha) + ': anulados ' + antes.length + ' consumos anteriores de Tapfeed', 'Aplicado', '']);
+    if (ya) {
+      const n = shP.getLastRow();
+      const quedan = shP.getRange(2, 1, n - 1, COLS_PREMEZCLA.length).getValues().filter((f) => iso_(f[0]) !== fecha);
+      shP.getRange(2, 1, n - 1, COLS_PREMEZCLA.length).clearContent();
+      if (quedan.length) shP.getRange(2, 1, quedan.length, COLS_PREMEZCLA.length).setValues(quedan);
+    }
+    const url = guardarPdf(log, ahora);
+    const ids = {};
+    movs.forEach((m) => { ids[m.id] = true; });
+    const filasMov = Object.keys(cargado).filter((n) => cargado[n] > 0).map((n, k) => {
+      const ins = insumoDe(n);
+      const kg = r2(cargado[n]);
+      let id = 'TF-' + fecha + '-' + ins.nombre.replace(/[^A-Za-z0-9]+/g, '') + '-P';
+      if (ids[id]) id += '-' + ahora.getTime();
+      log.push([ahora, u.nombre, 'Tapfeed', 'Consumo ' + ins.nombre + ' ' + kg + ' kg (' + ddmmaaaa_(fecha) + ', peso cargado)', 'Aplicado', id]);
+      return filaMov_([id, fecha, 'Consumo', ins.nombre, cantDe(ins, kg), ins.unidad, kg, 'Confinamiento', '', '', '', NOTA_TF_PREMEZCLA,
+        'Tapfeed (' + u.nombre + ')', '', ahora, false, '', ahora.getTime() + k, '']);
+    });
+    if (filasMov.length) shM.getRange(shM.getLastRow() + 1, 1, filasMov.length, COLS_MOV.length).setValues(filasMov);
+    const filasP = items.map((t) => {
+      const ins = porTapfeed[String(t.nombre).trim().toUpperCase()];
+      return [fecha, ins.nombre, texto_(t.nombre, 60), Number(t.recuperar) || 0, Number(t.cargado) || 0, Number(t.recuperarMs) || 0, Number(t.cargadoMs) || 0,
+        url, u.nombre, ahora];
+    });
+    shP.getRange(shP.getLastRow() + 1, 1, filasP.length, COLS_PREMEZCLA.length).setValues(filasP);
     registrar_(ss, log);
     reconstruirStock_(ss);
     publicarDatosInforme_(ss);
@@ -1366,9 +1547,11 @@ function publicarDatosInforme_(ss) {
     const ingStock = insumos.filter((i) => i.activo && i.modulo === 'Stock' && (base.fuera || []).indexOf(i.nombre) === -1).map((i) => i.nombre)
       .sort((a, b) => { const p = (n) => { const k = ORDEN_STOCK_INFORME.indexOf(n); return k === -1 ? 99 : k; }; return p(a) - p(b); });
     const consumoDia = {};   // insumo|fecha -> kg (todos los destinos)
+    const ajusteDia = {};    // ídem, el "Ajuste de stock": cuenta en el acumulado y el saldo, no en el consumo del día
     movsInf.filter((m) => m.tipo === 'Consumo').forEach((m) => {
       const k = m.insumo + '|' + m.fecha;
-      consumoDia[k] = (consumoDia[k] || 0) + cantRep(m.insumo, m.cantidad);
+      const a = esAjusteStock_(m) ? ajusteDia : consumoDia;
+      a[k] = (a[k] || 0) + cantRep(m.insumo, m.cantidad);
     });
     // Saldo al final de un día, sumando las estancias (Fardos lleva un stock por estancia).
     const saldosAl = (fecha) => {
@@ -1411,6 +1594,10 @@ function publicarDatosInforme_(ss) {
           if (p[1] >= INFORME_ACUM_DESDE) acum += consumoDia[k];
           if (p[1] > sumarDias_(f, -7)) siete += consumoDia[k];
         });
+        Object.keys(ajusteDia).forEach((k) => {
+          const p = k.split('|');
+          if (p[0] === ins && p[1] <= f && p[1] >= INFORME_ACUM_DESDE) acum += ajusteDia[k];
+        });
         const saldo = saldos[ins] || 0;
         const esp = esperado[ins] || 0;
         stockDia.push([ddmmaaaa_(f), ins, unidadRep(ins), r0(consumoDia[ins + '|' + f] || 0), r0(acum), r0(siete / 7), r0(esp), r0(saldo),
@@ -1429,6 +1616,17 @@ function publicarDatosInforme_(ss) {
       stock.push([x.insumo, x.estancia ? nombreEstancia_(x.estancia) : '', Math.round(x.cantidad * 100) / 100, i.unidad, i.kgUnidad || i.unidad === 'kg' ? r0(kgDe(x.insumo, x.cantidad)) : '']);
     });
 
+    // Stock con peso cargado (premezcla). Días con informe por grupo pero sin premezcla, después del ajuste:
+    // ese día el stock se descontó con el peso entregado.
+    const diasPm = diasPremezcla_(ss);
+    const ajustes = movs.filter(esAjusteStock_);
+    const hastaAj = ajusteHasta_(ajustes);
+    const sinPremezcla = diasTf.filter((f) => f >= INFORME_ACUM_DESDE && f > hastaAj && diasPm.indexOf(f) === -1)
+      .map((f) => ['Aviso', 'Stock del ' + ddmmaaaa_(f) + ' descontado con peso entregado (falta informe de premezcla)']);
+    const textoAjuste = hastaAj ? ajustes.map((m) => {
+      const kg = r0(cantRep(m.insumo, m.cantidad));
+      return m.insumo + ' ' + (kg > 0 ? '+' : '') + kg + ' ' + unidadRep(m.insumo);
+    }).join('; ') : '';
     const resumen = escribir('Resumen', [
       ['Dato', 'Valor'],
       ['Planilla', 'Registros Zehirut – datos para el informe. La actualiza sola la app con cada carga. No editar.'],
@@ -1441,7 +1639,11 @@ function publicarDatosInforme_(ss) {
         (base.estancia ? ' Fardos: solo ' + nombreEstancia_(base.estancia) + '.' : '') + ' Consumo = confinamiento (Tapfeed) + otros destinos (autoconsumo, cargado en la app).'],
       ['Consumo esperado', base.error ? 'NO SE PUDO CALCULAR: ' + base.error
         : 'Según las dietas de la hoja "' + HOJA_ESPERADO + '" de Datos base confinamiento (cantidad por cabeza × cabezas; confinamiento con las cabezas de Tapfeed). Días de stock = saldo ÷ consumo esperado.'],
-    ]);
+      ['Peso del stock', 'Stock por día: el consumo del confinamiento es el peso CARGADO al mixer (informe "Uso ingrediente & premezcla"). ' +
+        'Corrales por día e Ingredientes por día: peso ENTREGADO a los corrales (informe "Uso de ingredientes por grupo").'],
+      ['Ajuste de stock', hastaAj ? 'Peso cargado − consumo registrado del ' + ddmmaaaa_(INFORME_ACUM_DESDE) + ' al ' + ddmmaaaa_(hastaAj) +
+        ' (suma al consumo acumulado y al saldo, no al consumo del día): ' + (textoAjuste || 'sin diferencias') : 'todavía no se hizo'],
+    ].concat(sinPremezcla));
     escribir('Stock por día', stockDia);
     escribir('Corrales por día', corrales);
     escribir('Ingredientes por día', ingred);
@@ -1561,7 +1763,7 @@ function exportarExcel_(body) {
     const c = cuenta(m);
     let entra = 0, sale = 0;
     if (m.tipo === 'Ingreso') entra = m.cantidad;
-    else if (m.tipo === 'Consumo') sale = m.cantidad;
+    else if (m.tipo === 'Consumo') { if (m.cantidad < 0) entra = -m.cantidad; else sale = m.cantidad; }   // un ajuste de stock puede ser negativo
     else if (m.tipo === 'Conteo') { const dif = m.cantidad - c.saldo; if (dif > 0) entra = dif; else sale = -dif; }
     c.saldo += entra - sale;
     // El primer movimiento de un insumo, si es un conteo, es su stock inicial.
