@@ -282,7 +282,7 @@ botón "Compartir por WhatsApp" (navigator.share en el celular, wa.me en la PC; 
 temporada y año con barras ▓░ entre ``` como en ZehirutApp), acumulados con barras (mes actual, temporada
 actual "26-27" y total de la temporada anterior "25-26" para comparar; sin el año, pedido 28/09; el
 rótulo va al lado de cada barra, sin leyenda). WhatsApp: día + temporada actual y anterior, misma escala. "Cargar lluvia" abre el formulario y vuelve al día cargado. Sectores con su
-referencia (C Central, D Retiro / B Retiro, E Central).
+referencia (C Central, D Retiro / B Retiro, E Central). La Paciencia tiene sectores A, B, C, D (pluviómetro nuevo, 05/10/2026), E, F.
 
 Ya existe en ZehirutApp (`Lluvias.js`: planilla "Registro de Lluvias Zehirut S.A.", sectores por
 estancia, ID AAAAMMDDFINCASECTOR, resumen año / temporada set-ago). Se integra acá; Osmar con

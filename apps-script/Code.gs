@@ -191,7 +191,7 @@ function ajustarConsumoEsperado_(h) {
 }
 const SECTORES_POR_FINCA = {
   'LA PRUDENCIA': ['A', 'C', 'D', 'F'],
-  'LA PACIENCIA': ['A', 'B', 'C', 'E', 'F'],
+  'LA PACIENCIA': ['A', 'B', 'C', 'D', 'E', 'F'],
 };
 
 // ---------------------------------------------------------------- instalación

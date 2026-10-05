@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.21.0';
+const VERSION = '1.21.1';
 
 
 const DIAS_HISTORIAL = 60;
@@ -1640,7 +1640,7 @@ const nombreSector = (finca, s) => 'Sector ' + s + (REF_SECTOR[finca] && REF_SEC
 const MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'setiembre', 'octubre', 'noviembre', 'diciembre'];
 
 function lluviasDatos() {
-  return (datos && datos.lluvias) || { sectores: { 'LA PRUDENCIA': ['A', 'C', 'D', 'F'], 'LA PACIENCIA': ['A', 'B', 'C', 'E', 'F'] }, registros: [], resumen: [] };
+  return (datos && datos.lluvias) || { sectores: { 'LA PRUDENCIA': ['A', 'C', 'D', 'F'], 'LA PACIENCIA': ['A', 'B', 'C', 'D', 'E', 'F'] }, registros: [], resumen: [] };
 }
 
 /** Registros de lluvia de Google más los que siguen en la cola (lo último cargado manda). */
