@@ -131,6 +131,18 @@ function fijarClaveEstancia_(body) {
   });
 }
 
+/** Correo de la app de la estancia (código para recuperar la contraseña, 2026-10-06): lo manda
+ *  desde la cuenta del script (zehirutsa@gmail.com) con la misma clave compartida. Solo texto. */
+function correoEstancia_(body) {
+  const clave = props_().getProperty('CLAVE_ESTANCIA');
+  if (!clave || String(body.clave || '') !== clave) throw new Error('clave incorrecta');
+  const para = String(body.para || '').trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(para)) throw new Error('correo inválido');
+  MailApp.sendEmail({ to: para, subject: String(body.asunto || 'Estancia').slice(0, 200),
+    body: String(body.texto || '').slice(0, 5000), name: 'App de la estancia' });
+  return { ok: true };
+}
+
 function estancia_(body) {
   const clave = props_().getProperty('CLAVE_ESTANCIA');
   if (!clave || String(body.clave || '') !== clave) throw new Error('clave incorrecta');

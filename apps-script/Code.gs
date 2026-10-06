@@ -552,6 +552,7 @@ function doPost(e) {
       case 'excel': return json_(exportarExcel_(body));
       case 'za': return json_(zehirut_(body));
       case 'estancia': return json_(estancia_(body));
+      case 'correoEstancia': return json_(correoEstancia_(body));
       case 'claveEstancia': return json_(fijarClaveEstancia_(body));
       case 'producto': return json_(guardarProducto_(body));
       default: return json_({ ok: false, error: 'acción desconocida' });
