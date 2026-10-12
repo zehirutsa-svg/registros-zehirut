@@ -93,9 +93,10 @@ async function prepararArchivo(file) {
   return { base64: await blobABase64(blob), tipo, nombre, vista: /^image\//.test(tipo) ? URL.createObjectURL(blob) : '' };
 }
 
-/** Botones para sacar una foto o elegir una foto/PDF. El archivo queda en ui.fac.archivos[clave]. */
+/** Botones para sacar una foto o elegir una foto/PDF. El archivo queda en archivos[clave] de la pantalla
+ *  (Facturas o Fondo fijo; a Fondo fijo se puede entrar sin haber abierto Facturas). */
 function htmlElegirArchivo(clave, texto) {
-  const a = (ui.fac.archivos || {})[clave];
+  const a = ((ui.pantalla === 'fondofijo' ? estadoFF() : estadoFac()).archivos || {})[clave];
   return '<div class="elegir-archivo">' +
     '<label class="btn sec">📷 Sacar foto<input type="file" accept="image/*" capture="environment" data-archivo="' + clave + '" hidden></label>' +
     '<label class="btn sec">📎 ' + (texto || 'Elegir foto o PDF') + '<input type="file" accept="image/*,application/pdf" data-archivo="' + clave + '" hidden></label>' +
