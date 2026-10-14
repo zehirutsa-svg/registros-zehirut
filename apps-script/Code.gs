@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '19';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '20';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
@@ -111,6 +111,7 @@ const MAQUINAS_INICIALES = [
   ['GEN-Yan 2', 'Generador Yanmar 2', 'Diesel', false, false, '', true, true],
   ['GEN-Yan 3', 'Generador Yanmar 3', 'Diesel', false, false, '', true, true],
   ['GEN-Lifan', 'Generador Lifan', 'Diesel', false, false, '', true, false],
+  ['GEN-Depco', 'Generador DEPCO', 'Diesel', false, false, '', true, true],
   ['MOTO', 'Motos', 'Nafta', false, true, 'Yamaha, Honda, Moto carro, Kenton', true, false],
   ['HM-Ms', 'Motosierras', 'Nafta', false, true, '', true, false],
   ['HM-Mb', 'Motobombas', 'Nafta', false, true, '', true, false],
@@ -437,6 +438,12 @@ function asegurarCombustible_(ss, ins, mov) {
   });
   const maq = hoja_(ss, 'Máquinas', COLS_MAQUINAS);
   if (maq.getLastRow() < 2) maq.getRange(2, 1, MAQUINAS_INICIALES.length, COLS_MAQUINAS.length).setValues(MAQUINAS_INICIALES);
+  // Altas posteriores a la carga inicial (14/10/2026: Generador DEPCO), solo si no está en la hoja.
+  ['GEN-Depco'].forEach((cod) => {
+    const n = maq.getLastRow();
+    const ya = n > 1 && maq.getRange(2, 1, n - 1, 1).getValues().some((f) => String(f[0]).trim() === cod);
+    if (!ya) maq.appendRow(MAQUINAS_INICIALES.find((m) => m[0] === cod));
+  });
   maq.getRange(2, 4, 200, 2).insertCheckboxes();
   maq.getRange(2, 7, 200, 1).insertCheckboxes();
   const tra = hoja_(ss, 'Trabajos', ['Trabajo']);
