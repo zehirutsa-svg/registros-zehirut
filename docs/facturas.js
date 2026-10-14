@@ -14,7 +14,7 @@ const BIENES_USO = [
   ['IMPL-Ras', 'Implemento Rastrillo frontal'], ['IMPL-Pal 1', 'Implemento Pala Frontal'], ['IMPL-Pal 2', 'Implemento Palita Tatu'],
   ['IMPL-Hoy', 'Implemento Hoyadora de Postes'], ['IMPL-Fum', 'Implemento Yumbo'], ['IMPL-Cac 1', 'Implemento Cachape 1'],
   ['IMPL-Cac 2', 'Implemento Cachape 2'], ['IMPL-Mez', 'Implemento Mezcladora Tracto'], ['GEN-Cat', 'Generador Caterpillar'],
-  ['GEN-Yan 1', 'Generador Yanmar 1'], ['GEN-Yan 2', 'Generador Yanmar 2'], ['GEN-Yan 3', 'Generador Yanmar 3'],
+  ['GEN-Yan 1', 'Generador Yanmar 1 - LPA'], ['GEN-Yan 2', 'Generador Yanmar 2 - LPA (Confi)'], ['GEN-Yan 3', 'Generador Yanmar 3 - LPR (Mono)'],
   ['GEN-Lifan', 'Generador Lifan'], ['GEN-Depco', 'Generador DEPCO'],
   ['HM-Ms', 'Motosierras'], ['HM-Fum', 'Mochilas Fumigadoras'], ['HM-Mb', 'Motobombas'],
   ['HM-Des', 'Desmalezadoras Husqvarna'], ['INF-Tc', 'Tanque Combustible (Estático)'], ['BPY', 'Beechcraft Bonanza A36'], ['VARIOS', 'Varios'],
