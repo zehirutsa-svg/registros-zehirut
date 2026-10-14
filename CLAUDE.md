@@ -190,7 +190,7 @@ Tarjeta en Stocks debajo de Combustible; permisos = columna Combustible. Código
   viene con el final del último parte de esa máquina; si no coincide (horas sin parte o superposición) o
   pasa de 24 h, pide confirmar. Corregir = anular + nuevo (mismas reglas que Movimientos).
 - Máquinas: columna "Horómetro" de la hoja Máquinas (tractores Valtra, Massey, LS; generadores Caterpillar
-  y Yanmar 1/2/3). No mueve stock: el control es litros ÷ horas con lo cargado en Combustible a la misma
+  y DEPCO; los Yanmar salieron el 14/10/2026). No mueve stock: el control es litros ÷ horas con lo cargado en Combustible a la misma
   máquina (ficha: horas del mes por unidad de negocio, litros del mes, l/h).
 - Trabajos (lista depurada por el usuario, única para Combustible y Horómetro): Caminería, Trabajos varios
   con traila, Trabajos varios con niveladora, Cargada de corral, Acarreo de fardos, Acarreos varios,

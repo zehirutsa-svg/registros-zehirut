@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '20';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '21';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
@@ -107,9 +107,9 @@ const MAQUINAS_INICIALES = [
   ['CAM-3', 'Camioneta Isuzu D-Max 2023', 'Diesel', false, false, '', true, false],
   ['CAM-4', 'Camioneta Mazda BT-50 2027', 'Diesel', false, false, '', true, false],
   ['GEN-Cat', 'Generador Caterpillar', 'Diesel', false, false, '', true, true],
-  ['GEN-Yan 1', 'Generador Yanmar 1', 'Diesel', false, false, '', true, true],
-  ['GEN-Yan 2', 'Generador Yanmar 2', 'Diesel', false, false, '', true, true],
-  ['GEN-Yan 3', 'Generador Yanmar 3', 'Diesel', false, false, '', true, true],
+  ['GEN-Yan 1', 'Generador Yanmar 1', 'Diesel', false, false, '', true, false],
+  ['GEN-Yan 2', 'Generador Yanmar 2', 'Diesel', false, false, '', true, false],
+  ['GEN-Yan 3', 'Generador Yanmar 3', 'Diesel', false, false, '', true, false],
   ['GEN-Lifan', 'Generador Lifan', 'Diesel', false, false, '', true, false],
   ['GEN-Depco', 'Generador DEPCO', 'Diesel', false, false, '', true, true],
   ['MOTO', 'Motos', 'Nafta', false, true, 'Yamaha, Honda, Moto carro, Kenton', true, false],
@@ -444,6 +444,14 @@ function asegurarCombustible_(ss, ins, mov) {
     const ya = n > 1 && maq.getRange(2, 1, n - 1, 1).getValues().some((f) => String(f[0]).trim() === cod);
     if (!ya) maq.appendRow(MAQUINAS_INICIALES.find((m) => m[0] === cod));
   });
+  // 14/10/2026: los Yanmar salen del horómetro (una sola vez, por si después se vuelven a tildar a mano).
+  if (props_().getProperty('YANMAR_SIN_HOROMETRO') !== '1') {
+    const n = maq.getLastRow(), col = COLS_MAQUINAS.indexOf('Horómetro') + 1;
+    if (n > 1) maq.getRange(2, 1, n - 1, 1).getValues().forEach((f, i) => {
+      if (/^GEN-Yan /.test(String(f[0]).trim())) maq.getRange(i + 2, col).setValue(false);
+    });
+    props_().setProperty('YANMAR_SIN_HOROMETRO', '1');
+  }
   maq.getRange(2, 4, 200, 2).insertCheckboxes();
   maq.getRange(2, 7, 200, 1).insertCheckboxes();
   const tra = hoja_(ss, 'Trabajos', ['Trabajo']);
