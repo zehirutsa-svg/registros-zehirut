@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.21.5';
+const VERSION = '1.21.6';
 
 
 const DIAS_HISTORIAL = 60;

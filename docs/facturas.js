@@ -236,6 +236,17 @@ async function leerFacturaElegida(file) {
   render();
   const descartar = () => { za('descartarArchivo', [r.archivoId, '__PIN__']).catch(() => {}); toast('Carga descartada'); };
   // Mismos avisos que ZehirutApp, de a uno.
+  // Solo facturas: un recibo (u otro documento) no se carga, salvo los de peaje. El archivo ya lo
+  // borró el servidor.
+  if (r.noEsFactura) {
+    const doc = r.documentoDetectado || 'Otro';
+    await cartel({ icono: '🚫', titulo: 'Esto no es una factura',
+      si: 'Entendido', no: '',
+      html: (doc !== 'Otro' ? '<p>Se leyó como: <b>' + esc(doc) + '</b>.</p>' : '') + '<p>Acá solo se cargan facturas (los recibos se aceptan únicamente para peajes). No se guardó nada.</p>' +
+        (doc === 'Recibo' ? '<p>Si es el recibo de una factura ya cargada, agregalo desde el detalle de esa factura (Ver facturas).</p>' : '') +
+        '<p>Sacale una foto a la factura y cargala de nuevo.</p>' });
+    return;
+  }
   if (!r.clienteCoincide) {
     const ok = await cartel({ icono: '⚠️', titulo: 'Esta factura no parece ser de Zehirut S.A.', si: 'Sí, es de Zehirut', no: 'No, descartar',
       html: '<p>Cliente detectado: "<b>' + esc(r.clienteDetectado) + '</b>".</p><p>Puede ser un error de lectura (por ejemplo, en facturas manuscritas).</p>' });
