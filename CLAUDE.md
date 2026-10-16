@@ -145,7 +145,15 @@ Parámetros (300). Código: leerDatosBase_ y publicarDatosInforme_.
 - El script registra un Consumo por ingrediente del TOTAL (destino Confinamiento, "Cargado por"
   = "Tapfeed (usuario)", ID `TF-AAAA-MM-DD-<insumo>`), guarda el detalle por corral en la hoja
   **Tapfeed** y el PDF en la carpeta "1 Tapfeed" (Drive id 1ZybVBnxzMW_9OixfT_ut9GuvKtQbagH1).
-  Si el día ya estaba: la app avisa y "Reemplazar" anula los consumos anteriores del día.
+  Si el día ya estaba: la app avisa y "Reemplazar" saca los consumos anteriores del día.
+- **Reemplazos SIN anular (16/10/2026, pedido del usuario: "que en el stock haya constantemente anulaciones está
+  mal").** Todo consumo de Tapfeed o ajuste de stock que otro informe reemplaza (premezcla sobre por grupo, informe
+  repetido, ajuste nuevo) NO se marca anulado: se mueve a la hoja oculta **"Movimientos reemplazados"** (mismas
+  columnas, con motivo) y se borra de Movimientos (moverReemplazados_). Los ~32 anulados viejos se movieron una vez
+  (limpiarReemplazosTapfeed_, propiedad limpiezaReemplazosTF1). Anular a mano sigue igual.
+- Diagnóstico sin acceso a la planilla principal (la conexión Drive de Claude no la ve): una función temporal en
+  doGet que escriba en la planilla del informe (DESPUÉS de publicarDatosInforme_, que borra hojas extra), clasp push
+  + update-deployment y `curl -sL` al /exec; leerla con read_file_content (muestra ~30 filas por hoja: agrupar).
 - **Stock con peso CARGADO (05/10/2026, v1.21.0).** Tapfeed da dos números distintos: "Uso ingrediente & premezcla"
   = peso **cargado** al mixer (lo que sale del depósito) y "Uso de ingredientes por grupo" = peso **entregado** a los
   corrales (menor: residuo en el mixer, balanza en movimiento; 04/10: 19.512 vs 19.456 kg). **Stock = cargado;

@@ -384,6 +384,39 @@ function fardosAjusteAConteo_(ss) {
   });
 }
 
+/** Saca de Movimientos los consumos de Tapfeed / ajustes que otro informe reemplazó (16/10/2026, pedido del usuario:
+ *  no son errores de nadie y llenaban el historial de anulados). No se pierden: pasan a la hoja oculta
+ *  "Movimientos reemplazados" con el motivo. Se borran de abajo hacia arriba para no correr los números de fila. */
+function moverReemplazados_(ss, movs, quien, motivo) {
+  if (!movs.length) return;
+  const shM = ss.getSheetByName('Movimientos');
+  const shR = hoja_(ss, 'Movimientos reemplazados', COLS_MOV);
+  if (!shR.isSheetHidden()) shR.hideSheet();
+  const filas = movs.map((m) => {
+    const f = shM.getRange(m.fila, 1, 1, COLS_MOV.length).getValues()[0];
+    f[15] = true;
+    f[16] = f[16] || (quien + ': ' + motivo);
+    return f;
+  });
+  shR.getRange(shR.getLastRow() + 1, 1, filas.length, COLS_MOV.length).setValues(filas);
+  movs.map((m) => m.fila).sort((a, b) => b - a).forEach((n) => shM.deleteRow(n));
+}
+
+/** Una sola vez (16/10/2026): los consumos de Tapfeed y ajustes que ya habían quedado anulados por un reemplazo
+ *  pasan a "Movimientos reemplazados". Desde ahora los reemplazos van directo ahí, sin anular en Movimientos. */
+function limpiarReemplazosTapfeed_(ss) {
+  const props = props_();
+  if (props.getProperty('limpiezaReemplazosTF1')) return;
+  conLock_(() => {
+    const viejos = leerMovimientos_(ss).filter((m) => m.anulado && (m.id.indexOf('TF-') === 0 || esAjusteStock_(m)) && /reemplazado/.test(m.anuladoPor));
+    moverReemplazados_(ss, viejos, 'Sistema', '');
+    const ahora = new Date();
+    registrar_(ss, [[ahora, 'Sistema', 'Tapfeed', 'Limpieza: ' + viejos.length + ' consumos de Tapfeed anulados por reemplazo pasados a "Movimientos reemplazados"', 'Aplicado', '']]);
+    reconstruirStock_(ss);
+    props.setProperty('limpiezaReemplazosTF1', ahora.toISOString() + ' (' + viejos.length + ')');
+  });
+}
+
 /** Una sola vez (03/10/2026, pedido del usuario): a la papelera las versiones reemplazadas del informe del 02/10
  *  (las creó la conexión de la tarea; la de Claude no las puede borrar). Solo si el nombre empieza con "(reemplazado". */
 function papeleraInformesViejos_() {
@@ -550,6 +583,7 @@ function doGet() {
   fardosAjusteAConteo_(SpreadsheetApp.getActive());
   eproBolsa30_(SpreadsheetApp.getActive());
   papeleraInformesViejos_();
+  limpiarReemplazosTapfeed_(SpreadsheetApp.getActive());
   publicarDatosInforme_(SpreadsheetApp.getActive());
   const url = SpreadsheetApp.getActive().getUrl();
   return HtmlService.createHtmlOutput(
@@ -1287,10 +1321,9 @@ function cargarTapfeed_(body) {
     const shT = ss.getSheetByName('Tapfeed');
     const log = [];
     if (ya) {
-      // Reemplazo: se anulan los consumos de ese día (los del informe por grupo) y se saca su detalle.
-      movs.filter((m) => m.id.indexOf('TF-' + fecha + '-') === 0 && !m.anulado && m.nota === NOTA_TF_GRUPO).forEach((m) => {
-        shM.getRange(m.fila, 16, 1, 2).setValues([[true, u.nombre + ': reemplazado por otro informe de Tapfeed']]);
-      });
+      // Reemplazo: los consumos de ese día (los del informe por grupo) pasan a "Movimientos reemplazados" y se saca su detalle.
+      moverReemplazados_(ss, movs.filter((m) => m.id.indexOf('TF-' + fecha + '-') === 0 && !m.anulado && m.nota === NOTA_TF_GRUPO),
+        u.nombre, 'reemplazado por otro informe de Tapfeed');
       const n = shT.getLastRow();
       const quedan = shT.getRange(2, 1, n - 1, COLS_TAPFEED.length).getValues().filter((f) => iso_(f[0]) !== fecha);
       shT.getRange(2, 1, n - 1, COLS_TAPFEED.length).clearContent();
@@ -1425,8 +1458,8 @@ function cargarPremezcla_(body) {
       const ahora = new Date();
       const log = [];
       const shM = ss.getSheetByName('Movimientos');
-      c.anterior.forEach((m) => shM.getRange(m.fila, 16, 1, 2).setValues([[true, u.nombre + ': reemplazado por el ajuste del ' + ddmmaaaa_(desde) + ' al ' + ddmmaaaa_(hasta)]]));
-      if (c.anterior.length) log.push([ahora, u.nombre, 'Tapfeed', 'Ajuste de stock anterior anulado (' + c.anterior.length + ' movimientos)', 'Aplicado', '']);
+      moverReemplazados_(ss, c.anterior, u.nombre, 'reemplazado por el ajuste del ' + ddmmaaaa_(desde) + ' al ' + ddmmaaaa_(hasta));
+      if (c.anterior.length) log.push([ahora, u.nombre, 'Tapfeed', 'Ajuste de stock anterior reemplazado (' + c.anterior.length + ' movimientos)', 'Aplicado', '']);
       const url = guardarPdf(log, ahora);
       const nota = 'Ajuste de stock: peso cargado (premezcla ' + ddmmaaaa_(desde) + ' al ' + ddmmaaaa_(hasta) + ') − consumo registrado';
       const filasMov = c.filas.filter((f) => Math.abs(f.ajuste) >= 0.5).map((f, k) => {
@@ -1461,10 +1494,11 @@ function cargarPremezcla_(body) {
     const shM = ss.getSheetByName('Movimientos');
     const shP = ss.getSheetByName('Tapfeed premezcla');
     const log = [];
-    // Los consumos de Tapfeed de ese día (del informe por grupo o de una premezcla anterior) se reemplazan.
+    // Los consumos de Tapfeed de ese día (del informe por grupo o de una premezcla anterior) se reemplazan:
+    // pasan a "Movimientos reemplazados" (no quedan anulados en el historial de stock).
     const antes = movs.filter((m) => m.id.indexOf('TF-' + fecha + '-') === 0 && !m.anulado);
-    antes.forEach((m) => shM.getRange(m.fila, 16, 1, 2).setValues([[true, u.nombre + ': reemplazado por el informe de premezcla (peso cargado)']]));
-    if (antes.length) log.push([ahora, u.nombre, 'Tapfeed', 'Premezcla del ' + ddmmaaaa_(fecha) + ': anulados ' + antes.length + ' consumos anteriores de Tapfeed', 'Aplicado', '']);
+    moverReemplazados_(ss, antes, u.nombre, 'reemplazado por el informe de premezcla (peso cargado)');
+    if (antes.length) log.push([ahora, u.nombre, 'Tapfeed', 'Premezcla del ' + ddmmaaaa_(fecha) + ': reemplazados ' + antes.length + ' consumos anteriores de Tapfeed', 'Aplicado', '']);
     if (ya) {
       const n = shP.getLastRow();
       const quedan = shP.getRange(2, 1, n - 1, COLS_PREMEZCLA.length).getValues().filter((f) => iso_(f[0]) !== fecha);
