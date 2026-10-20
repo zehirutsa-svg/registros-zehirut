@@ -421,7 +421,7 @@ function limpiarReemplazosTapfeed_(ss) {
  *  (las creó la conexión de la tarea; la de Claude no las puede borrar). Solo si el nombre empieza con "(reemplazado". */
 function papeleraInformesViejos_() {
   const props = props_();
-  if (props.getProperty('papeleraInf0210d')) return;
+  if (!props.getProperty('papeleraInf0210d')) {
   // 1AJY…: fardos en kg; 1hzQ…: fardos de las dos estancias (reemplazados; solo La Paciencia desde 03/10).
   ['1Nza1NT4Zg31IE2OaFJAkefPkukoMZ-wa', '11TNiKi3JOgsVRJR5RRNAkZ5KW10CEQ9R', '1AJYInHIJJfi2d_l_n5c7ffhuA1mQ4uVH',
     '1hzQsruV3-XAAq0DOzZEmjQiFhICdW3qR', '1mrxn0Ebq5UfwUB-27_w_z5XssNPwDBj1'].forEach((id) => {
@@ -431,6 +431,16 @@ function papeleraInformesViejos_() {
     } catch (e) { console.error('No se pudo mandar a la papelera ' + id + ': ' + e); }
   });
   props.setProperty('papeleraInf0210d', '1');
+  }
+  // 20/10/2026: informes del 16 al 18/10 hechos antes de "esperado ≥ consumo real" y de corregir los ingresos.
+  if (props.getProperty('papeleraInf1618')) return;
+  ['1odiKtA8GPQ5pbT9EmgFZXCQbKnOG0XX1', '1Pt6hKb-nBu7rZAJzVKRooxLaPu-4rKLo', '1mPTZuWpW86XNK9GbneuJmqnMJ03Bjfd_'].forEach((id) => {
+    try {
+      const f = DriveApp.getFileById(id);
+      if (!f.isTrashed() && /1[678] OCT 26\.pdf$/.test(f.getName())) f.setTrashed(true);
+    } catch (e) { console.error('No se pudo mandar a la papelera ' + id + ': ' + e); }
+  });
+  props.setProperty('papeleraInf1618', '1');
 }
 
 /** Una sola vez (03/10/2026): la bolsa de E-PRO 35 es de 30 kg, no de 40. Corrige Insumos y los kg de sus movimientos. */
