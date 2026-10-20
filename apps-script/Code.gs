@@ -1607,10 +1607,12 @@ function publicarDatosInforme_(ss) {
       .sort((a, b) => { const p = (n) => { const k = ORDEN_STOCK_INFORME.indexOf(n); return k === -1 ? 99 : k; }; return p(a) - p(b); });
     const consumoDia = {};   // insumo|fecha -> kg (todos los destinos)
     const ajusteDia = {};    // ídem, el "Ajuste de stock": cuenta en el acumulado y el saldo, no en el consumo del día
+    const mezclaDia = {};    // ídem, solo lo que pasó por el mixer (Tapfeed): es el "consumo real" del esperado
     movsInf.filter((m) => m.tipo === 'Consumo').forEach((m) => {
       const k = m.insumo + '|' + m.fecha;
       const a = esAjusteStock_(m) ? ajusteDia : consumoDia;
       a[k] = (a[k] || 0) + cantRep(m.insumo, m.cantidad);
+      if (String(m.id).indexOf('TF-') === 0) mezclaDia[k] = (mezclaDia[k] || 0) + cantRep(m.insumo, m.cantidad);
     });
     // Saldo al final de un día, sumando las estancias (Fardos lleva un stock por estancia).
     const saldosAl = (fecha) => {
@@ -1658,10 +1660,11 @@ function publicarDatosInforme_(ss) {
           if (p[0] === ins && p[1] <= f && p[1] >= INFORME_ACUM_DESDE) acum += ajusteDia[k];
         });
         const saldo = saldos[ins] || 0;
-        // El esperado nunca es menor que el consumo real (pedido 20/10/2026): el del día, o si ese día
-        // todavía no tiene Tapfeed (hoy), el del último día con Tapfeed.
+        // El esperado nunca es menor que el consumo real de Tapfeed (pedido 20/10/2026): el del día, o si ese
+        // día todavía no tiene Tapfeed (hoy), el del último día con Tapfeed. Lo cargado a mano (Beef, maíz
+        // quebrado: se carga lo que se lleva, no lo que se come ese día) no cuenta: queda la dieta.
         const diaReal = diasTf.indexOf(f) !== -1 ? f : (diasTf.filter((d) => d <= f).pop() || f);
-        const esp = Math.max(esperado[ins] || 0, consumoDia[ins + '|' + diaReal] || 0);
+        const esp = Math.max(esperado[ins] || 0, mezclaDia[ins + '|' + diaReal] || 0);
         stockDia.push([ddmmaaaa_(f), ins, unidadRep(ins), r0(consumoDia[ins + '|' + f] || 0), r0(acum), r0(siete / 7), r0(esp), r0(saldo),
           esp > 0 ? Math.max(0, Math.floor(saldo / esp)) : '—']);
       });
@@ -1700,7 +1703,7 @@ function publicarDatosInforme_(ss) {
       ['Unidades', 'En kg, redondeado, salvo lo que se cuenta por unidad (Fardos: en fardos); ver columna Unidad de Stock por día.' +
         (base.estancia ? ' Fardos: solo ' + nombreEstancia_(base.estancia) + '.' : '') + ' Consumo = confinamiento (Tapfeed) + otros destinos (autoconsumo, cargado en la app).'],
       ['Consumo esperado', base.error ? 'NO SE PUDO CALCULAR: ' + base.error
-        : 'Según las dietas de la hoja "' + HOJA_ESPERADO + '" de Datos base confinamiento (cantidad por cabeza × cabezas; confinamiento con las cabezas de Tapfeed). Nunca menor que el consumo real del día (o del último día con Tapfeed). Días de stock = saldo ÷ consumo esperado.'],
+        : 'Según las dietas de la hoja "' + HOJA_ESPERADO + '" de Datos base confinamiento (cantidad por cabeza × cabezas; confinamiento con las cabezas de Tapfeed). Nunca menor que el consumo real de Tapfeed del día (o del último día con Tapfeed); lo cargado a mano no cuenta. Días de stock = saldo ÷ consumo esperado.'],
       ['Peso del stock', 'Stock por día: el consumo del confinamiento es el peso CARGADO al mixer (informe "Uso ingrediente & premezcla"). ' +
         'Corrales por día e Ingredientes por día: peso ENTREGADO a los corrales (informe "Uso de ingredientes por grupo").'],
       ['Ajuste de stock', hastaAj ? 'Peso cargado − consumo registrado del ' + ddmmaaaa_(INFORME_ACUM_DESDE) + ' al ' + ddmmaaaa_(hastaAj) +
