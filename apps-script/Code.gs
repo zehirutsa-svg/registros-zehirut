@@ -1658,7 +1658,10 @@ function publicarDatosInforme_(ss) {
           if (p[0] === ins && p[1] <= f && p[1] >= INFORME_ACUM_DESDE) acum += ajusteDia[k];
         });
         const saldo = saldos[ins] || 0;
-        const esp = esperado[ins] || 0;
+        // El esperado nunca es menor que el consumo real (pedido 20/10/2026): el del día, o si ese día
+        // todavía no tiene Tapfeed (hoy), el del último día con Tapfeed.
+        const diaReal = diasTf.indexOf(f) !== -1 ? f : (diasTf.filter((d) => d <= f).pop() || f);
+        const esp = Math.max(esperado[ins] || 0, consumoDia[ins + '|' + diaReal] || 0);
         stockDia.push([ddmmaaaa_(f), ins, unidadRep(ins), r0(consumoDia[ins + '|' + f] || 0), r0(acum), r0(siete / 7), r0(esp), r0(saldo),
           esp > 0 ? Math.max(0, Math.floor(saldo / esp)) : '—']);
       });
@@ -1697,7 +1700,7 @@ function publicarDatosInforme_(ss) {
       ['Unidades', 'En kg, redondeado, salvo lo que se cuenta por unidad (Fardos: en fardos); ver columna Unidad de Stock por día.' +
         (base.estancia ? ' Fardos: solo ' + nombreEstancia_(base.estancia) + '.' : '') + ' Consumo = confinamiento (Tapfeed) + otros destinos (autoconsumo, cargado en la app).'],
       ['Consumo esperado', base.error ? 'NO SE PUDO CALCULAR: ' + base.error
-        : 'Según las dietas de la hoja "' + HOJA_ESPERADO + '" de Datos base confinamiento (cantidad por cabeza × cabezas; confinamiento con las cabezas de Tapfeed). Días de stock = saldo ÷ consumo esperado.'],
+        : 'Según las dietas de la hoja "' + HOJA_ESPERADO + '" de Datos base confinamiento (cantidad por cabeza × cabezas; confinamiento con las cabezas de Tapfeed). Nunca menor que el consumo real del día (o del último día con Tapfeed). Días de stock = saldo ÷ consumo esperado.'],
       ['Peso del stock', 'Stock por día: el consumo del confinamiento es el peso CARGADO al mixer (informe "Uso ingrediente & premezcla"). ' +
         'Corrales por día e Ingredientes por día: peso ENTREGADO a los corrales (informe "Uso de ingredientes por grupo").'],
       ['Ajuste de stock', hastaAj ? 'Peso cargado − consumo registrado del ' + ddmmaaaa_(INFORME_ACUM_DESDE) + ' al ' + ddmmaaaa_(hastaAj) +
