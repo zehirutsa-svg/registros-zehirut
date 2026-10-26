@@ -326,6 +326,11 @@ acceso total.
   de la biblioteca en `appsscript.json`, `clasp push --force` + update-deployment.
 - Scopes nuevos (calendar.events, send_mail, scriptapp, que usa la biblioteca): el dueño corre
   `autorizar()` desde el editor.
+- **Mail diario de facturas (26/10/2026, v1.21.11): lo dispara Registros.** El disparador propio de ZehirutApp
+  dejó de mandarlo después del 02/10 (no se puede ver desde acá: ScriptApp no está autorizado). Ahora el primer
+  doPost desde las 8:00 (Asunción) de cada día llama a `ZA.revisarYNotificarComprobantesNuevos` (avisoFacturasDiario_,
+  propiedad AVISO_FACTURAS_REVISADO); la idempotencia real es ULTIMO_AVISO_ENVIADO en las propiedades de la biblioteca,
+  así que si el disparador viejo revive no hay mails dobles. Un error queda en la hoja Registro.
 - Fotos: se achican solo si pasan de 2400 px de lado mayor (JPEG 0,88) para que Gemini lea bien; los
   PDF no se tocan. Pendiente fase 2: cola offline de fotos ("pendiente de leer").
 
