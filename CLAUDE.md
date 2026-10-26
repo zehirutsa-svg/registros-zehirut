@@ -331,6 +331,9 @@ acceso total.
   doPost desde las 8:00 (Asunción) de cada día llama a `ZA.revisarYNotificarComprobantesNuevos` (avisoFacturasDiario_,
   propiedad AVISO_FACTURAS_REVISADO); la idempotencia real es ULTIMO_AVISO_ENVIADO en las propiedades de la biblioteca,
   así que si el disparador viejo revive no hay mails dobles. Un error queda en la hoja Registro.
+  Requiere el permiso send_mail autorizado en Registros (autorizar() lo pide; el dueño lo aceptó el 26/10/2026).
+  **Ojo con fechas a través de la biblioteca:** si Registros abre la planilla y le pasa la hoja a ZA, los Date llegan
+  de otro contexto y `instanceof Date` falla en ZA (salen como "Fri Oct 23 2026…"); que ZA abra la planilla él mismo.
 - Fotos: se achican solo si pasan de 2400 px de lado mayor (JPEG 0,88) para que Gemini lea bien; los
   PDF no se tocan. Pendiente fase 2: cola offline de fotos ("pendiente de leer").
 

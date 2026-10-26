@@ -1941,6 +1941,8 @@ function autorizar() {
   SpreadsheetApp.getActive().getName();
   DriveApp.getRootFolder().getName();
   UrlFetchApp.fetch('https://www.google.com', { muteHttpExceptions: true });
+  MailApp.getRemainingDailyQuota();   // mail diario de facturas y correos de la estancia
+  ScriptApp.getProjectTriggers();
   try { ZA.iniciarSesion('0000'); } catch (e) { /* PIN falso: solo carga la biblioteca de ZehirutApp */ }
   return 'Permisos OK';
 }
