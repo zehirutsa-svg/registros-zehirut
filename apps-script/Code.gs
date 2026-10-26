@@ -610,6 +610,7 @@ function doPost(e) {
   try {
     asegurarConfigurado_();
     limpiarObsoletos_();
+    avisoFacturasDiario_();
     switch (body.accion) {
       case 'entrar': return json_(entrar_(body));
       case 'guardar': return json_(guardar_(body));
@@ -2009,4 +2010,22 @@ function limpiarObsoletos_() {
       props_().setProperty('LIMPIEZA_ZEHIRUTAPP', r);
     });
   } catch (e) { console.error('Limpieza: ' + e); }   // nunca frena la app
+}
+
+// ---------------------------------------------------------------- mail diario de facturas
+/** 26/10/2026: el disparador propio de ZehirutApp dejó de mandar el aviso después del 02/10. Lo dispara
+ *  Registros: el primer pedido desde las 8:00 (Asunción) de cada día llama a ZA.revisarYNotificarComprobantesNuevos
+ *  (que decide si hay facturas nuevas y no manda dos veces el mismo día). Si falla queda anotado en Registro. */
+function avisoFacturasDiario_() {
+  const ahora = new Date();
+  if (Number(Utilities.formatDate(ahora, 'America/Asuncion', 'H')) < 8) return;
+  const hoy = Utilities.formatDate(ahora, 'America/Asuncion', 'yyyy-MM-dd');
+  if (props_().getProperty('AVISO_FACTURAS_REVISADO') === hoy) return;
+  props_().setProperty('AVISO_FACTURAS_REVISADO', hoy);   // se marca antes para no mandar dos veces
+  try {
+    ZA.revisarYNotificarComprobantesNuevos();
+  } catch (e) {   // nunca frena la app
+    try { registrar_(SpreadsheetApp.getActive(), [[new Date(), 'Sistema', 'Mail diario de facturas', String(e), 'Error', '']]); }
+    catch (e2) { console.error('Aviso de facturas: ' + e); }
+  }
 }
