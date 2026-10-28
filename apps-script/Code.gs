@@ -1729,7 +1729,7 @@ function publicarDatosInforme_(ss) {
     });
     dest.setActiveSheet(resumen);
     // Lo mismo, resumido, para el conector de IA de la estancia (Confinamiento.gs, 28/10/2026).
-    guardarResumenEstancia_(resumenEstancia_(hoy, stockDia, stock, diasTf, faltan, sinPremezcla, base));
+    guardarResumenEstancia_(resumenEstancia_(hoy, stockDia, stock, diasTf, faltan, sinPremezcla, base, corrales));
   } catch (e) {
     // Nunca frena una carga: si falla, queda anotado y se reintenta con el próximo cambio.
     console.error('No se pudo actualizar la planilla del informe: ' + e);

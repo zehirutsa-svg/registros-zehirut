@@ -20,7 +20,7 @@ function guardarResumenEstancia_(datos) {
 
 /** Arma el resumen con las tablas que publicarDatosInforme_ ya calculó.
  *  stockDia: filas de "Stock por día" (con encabezado); stock: filas de "Stock actual" (con encabezado). */
-function resumenEstancia_(hoy, stockDia, stock, diasTf, faltan, sinPremezcla, base) {
+function resumenEstancia_(hoy, stockDia, stock, diasTf, faltan, sinPremezcla, base, corralesDia) {
   const deHoy = {};
   stockDia.slice(1).filter((f) => f[0] === ddmmaaaa_(hoy)).forEach((f) => {
     // unidad_consumo: kg o fardos (el saldo de "Stock actual" puede estar en bolsas: no se mezclan)
@@ -35,6 +35,9 @@ function resumenEstancia_(hoy, stockDia, stock, diasTf, faltan, sinPremezcla, ba
     stock: stock.slice(1).map((f) => Object.assign({ insumo: f[0], estancia: f[1] || null, saldo: f[2], unidad: f[3],
       saldo_kg: f[4] === '' ? null : f[4] }, deHoy[f[0]] || {})),
     corrales: base.corrales || [],
+    // Cabezas por corral del último Tapfeed (filas de "Corrales por día": fecha, corral, cabezas, kg, MS).
+    cabezas_tapfeed: diasTf.length ? (corralesDia || []).slice(1).filter((f) => f[0] === ddmmaaaa_(diasTf[diasTf.length - 1]))
+      .map((f) => ({ corral: f[1], cabezas: f[2] })) : [],
     error_datos_base: base.error || '',
   };
 }
