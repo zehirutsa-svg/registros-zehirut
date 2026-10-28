@@ -1728,6 +1728,8 @@ function publicarDatosInforme_(ss) {
       if (['Resumen', 'Stock por día', 'Corrales por día', 'Ingredientes por día', 'Stock actual'].indexOf(h.getName()) === -1) dest.deleteSheet(h);
     });
     dest.setActiveSheet(resumen);
+    // Lo mismo, resumido, para el conector de IA de la estancia (Confinamiento.gs, 28/10/2026).
+    guardarResumenEstancia_(resumenEstancia_(hoy, stockDia, stock, diasTf, faltan, sinPremezcla, base));
   } catch (e) {
     // Nunca frena una carga: si falla, queda anotado y se reintenta con el próximo cambio.
     console.error('No se pudo actualizar la planilla del informe: ' + e);
@@ -1741,9 +1743,16 @@ function leerDatosBase_() {
   const r = { grupos: [], categoria: {}, error: '' };
 
   const cor = db.getSheetByName('Corrales');
+  r.corrales = [];
   if (cor && cor.getLastRow() > 1) {
-    cor.getRange(2, 1, cor.getLastRow() - 1, 3).getValues().forEach((f) => {
+    cor.getRange(2, 1, cor.getLastRow() - 1, Math.min(9, cor.getLastColumn())).getValues().forEach((f) => {
       if (String(f[0]).trim() && String(f[2]).trim()) r.categoria[String(f[0]).trim()] = String(f[2]).trim();
+      // Para el resumen de la estancia (Confinamiento.gs): la fila completa, solo lectura.
+      if (/^corral/i.test(String(f[0]).trim())) {
+        r.corrales.push({ corral: String(f[0]).trim(), descripcion: String(f[1] || '').trim(), categoria: String(f[2] || '').trim(),
+          cabezas: Number(f[3]) || null, peso: Number(f[4]) || null, fecha_peso: f[5] ? iso_(f[5]) : null,
+          activo: String(f[8] || 'SI').trim().toUpperCase() !== 'NO' });
+      }
     });
   }
 
@@ -1757,6 +1766,8 @@ function leerDatosBase_() {
     const fuera = filas.find((f) => String(f[0]).trim() === PARAM_FUERA_INFORME);
     if (fuera) r.fuera = String(fuera[1] || '').split(';').map((x) => x.trim()).filter(Boolean);
     else { par.appendRow([PARAM_FUERA_INFORME, 'Semilla de Gatton']); r.fuera = ['Semilla de Gatton']; }
+    const alerta = filas.find((f) => String(f[0]).trim() === PARAM_ALERTA_STOCK);
+    if (alerta && Number(alerta[1]) > 0) r.alerta = Number(alerta[1]);
     const est = filas.find((f) => String(f[0]).trim() === PARAM_ESTANCIA_INFORME);
     if (est) r.estancia = String(est[1] || '').trim().toUpperCase();
     else { par.appendRow([PARAM_ESTANCIA_INFORME, 'La Paciencia']); r.estancia = 'LA PACIENCIA'; }

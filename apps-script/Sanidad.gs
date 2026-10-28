@@ -110,7 +110,9 @@ const PRODUCTOS_SANIDAD = [
 // compartida (propiedad CLAVE_ESTANCIA del script, nunca en el código: el repositorio es público):
 //   manda  { accion: 'estancia', clave, desde, hasta, consumos: [{ fecha, producto, unidad: ml|un, total, animales }] }
 //          (total por día y producto de los últimos 30 días, ya sumado)
-//   recibe { productos: [...] } — la lista de Sanidad (con principio activo y stock), para los desplegables de allá.
+//   recibe { productos: [...] } — la lista de Sanidad (con principio activo y stock), para los desplegables de allá,
+//          y { confinamiento: {...} } — stock de insumos con días de stock, días sin Tapfeed / sin informe y la hoja
+//          Corrales (Confinamiento.gs, 28/10/2026), para el conector de IA de la estancia.
 // Cada día × producto es UN consumo con ID "SAN-AAAA-MM-DD-<producto>", que se reescribe en cada
 // llamada (si allá se corrige o se borra una sanidad, acá se corrige solo). Cuenta recién desde el
 // primer conteo del producto (su stock inicial): lo aplicado antes ya está en ese conteo. Si el
@@ -159,6 +161,7 @@ function estancia_(body) {
         principio: i.principio, stock: saldos[i.nombre] ? saldos[i.nombre].cantidad : 0,
         // Los materiales sanitarios se dan de baja a mano acá: no se ofrecen en la estancia (no van a animales).
         activo: i.activo && i.rubro !== RUBRO_MATERIALES })),
+      confinamiento: confinamientoParaEstancia_(),
     };
   });
 }

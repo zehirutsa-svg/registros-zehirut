@@ -272,6 +272,12 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
   ni anulan desde la app (se corrigen allá). Lo que no se pudo descontar (producto desconocido, unidad
   distinta) se ve arriba de la lista y en la hoja Registro. Código en `apps-script/Sanidad.gs`.
 - **Más adelante (verlo aparte):** descontar semen y hormonas al cargar un Servicio de IATF.
+- **Resumen del confinamiento para la estancia (28/10/2026, `apps-script/Confinamiento.gs`):** `estancia_` devuelve además
+  `confinamiento`: lo que `publicarDatosInforme_` ya calculó (stock de insumos con consumo esperado y días de stock, último
+  Tapfeed, días sin Tapfeed, avisos de premezcla, alerta de stock y la hoja Corrales de Datos base), guardado en la propiedad
+  RESUMEN_ESTANCIA, más los días sin PDF de informe (títulos de la carpeta de informes). Lo usa el conector de IA de la estancia
+  (stock_actual, insumos_a_pedir, dias_faltantes_informe, diferencias_confinamiento). Registros sigue siendo el dueño de esos
+  números; no cambia ninguna planilla ni la tarea del informe.
 - Arranque: cuando el usuario actualice su planilla, se carga el stock inicial como Conteo.
 
 ## Excel (Stock y Combustible; Sanidad ver arriba)
