@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.21.15';
+const VERSION = '1.21.16';
 
 
 const DIAS_HISTORIAL = 60;
@@ -137,9 +137,14 @@ const puede = (modulo, minimo) => nivel(modulo) >= NIVELES[minimo];
 
 // ---------------------------------------------------------------- avisos y carteles
 let toastTimer = null;
+/** Ruedita de "procesando", para poner delante de un texto que termina en "…". */
+const rueda = () => '<span class="ruedita" aria-hidden="true"></span>';
+/** Mensaje de espera centrado con ruedita ("Cargando…", "Buscando…"). */
+const espera = (texto, extra) => '<p class="vacio">' + rueda() + esc(texto) + (extra || '') + '</p>';
 function toast(texto, ms) {
   const t = $('#toast');
   t.textContent = texto;
+  t.classList.toggle('con-rueda', /…$/.test(texto));
   t.classList.remove('oculto');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.add('oculto'), ms || 2600);
@@ -402,7 +407,7 @@ function render() {
   const app = $('#app');
   if (!sesion) { app.innerHTML = htmlEntrada(); return; }
   if (!datos && ui.sincronizando) {
-    app.innerHTML = barra('Registros Zehirut', false) + '<div class="contenido"><p class="vacio">Bajando los datos de Google…</p></div>';
+    app.innerHTML = barra('Registros Zehirut', false) + '<div class="contenido">' + espera('Bajando los datos de Google…') + '</div>';
     return;
   }
   const pantallas = { inicio: htmlInicio, grupo: htmlGrupo, stock: htmlStock, lluvias: htmlLluvias, facturas: htmlFacturas, fondofijo: htmlFondoFijo, horometro: htmlHorometro };
@@ -453,7 +458,7 @@ function htmlEntrada() {
     '<div class="puntos">' + puntos + '</div>' +
     '<div class="teclado">' + teclas.map((t) =>
       '<button data-a="tecla" data-k="' + t + '" class="' + (t === 'Entrar' ? 'ok' : '') + '"' + (ui.entrando ? ' disabled' : '') + '>' +
-      (t === 'Entrar' && ui.entrando ? '…' : t) + '</button>').join('') + '</div>' +
+      (t === 'Entrar' && ui.entrando ? rueda() + 'Entrando…' : t) + '</button>').join('') + '</div>' +
     '<div class="error-txt">' + esc(ui.errorPin) + '</div>' +
     '<p style="margin-top:24px;font-size:13px">La primera vez hace falta señal. Después funciona sin señal.</p>' +
     '</div>';
@@ -1266,7 +1271,7 @@ function htmlTapfeed() {
     return h + '</div>';
   }
   if (tf.estado === 'leyendo' || tf.estado === 'enviando' || tf.estado === 'simulando') {
-    return h + '<p class="vacio">' + ({ leyendo: 'Leyendo el PDF…', enviando: 'Cargando en Google…', simulando: 'Calculando el ajuste…' })[tf.estado] + '</p></div>';
+    return h + espera(({ leyendo: 'Leyendo el PDF…', enviando: 'Cargando en Google…', simulando: 'Calculando el ajuste…' })[tf.estado]) + '</div>';
   }
   const ins = stockDatos().insumos;
   const insDe = (nombre) => ins.find((x) => esDeTapfeed(x, nombre));
@@ -1402,7 +1407,7 @@ function htmlExcel() {
     (esCombustible() ? 'combustible' : 'insumo') + ' (saldo con fórmula) y la tabla de <b>Movimientos</b> con el código del bien de uso (para Albor).') + '</div>' +
     '<div class="fila2"><div class="campo"><label for="x-desde">Desde</label><input class="txt" type="date" id="x-desde" value="' + e.desde + '"' + min + ' max="' + hoyISO() + '"></div>' +
     '<div class="campo"><label for="x-hasta">Hasta</label><input class="txt" type="date" id="x-hasta" value="' + e.hasta + '"' + min + ' max="' + hoyISO() + '"></div></div>' +
-    '<button class="btn" data-a="bajarExcel"' + (e.bajando ? ' disabled' : '') + '>' + (e.bajando ? 'Armando el Excel…' : '📥 Bajar Excel') + '</button></div>';
+    '<button class="btn" data-a="bajarExcel"' + (e.bajando ? ' disabled' : '') + '>' + (e.bajando ? rueda() + 'Armando el Excel…' : '📥 Bajar Excel') + '</button></div>';
 }
 
 async function bajarExcel() {
@@ -1548,7 +1553,7 @@ function htmlProducto() {
     '<div style="margin:6px 0 16px">' + chk('activo', 'Activo', '') +
     '<p class="nota-estancia" style="margin-top:8px"><b>Stock</b>: en Medicamentos el uso llega desde la app de la estancia; en Materiales sanitarios se carga acá. ' +
     'Para que aparezca en el filtro 🏷 IATF, poné Indicación <b>Reproducción</b>.</p></div>' +
-    '<button class="btn" data-a="guardarProducto"' + (p.guardando ? ' disabled' : '') + '>' + (p.guardando ? 'Guardando…' : (p.original ? 'Guardar cambios' : 'Crear producto')) + '</button></div>';
+    '<button class="btn" data-a="guardarProducto"' + (p.guardando ? ' disabled' : '') + '>' + (p.guardando ? rueda() + 'Guardando…' : (p.original ? 'Guardar cambios' : 'Crear producto')) + '</button></div>';
 }
 
 async function guardarProducto() {

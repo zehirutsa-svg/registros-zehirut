@@ -41,6 +41,10 @@ dev/bocetos-logo.js   bocetos del logo (versiones 1-3; se eligió la 2)
 
 Probar local: `node dev/servidor-prueba.js 8766` → <http://localhost:8766> (`/_hojas` muestra las hojas simuladas).
 
+Esperas (v1.21.16): todo lo que procesa muestra la **ruedita**. Mensaje central: `espera('Cargando…')`; botón
+ocupado: `rueda() + 'Guardando…'`; un `toast` cuyo texto termina en "…" la muestra solo. En Ver facturas, si ya
+hay resultados y se busca de nuevo, aparece "Buscando…" arriba (`#fac-buscando`) sin borrar la lista.
+
 ## Google (clasp, cuenta zehirutsa@gmail.com)
 
 - Sheet "Registros Zehirut": `https://docs.google.com/spreadsheets/d/1a-Tl5GQCEzwBGTVMK3r3yNd0kT2p51xIn92KMkOPvmo`

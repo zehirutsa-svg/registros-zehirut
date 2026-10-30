@@ -389,3 +389,20 @@ label.btn { text-align: center; cursor: pointer; }
 .buscar-fila .buscar { margin-bottom: 0; flex: 1; min-width: 0; }
 .chip-filtro { border: 2px solid var(--azul); background: #fff; color: var(--azul); border-radius: 999px; padding: 10px 14px; font: inherit; font-weight: 700; white-space: nowrap; }
 .chip-filtro.activo { background: var(--azul); color: #fff; }
+
+/* ruedita de "procesando": toma el color del texto (sirve en botones, mensajes y avisos) */
+.ruedita {
+  display: inline-block; width: 1em; height: 1em; margin-right: 8px; vertical-align: -0.15em;
+  border: 2.5px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  animation: girar .7s linear infinite;
+}
+.vacio .ruedita { width: 1.3em; height: 1.3em; color: var(--verde); }
+.toast.con-rueda::before {
+  content: ''; display: inline-block; width: 1em; height: 1em; margin-right: 8px; vertical-align: -0.15em;
+  border: 2.5px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  animation: girar .7s linear infinite;
+}
+.buscando-mas { margin: -4px 0 10px; color: var(--gris); font-size: 14px; }
+.buscando-mas .ruedita { color: var(--verde); }
+@keyframes girar { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ruedita, .toast.con-rueda::before { animation-duration: 2s; } }

@@ -165,9 +165,10 @@ function htmlFacLista() {
   if (buscando && !f.lista && !f.cargando) setTimeout(() => cargarListaFac(true), 0);
   let h = '';
   h += '<div class="filtros"><input class="txt" id="fac-q" placeholder="Buscar N°, proveedor, RUC o ítem" value="' + esc(f.q) + '" autocomplete="off">' +
-    '<input class="txt" type="month" id="fac-mes" value="' + esc(f.mes) + '" style="flex:0 1 170px"></div>';
+    '<input class="txt" type="month" id="fac-mes" value="' + esc(f.mes) + '" style="flex:0 1 170px"></div>' +
+    '<p class="buscando-mas" id="fac-buscando"' + (f.cargando && f.lista ? '' : ' hidden') + '>' + rueda() + 'Buscando…</p>';
   if (!buscando) return h + '<p class="vacio" style="padding:20px 8px">Escribí un N°, proveedor, RUC o lo que se compró (ej. adaptador), o elegí un mes.</p>';
-  if (!f.lista) return h + '<p class="vacio">' + (f.error ? '⚠️ ' + esc(f.error) : 'Buscando…') + '</p>';
+  if (!f.lista) return h + (f.error ? '<p class="vacio">⚠️ ' + esc(f.error) + '</p>' : espera('Buscando…'));
   if (!f.lista.filas.length) h += '<p class="vacio">No hay facturas con ese filtro.</p>';
   h += f.lista.filas.map((x) =>
     '<button class="mov factura' + (x.cargadoAlbor ? ' albor' : '') + '" data-a="fac" data-x="abrir" data-id="' + esc(x.id) + '">' +
@@ -185,6 +186,8 @@ async function cargarListaFac(reiniciar) {
   const f = estadoFac();
   f.cargando = true;
   f.error = '';
+  const aviso = $('#fac-buscando');
+  if (aviso) aviso.hidden = false; // si ya hay resultados, se quedan a la vista y se avisa arriba
   try {
     const offset = reiniciar || !f.lista ? 0 : f.lista.filas.length;
     const r = await za('listarFacturas', ['__PIN__', { query: f.q, mes: f.mes, offset, limite: 30 }], true);
@@ -212,7 +215,7 @@ function htmlFacCarga() {
   const f = estadoFac();
   if (f.leyendo) {
     return (f.leyendo.vista ? '<img class="vista-factura" src="' + f.leyendo.vista + '" alt="">' : '') +
-      '<p class="vacio">⏳ Subiendo y leyendo la factura…<br><small>Puede tardar unos segundos.</small></p>';
+      espera('Subiendo y leyendo la factura…', '<br><small>Puede tardar unos segundos.</small>');
   }
   return '<div class="aviso">Sacale una foto a la factura o elegí la foto/PDF. Gemini lee los datos y después los revisás antes de guardar.</div>' +
     htmlElegirArchivo('factura', 'Elegir foto o PDF');
@@ -335,7 +338,7 @@ function htmlFacForm() {
       '<button class="btn sec chico" data-a="fac" data-x="agregarItem">+ Agregar ítem</button></div>';
   }
   h += '<div class="acciones"><button class="btn" data-a="fac" data-x="guardarForm"' + (x.guardando ? ' disabled' : '') + '>' +
-    (x.guardando ? 'Guardando…' : x.modo === 'editar' ? 'Guardar cambios' : 'Confirmar y guardar') + '</button>' +
+    (x.guardando ? rueda() + 'Guardando…' : x.modo === 'editar' ? 'Guardar cambios' : 'Confirmar y guardar') + '</button>' +
     '<button class="btn sec" data-a="fac" data-x="cancelarForm">Cancelar</button></div>';
   return h;
 }
@@ -411,7 +414,7 @@ async function abrirDetalleFac(id) {
 function htmlFacDetalle() {
   const f = estadoFac();
   const p = zaP();
-  if (!f.det) return '<p class="vacio">Cargando…</p>';
+  if (!f.det) return espera('Cargando…');
   if (f.det.error) return '<p class="vacio">⚠️ ' + esc(f.det.error) + '</p>';
   const x = f.det.factura;
   f.copiables = [];
@@ -475,7 +478,7 @@ function htmlFacComprobante() {
     else h += c.otras.map((o) => '<label class="check-linea"><input type="checkbox" data-otra="' + esc(o.id) + '"' + (c.elegidas.indexOf(String(o.id)) !== -1 ? ' checked' : '') + '><span><b>' +
       esc(o.numeroFactura || '(sin número)') + '</b> · ' + esc(o.fecha) + ' · ' + fmtMonto(o.monto, o.moneda) + ' ' + esc(o.moneda) + '</span></label>').join('');
   }
-  return h + '<button class="btn" data-a="fac" data-x="guardarComp" style="margin-top:14px"' + (c.guardando ? ' disabled' : '') + '>' + (c.guardando ? 'Subiendo…' : 'Guardar comprobante') + '</button>';
+  return h + '<button class="btn" data-a="fac" data-x="guardarComp" style="margin-top:14px"' + (c.guardando ? ' disabled' : '') + '>' + (c.guardando ? rueda() + 'Subiendo…' : 'Guardar comprobante') + '</button>';
 }
 
 async function guardarCompFac() {
@@ -507,7 +510,7 @@ function htmlFacVincular() {
   const v = f.vinc || (f.vinc = { q: '', res: null });
   return '<div class="aviso">Buscá el anticipo por proveedor, motivo o RUC (mínimo 3 letras) y tocalo para vincularlo a esta factura.</div>' +
     '<input class="txt" id="fac-vinc" placeholder="Buscar anticipo…" value="' + esc(v.q) + '" autocomplete="off" style="margin-bottom:12px">' +
-    (v.buscando ? '<p class="vacio">Buscando…</p>' : !v.res ? '' : !v.res.length ? '<p class="vacio">Sin resultados.</p>' :
+    (v.buscando ? espera('Buscando…') : !v.res ? '' : !v.res.length ? '<p class="vacio">Sin resultados.</p>' :
       v.res.map((a) => '<button class="mov" data-a="fac" data-x="vincular" data-id="' + esc(a.id) + '"><span class="cuerpo"><b>' + esc(a.proveedor || '(sin proveedor)') +
         '</b><small>' + esc(a.motivo || '(sin motivo)') + ' · cargado el ' + esc(a.fechaCarga) + (a.facturasVinculadas ? ' · ya vinculado a ' + a.facturasVinculadas : '') +
         '</small></span><span class="num">' + fmtMonto(a.monto, a.moneda) + '<br><small style="color:var(--gris)">' + esc(a.moneda) + '</small></span></button>').join(''));
@@ -539,7 +542,7 @@ function htmlFacAnticipo() {
     '</select><input class="txt" id="fa-monto" inputmode="decimal" value="' + esc(a.monto || '') + '"></div></div>' +
     '<div class="campo"><label for="fa-motivo">Motivo</label><input class="txt" id="fa-motivo" value="' + esc(a.motivo || '') + '" placeholder="Ej: Adelanto repuestos camioneta"></div>' +
     '<div class="campo"><span class="etq">Comprobante</span>' + htmlElegirArchivo('anticipo') + '</div>' +
-    '<button class="btn" data-a="fac" data-x="guardarAnticipo"' + (a.guardando ? ' disabled' : '') + '>' + (a.guardando ? 'Guardando…' : 'Guardar anticipo') + '</button>';
+    '<button class="btn" data-a="fac" data-x="guardarAnticipo"' + (a.guardando ? ' disabled' : '') + '>' + (a.guardando ? rueda() + 'Guardando…' : 'Guardar anticipo') + '</button>';
 }
 
 function htmlFacPagoSF() {
@@ -553,7 +556,7 @@ function htmlFacPagoSF() {
     '<div class="campo"><label for="fp-unidad">Unidad de negocio</label><select class="txt" id="fp-unidad">' + opcion('', 'Elegí…', a.unidad || '') + UNIDADES_NEGOCIO.map((u) => opcion(u, u, a.unidad)).join('') + '</select></div>' +
     '<div class="campo"><label for="fp-forma">Forma de pago</label><select class="txt" id="fp-forma">' + opcion('', 'Elegí…', a.forma || '') + FORMAS_PAGO_BASE.map((u) => opcion(u, u, a.forma)).join('') + '</select></div>' +
     '<div class="campo"><span class="etq">Comprobante <small>(opcional)</small></span>' + htmlElegirArchivo('pagoSF') + '</div>' +
-    '<button class="btn" data-a="fac" data-x="guardarPagoSF"' + (a.guardando ? ' disabled' : '') + '>' + (a.guardando ? 'Guardando…' : 'Guardar pago sin factura') + '</button>';
+    '<button class="btn" data-a="fac" data-x="guardarPagoSF"' + (a.guardando ? ' disabled' : '') + '>' + (a.guardando ? rueda() + 'Guardando…' : 'Guardar pago sin factura') + '</button>';
 }
 
 function leerCampos(prefijo, obj, claves) {
@@ -709,7 +712,7 @@ async function cargarFF() {
 function htmlFFResumen() {
   const f = estadoFF();
   if (!f.res && !f.cargando && !f.error) setTimeout(cargarFF, 0);
-  if (!f.res) return '<p class="vacio">' + (f.error ? '⚠️ ' + esc(f.error) : 'Cargando…') + '</p>';
+  if (!f.res) return f.error ? '<p class="vacio">⚠️ ' + esc(f.error) + '</p>' : espera('Cargando…');
   const s = f.res.saldo;
   let h = '<div class="saldo ' + (s < 0 ? 'negativo' : '') + '" style="margin-bottom:14px"><h3>Saldo de la caja chica</h3><div class="cant">' +
     (s < 0 ? '−' : '') + fmtMonto(Math.abs(s), 'PYG') + '<small>Gs.</small></div></div>' +
@@ -730,7 +733,7 @@ function htmlFFFondeo() {
     '<div class="campo"><label for="fo-monto">Monto (Gs.)</label><input class="txt" id="fo-monto" inputmode="decimal" value="' + esc(a.monto || '') + '"></div>' +
     '<div class="campo"><label for="fo-descripcion">Descripción</label><input class="txt" id="fo-descripcion" value="' + esc(a.descripcion) + '"></div>' +
     '<div class="campo"><span class="etq">Comprobante de la transferencia <small>(opcional)</small></span>' + htmlElegirArchivo('fondeo') + '</div>' +
-    '<button class="btn" data-a="ff" data-x="guardarFondeo"' + (a.guardando ? ' disabled' : '') + '>' + (a.guardando ? 'Guardando…' : 'Guardar fondeo') + '</button>';
+    '<button class="btn" data-a="ff" data-x="guardarFondeo"' + (a.guardando ? ' disabled' : '') + '>' + (a.guardando ? rueda() + 'Guardando…' : 'Guardar fondeo') + '</button>';
 }
 
 function htmlFFExcel() {
