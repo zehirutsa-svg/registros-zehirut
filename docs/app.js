@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.21.13';
+const VERSION = '1.21.14';
 
 
 const DIAS_HISTORIAL = 60;
@@ -1260,10 +1260,7 @@ function htmlTapfeed() {
       h += '<div class="tarjeta" style="margin-top:16px"><b>Último día cargado:</b> ' + fechaTxt(ultimo, true) +
         (faltan.length ? '<br><span class="rojo"><b>Faltan:</b> ' + faltan.map((f) => fechaTxt(f)).join(', ') + '</span>' : '') +
         (faltanPm.length ? '<br><span class="rojo"><b>Falta la premezcla de:</b> ' + faltanPm.map((f) => fechaTxt(f)).join(', ') + '</span>' : '') +
-        '<br><b>Ajuste de stock inicial:</b> ' + (ajusteHasta ? 'hecho del ' + fechaTxt(FECHA_AJUSTE) + ' al ' + fechaTxt(ajusteHasta) +
-            ' (esos días se corrigieron juntos con una sola premezcla).<br>Desde el ' + fechaTxt(sumarDias(ajusteHasta, 1)) +
-            ' el stock se descuenta con la premezcla de cada día.'
-          : '<span class="rojo">falta. Subí un "Uso ingrediente &amp; premezcla" desde el ' + fechaTxt(FECHA_AJUSTE) + ' hasta el último día sin premezcla.</span>') +
+        (ajusteHasta ? '' : '<br><b>Ajuste de stock:</b> <span class="rojo">falta. Subí un "Uso ingrediente &amp; premezcla" desde el ' + fechaTxt(FECHA_AJUSTE) + ' hasta el último día sin premezcla.</span>') +
         '</div>';
     }
     return h + '</div>';
