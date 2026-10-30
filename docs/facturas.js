@@ -164,16 +164,17 @@ function htmlFacLista() {
   const buscando = !!(f.q || f.mes);
   if (buscando && !f.lista && !f.cargando) setTimeout(() => cargarListaFac(true), 0);
   let h = '';
-  h += '<div class="filtros"><input class="txt" id="fac-q" placeholder="Buscar N°, proveedor o RUC" value="' + esc(f.q) + '" autocomplete="off">' +
+  h += '<div class="filtros"><input class="txt" id="fac-q" placeholder="Buscar N°, proveedor, RUC o ítem" value="' + esc(f.q) + '" autocomplete="off">' +
     '<input class="txt" type="month" id="fac-mes" value="' + esc(f.mes) + '" style="flex:0 1 170px"></div>';
-  if (!buscando) return h + '<p class="vacio" style="padding:20px 8px">Escribí un N°, proveedor o RUC, o elegí un mes.</p>';
+  if (!buscando) return h + '<p class="vacio" style="padding:20px 8px">Escribí un N°, proveedor, RUC o lo que se compró (ej. adaptador), o elegí un mes.</p>';
   if (!f.lista) return h + '<p class="vacio">' + (f.error ? '⚠️ ' + esc(f.error) : 'Buscando…') + '</p>';
   if (!f.lista.filas.length) h += '<p class="vacio">No hay facturas con ese filtro.</p>';
   h += f.lista.filas.map((x) =>
     '<button class="mov factura' + (x.cargadoAlbor ? ' albor' : '') + '" data-a="fac" data-x="abrir" data-id="' + esc(x.id) + '">' +
     '<span class="cuerpo"><b>' + esc(x.proveedor || '(sin proveedor)') + '</b><small>' + esc(x.numeroFactura) + ' · ' + esc(x.fecha) +
     (x.detalle ? ' · ' + esc(x.detalle) : '') + ' · ' + esc(String(x.usuario || '').split(' ')[0]) +
-    (x.cargadoAlbor ? ' <span class="chip verde">✓ Albor</span>' : '') + '</small></span>' +
+    (x.cargadoAlbor ? ' <span class="chip verde">✓ Albor</span>' : '') + '</small>' +
+    (x.itemCoincidente ? '<small class="item-buscado">🔎 ' + esc(x.itemCoincidente) + '</small>' : '') + '</span>' +
     '<span class="num">' + fmtMonto(x.monto, x.moneda) + '<br><small style="font-weight:600;color:var(--gris)">' + esc(x.moneda) + '</small></span></button>').join('');
   if (f.lista.hayMas) h += '<button class="btn sec" data-a="fac" data-x="mas">Ver más (' + (f.lista.total - f.lista.filas.length) + ')</button>';
   if (f.lista.filas.length) h += '<div class="pie-stock"><button class="btn sec chico" data-a="fac" data-x="excel">📥 Bajar Excel (con este filtro)</button></div>';

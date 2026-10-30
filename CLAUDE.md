@@ -307,13 +307,15 @@ acceso total.
 
 - **Navegación (pedido 01/10/2026):** en el inicio el grupo se llama **Registros contables** (antes Comprobantes) y
   tiene tres tarjetas: **Comprobantes** (abre "Carga de comprobantes": Factura, Anticipo a proveedor, Pago sin
-  factura), **Ver facturas** (buscador; **no carga nada hasta que se busca algo o se elige un mes**) y Fondo
+  factura), **Ver facturas** (buscador; **no carga nada hasta que se busca algo o se elige un mes**; el texto busca en
+  N°, proveedor, RUC y **los ítems** —cada palabra en la descripción o el código, sin importar tildes— y muestra
+  el ítem encontrado; el Excel usa el mismo filtro: `ZA.facturasQueCoinciden`, desde ZA 142) y Fondo
   fijo. Factura y Anticipo abren el selector de archivo en el mismo toque (`#fac-elegir`, sin `capture`:
   el celular ofrece sacar foto o elegir archivo; la compu, el explorador). `ui.fac.raiz` = pantalla de
   entrada (tipo | lista): la flecha vuelve ahí y después al grupo; al guardar se vuelve a la raíz.
 
 - No se copia la lógica: el script usa **ZehirutApp como biblioteca** (símbolo `ZA`, versión fija en
-  `appsscript.json`, hoy 138). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
+  `appsscript.json`, hoy 142). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
   salen de la hoja Usuarios de ESTE Sheet (ver "Una sola planilla de usuarios"). La web de ZehirutApp quedó
   apagada (v137: solo muestra un botón a Registros); el proyecto sigue como biblioteca y para el mail diario.
   v138 (01/10): sin Index.html ni Combustible.js; la planilla vieja de usuarios y la hoja "Combustible

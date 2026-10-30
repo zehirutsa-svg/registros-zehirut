@@ -223,6 +223,7 @@ input.txt:focus, select.txt:focus, textarea.txt:focus, .cantidad input:focus { o
 .mov .cuerpo { flex: 1; min-width: 0; }
 .mov .cuerpo b { display: block; }
 .mov .cuerpo small { color: var(--gris); font-size: 14px; }
+.mov .cuerpo small.item-buscado { display: block; margin-top: 2px; color: var(--verde, inherit); }
 .mov .num { font-weight: 800; font-size: 18px; text-align: right; white-space: nowrap; }
 .mov.anulado { opacity: .5; }
 .mov.anulado .num, .mov.anulado b { text-decoration: line-through; }
