@@ -37,8 +37,10 @@ module.exports = function crearZA() {
       .sort((a, b) => orden(b.fecha) - orden(a.fecha));
   };
   // Facturas a pagar: vencimiento = fecha + días de crédito (igual que Pagos.js).
+  const porMes = (f) => /CHACO\s*POTY/i.test(String(f.proveedor || ''));
   const venc = (f) => {
-    const p = String(f.fecha || '').split('/'); const d = parseInt(String(f.diasCredito || '').match(/\d+/) || 0, 10);
+    const p = String(f.fecha || '').split('/');
+    if (porMes(f) && p.length === 3) { const v = new Date(Date.UTC(+p[2], +p[1] - 1 + 2, 5)); return '05/' + ('0' + (v.getUTCMonth() + 1)).slice(-2) + '/' + v.getUTCFullYear(); } const d = parseInt(String(f.diasCredito || '').match(/\d+/) || 0, 10);
     if (p.length !== 3 || !d) return '';
     const v = new Date(Date.UTC(+p[2], +p[1] - 1, +p[0] + d));
     return ('0' + v.getUTCDate()).slice(-2) + '/' + ('0' + (v.getUTCMonth() + 1)).slice(-2) + '/' + v.getUTCFullYear();
@@ -50,11 +52,13 @@ module.exports = function crearZA() {
   const conPago = (f) => Object.assign({}, f, { vencimiento: f.tipoComprobante === 'Factura Crédito' ? venc(f) : '', pagada: !!f.pagada });
   // Ejemplos para ver la tarjeta con datos: una vencida, una que vence en días, una más adelante.
   [[-40, 'Agro Sur', 'PYG', 3500000, 'Osmar Acosta'], [-25, 'Veterinaria Central', 'PYG', 980000, 'Enrique Delfante'],
-   [-5, 'Repuestos Chaco', 'USD', 1250.5, 'Enrique Delfante'], [20, 'Ferretería Loma', 'PYG', 450000, 'Osmar Acosta']].forEach(([dd, prov, mon, monto, usu], i) => {
+   [-5, 'Repuestos Chaco', 'USD', 1250.5, 'Enrique Delfante'], [20, 'Ferretería Loma', 'PYG', 450000, 'Osmar Acosta'],
+   [-55, 'CHACO POTY SACI', 'PYG', 9100000, 'Enrique Delfante'], [-40, 'CHACO POTY SACI', 'PYG', 9300000, 'Osmar Acosta'],
+   [-20, 'CHACO POTY SACI', 'PYG', 12000000, 'Enrique Delfante'], [-3, 'Chaco Poty S.A.C.I.', 'PYG', 4800000, 'Enrique Delfante']].forEach(([dd, prov, mon, monto, usu], i) => {
     const d = new Date(); d.setDate(d.getDate() + dd);
     const fecha = ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
     facturas.push({ id: 26090000 + i, fechaCarga: fecha, tipoComprobante: 'Factura Crédito', diasCredito: '30 días', fecha, numeroFactura: '001-001-000' + (100 + i),
-      proveedor: prov, ruc: '8000' + i, moneda: mon, monto, usuario: usu, cargadoAlbor: false, detalle: 'Ejemplo crédito' });
+      proveedor: prov, ruc: /chaco poty/i.test(prov) ? '80020000-1' : '8000' + i, moneda: mon, monto, usuario: usu, cargadoAlbor: false, detalle: 'Ejemplo crédito' });
   });
   const guardarArchivo = (nombre, base64) => { const aid = 'arch' + ++sec; archivos[aid] = { nombre, base64, tamanioKB: Math.max(1, Math.round((base64 || '').length * 0.75 / 1024)) }; return aid; };
 
@@ -145,7 +149,7 @@ module.exports = function crearZA() {
       const s = sesion(pin);
       const pagadas = !!(o && o.pagadas);
       const filas = facturas.filter((f) => f.tipoComprobante === 'Factura Crédito' && !!f.pagada === pagadas && (!s.verSoloPropias || f.usuario === s.nombre))
-        .map((f) => Object.assign(resumen(f), { vencimiento: venc(f), dias: diasA(venc(f)), pagada: !!f.pagada, fechaPago: f.fechaPago || '', pagadaCon: f.pagadaCon || '', pagadaPor: f.pagadaPor || '' }));
+        .map((f) => Object.assign(resumen(f), { vencimiento: venc(f), dias: diasA(venc(f)), pagada: !!f.pagada, fechaPago: f.fechaPago || '', pagadaCon: f.pagadaCon || '', pagadaPor: f.pagadaPor || '', creditoPorMes: porMes(f) }));
       filas.sort((a, b) => (pagadas ? orden(b.fechaPago) - orden(a.fechaPago) : a.dias - b.dias));
       return { filas, total: filas.length, puedeMarcar: !!s.puedeMarcarPagos };
     },

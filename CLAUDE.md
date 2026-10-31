@@ -319,7 +319,7 @@ acceso total.
   entrada (tipo | lista): la flecha vuelve ahí y después al grupo; al guardar se vuelve a la raíz.
 
 - No se copia la lógica: el script usa **ZehirutApp como biblioteca** (símbolo `ZA`, versión fija en
-  `appsscript.json`, hoy 144). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
+  `appsscript.json`, hoy 145). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
   salen de la hoja Usuarios de ESTE Sheet (ver "Una sola planilla de usuarios"). La web de ZehirutApp quedó
   apagada (v137: solo muestra un botón a Registros); el proyecto sigue como biblioteca y para el mail diario.
   v138 (01/10): sin Index.html ni Combustible.js; la planilla vieja de usuarios y la hoja "Combustible
@@ -352,7 +352,10 @@ acceso total.
   desde v1.22.3, antes 💳 "Facturas a pagar")**: cuarta tarjeta de Registros
   contables. Solo "Factura Crédito"; vencimiento = fecha + días de crédito (sin días: 30 por defecto, sin marcar
   nada aparte, pedido del usuario). Pendientes en 3 grupos (vencidas / próximos 7 días / más adelante) con total por
-  moneda; filtro Pagadas (últimas 100). Ve la lista quien ve facturas; con "Propias" (Osmar) solo las suyas. **Marca
+  moneda; filtro Pagadas (últimas 300). **Vista por proveedor (v1.23.0, pedido del usuario):** una línea por proveedor
+  (mismo RUC o, sin RUC, mismo nombre) con su total y aviso (vencidas / próximo pago), ordenados por urgencia; se
+  despliega con sus facturas; los de crédito por mes (creditoPorMes) muestran sus facturas por "Pago del DD/MM" con
+  subtotal. Pagadas: también por proveedor, el último pagado primero. Ve la lista quien ve facturas; con "Propias" (Osmar) solo las suyas. **Marca
   pagada** (fecha + cómo se pagó) o desmarca solo quien tiene la casilla **"Marca pagos"** en Usuarios (esquema 23:
   Enrique, Natalia, Raquel; nunca con Propias); se hace desde el detalle de la factura, y al subir una transferencia
   o recibo a una factura a crédito pendiente la app ofrece marcarla. Columnas nuevas en Facturas (24-28):

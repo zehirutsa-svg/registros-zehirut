@@ -406,3 +406,8 @@ label.btn { text-align: center; cursor: pointer; }
 .buscando-mas .ruedita { color: var(--verde); }
 @keyframes girar { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .ruedita, .toast.con-rueda::before { animation-duration: 2s; } }
+
+/* Facturas a crédito: proveedor desplegable, sus facturas y (crédito por mes) la fecha de pago */
+.prov-facturas { margin: -4px 0 12px 14px; padding-left: 10px; border-left: 3px solid var(--azul-claro); }
+.mov.sub { padding-top: 10px; padding-bottom: 10px; }
+.pago-fecha { display: flex; justify-content: space-between; gap: 8px; margin: 10px 0 6px; font-size: 14px; font-weight: 700; color: var(--azul); }

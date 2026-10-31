@@ -401,7 +401,7 @@ async function guardarFormFac() {
 // ---- facturas a pagar (las "Factura Crédito" con su vencimiento; ver Pagos.js de ZehirutApp)
 function estadoPag() {
   const f = estadoFac();
-  if (!f.pag) f.pag = { pagadas: false, res: null, cargando: false, error: '' };
+  if (!f.pag) f.pag = { pagadas: false, res: null, cargando: false, error: '', abiertos: {} };
   return f.pag;
 }
 
@@ -431,27 +431,87 @@ function htmlFacPagos() {
   if (!g.res) return h + espera('Cargando…');
   const filas = g.res.filas;
   if (!filas.length) return h + '<p class="vacio">' + (g.pagadas ? 'Todavía no hay facturas marcadas como pagadas.' : 'No hay facturas a crédito pendientes de pago. 🎉') + '</p>';
-  const fila = (x) => {
-    const [txt, cls] = g.pagadas ? ['Pagada' + (x.fechaPago ? ' el ' + x.fechaPago : ''), 'verde'] : estadoVenc(x.dias);
-    return '<button class="mov factura" data-a="fac" data-x="abrir" data-id="' + esc(x.id) + '">' +
-      '<span class="cuerpo"><b>' + esc(x.proveedor || '(sin proveedor)') + '</b><small>' + esc(x.numeroFactura) + ' · vence ' + esc(x.vencimiento || '—') +
-      ' · ' + esc(String(x.usuario || '').split(' ')[0]) + '</small><small style="display:block;margin-top:4px"><span class="chip ' + cls + '">' + esc(txt) + '</span></small></span>' +
+  // Una línea por proveedor (con su total); tocándola se despliegan sus facturas.
+  const provs = agruparPorProveedor(filas, g.pagadas);
+  const totales = sumarPorMoneda(filas);
+  h += '<div class="tarjeta"><b>' + (g.pagadas ? 'Total pagado' : 'Total a pagar') + '</b> <small>(' + provs.length + (provs.length === 1 ? ' proveedor · ' : ' proveedores · ') +
+    filas.length + (filas.length === 1 ? ' factura' : ' facturas') + ')</small>' +
+    Object.keys(totales).map((m) => '<div class="monto-grande">' + fmtMonto(totales[m], m) + ' <small>' + esc(m) + '</small></div>').join('') + '</div>';
+  h += provs.map((p) => htmlProveedorPago(p, g)).join('');
+  if (g.pagadas && g.res.total > filas.length) h += '<p class="vacio">Se muestran las últimas ' + filas.length + ' de ' + g.res.total + ' pagadas.</p>';
+  return h;
+}
+
+/** Total por moneda (guaraníes y dólares no se suman entre sí). */
+function sumarPorMoneda(filas) {
+  const t = {};
+  filas.forEach((x) => { const m = monedaNormal(x.moneda); t[m] = (t[m] || 0) + (parseFloat(x.monto) || 0); });
+  return t;
+}
+
+/** Facturas agrupadas por proveedor (mismo RUC o, sin RUC, mismo nombre). Pendientes: primero el que tiene algo
+ *  vencido, después el que vence antes. Pagadas: el pagado más recientemente primero. */
+function agruparPorProveedor(filas, pagadas) {
+  const clave = (x) => String(x.ruc || '').replace(/\D/g, '') ||
+    String(x.proveedor || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+  const mapa = {};
+  filas.forEach((x) => {
+    const k = clave(x) || '(sin proveedor)';
+    (mapa[k] = mapa[k] || { clave: k, nombre: x.proveedor || '(sin proveedor)', filas: [] }).filas.push(x);
+  });
+  const lista = Object.values(mapa);
+  if (pagadas) {
+    const orden = (f) => { const p = String(f || '').split('/'); return p.length === 3 ? +p[2] * 10000 + +p[1] * 100 + +p[0] : 0; };
+    lista.forEach((p) => { p.filas.sort((a, b) => orden(b.fechaPago) - orden(a.fechaPago)); p.ultimo = p.filas[0].fechaPago; p.orden = orden(p.ultimo); });
+    return lista.sort((a, b) => b.orden - a.orden);
+  }
+  const dias = (x) => (x.dias === null || x.dias === undefined ? 1e9 : x.dias);
+  lista.forEach((p) => { p.filas.sort((a, b) => dias(a) - dias(b)); p.min = dias(p.filas[0]); });
+  return lista.sort((a, b) => a.min - b.min);
+}
+
+function htmlProveedorPago(p, g) {
+  const abierto = !!g.abiertos[p.clave];
+  const tot = sumarPorMoneda(p.filas);
+  const n = p.filas.length;
+  let aviso;
+  if (g.pagadas) aviso = ['Último pago ' + (p.ultimo || '—'), 'verde'];
+  else {
+    const vencidas = p.filas.filter((x) => x.dias !== null && x.dias < 0);
+    if (vencidas.length) aviso = [vencidas.length + (vencidas.length === 1 ? ' vencida' : ' vencidas') + ' · hace ' + (-vencidas[0].dias) + (vencidas[0].dias === -1 ? ' día' : ' días'), 'alerta'];
+    else {
+      const x = p.filas[0];
+      const [txt, cls] = estadoVenc(x.dias);
+      aviso = [(x.vencimiento ? 'Próximo pago ' + x.vencimiento.slice(0, 5) + ' · ' : '') + txt.replace(/^Vence /, ''), cls];
+    }
+  }
+  let h = '<button class="mov factura prov-pago' + (abierto ? ' abierto' : '') + '" data-a="fac" data-x="pagProv" data-k="' + esc(p.clave) + '">' +
+    '<span class="cuerpo"><b>' + (abierto ? '▾ ' : '▸ ') + esc(p.nombre) + '</b><small>' + n + (n === 1 ? ' factura' : ' facturas') + '</small>' +
+    '<small style="display:block;margin-top:4px"><span class="chip ' + aviso[1] + '">' + esc(aviso[0]) + '</span></small></span>' +
+    '<span class="num">' + Object.keys(tot).map((m) => fmtMonto(tot[m], m) + '<br><small style="font-weight:600;color:var(--gris)">' + esc(m) + '</small>').join('<br>') + '</span></button>';
+  if (!abierto) return h;
+  const factura = (x) => {
+    const [txt, cls] = g.pagadas ? ['Pagada' + (x.fechaPago ? ' el ' + x.fechaPago : '') + (x.pagadaCon ? ' · ' + x.pagadaCon : ''), 'verde'] : estadoVenc(x.dias);
+    return '<button class="mov factura sub" data-a="fac" data-x="abrir" data-id="' + esc(x.id) + '"><span class="cuerpo"><b>' + esc(x.numeroFactura || '(sin número)') +
+      '</b><small>' + esc(x.fecha) + ' · vence ' + esc(x.vencimiento || '—') + ' · ' + esc(String(x.usuario || '').split(' ')[0]) + '</small>' +
+      '<small style="display:block;margin-top:4px"><span class="chip ' + cls + '">' + esc(txt) + '</span></small></span>' +
       '<span class="num">' + fmtMonto(x.monto, x.moneda) + '<br><small style="font-weight:600;color:var(--gris)">' + esc(x.moneda) + '</small></span></button>';
   };
-  if (g.pagadas) {
-    return h + filas.map(fila).join('') + (g.res.total > filas.length ? '<p class="vacio">Se muestran las últimas ' + filas.length + ' de ' + g.res.total + '.</p>' : '');
+  // Crédito por mes (Chaco Poty): las pendientes se ven por fecha de pago, con lo que hay que pagar ese día.
+  if (!g.pagadas && p.filas[0].creditoPorMes) {
+    const porFecha = [];
+    p.filas.forEach((x) => {
+      let gr = porFecha.find((q) => q.venc === x.vencimiento);
+      if (!gr) porFecha.push(gr = { venc: x.vencimiento, filas: [] });
+      gr.filas.push(x);
+    });
+    return h + '<div class="prov-facturas">' + porFecha.map((q) => {
+      const t = sumarPorMoneda(q.filas);
+      return '<div class="pago-fecha"><span>Pago del ' + esc(q.venc || '—') + '</span><span>' + Object.keys(t).map((m) => fmtMonto(t[m], m) + ' ' + esc(m)).join(' · ') + '</span></div>' +
+        q.filas.map(factura).join('');
+    }).join('') + '</div>';
   }
-  // Total pendiente por moneda (guaraníes y dólares no se suman entre sí).
-  const totales = {};
-  filas.forEach((x) => { const m = monedaNormal(x.moneda); totales[m] = (totales[m] || 0) + (parseFloat(x.monto) || 0); });
-  h += '<div class="tarjeta"><b>Total a pagar</b> <small>(' + filas.length + (filas.length === 1 ? ' factura' : ' facturas') + ')</small>' +
-    Object.keys(totales).map((m) => '<div class="monto-grande">' + fmtMonto(totales[m], m) + ' <small>' + esc(m) + '</small></div>').join('') + '</div>';
-  const grupos = [
-    ['🔴 Vencidas', filas.filter((x) => x.dias !== null && x.dias < 0)],
-    ['🟡 Vencen en los próximos 7 días', filas.filter((x) => x.dias !== null && x.dias >= 0 && x.dias <= 7)],
-    ['⚪ Más adelante', filas.filter((x) => x.dias === null || x.dias > 7)],
-  ];
-  return h + grupos.filter((gr) => gr[1].length).map(([t, l]) => '<h3 class="subt">' + t + ' <small>(' + l.length + ')</small></h3>' + l.map(fila).join('')).join('');
+  return h + '<div class="prov-facturas">' + p.filas.map(factura).join('') + '</div>';
 }
 
 async function cargarPagosFac() {
@@ -801,6 +861,7 @@ async function accionFac(b) {
     catch (e) { toast('No se pudo: ' + e.message, 4000); }
     return;
   }
+  if (x === 'pagProv') { const g = estadoPag(); g.abiertos[b.dataset.k] = !g.abiertos[b.dataset.k]; render(); return; }
   if (x === 'pagFiltro') { const g = estadoPag(); g.pagadas = b.dataset.v === 'true'; g.res = null; g.error = ''; render(); return; }
   if (x === 'pagForma') { f.marca.fecha = ($('#fpag-fecha') || {}).value || f.marca.fecha; f.marca.forma = b.dataset.v; render(); return; }
   if (x === 'pagGuardar') { guardarPagoFac(true); return; }
