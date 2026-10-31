@@ -629,10 +629,11 @@ function doGet() {
   papeleraInformesViejos_();
   limpiarReemplazosTapfeed_(SpreadsheetApp.getActive());
   publicarDatosInforme_(SpreadsheetApp.getActive());
+  const pagos = marcarPagadasViejas_();
   const url = SpreadsheetApp.getActive().getUrl();
   return HtmlService.createHtmlOutput(
     '<div style="font-family:sans-serif;font-size:20px;padding:24px">' +
-    '<p>✓ <b>Registros Zehirut</b> está funcionando.</p>' +
+    '<p>✓ <b>Registros Zehirut</b> está funcionando.</p>' + (pagos ? '<p>' + pagos + '</p>' : '') +
     '<p><a href="' + url + '" target="_blank">Abrir la planilla</a></p></div>')
     .setTitle('Registros Zehirut');
 }
@@ -2057,6 +2058,21 @@ function limpiarObsoletos_() {
       props_().setProperty('LIMPIEZA_ZEHIRUTAPP', r);
     });
   } catch (e) { console.error('Limpieza: ' + e); }   // nunca frena la app
+}
+
+/** 31/10/2026, pedido del usuario: las facturas a crédito que vencieron antes de hoy se dan por pagadas (limpieza
+ *  inicial de Facturas a pagar; ZA.marcarPagadasAnterioresA también prende la grilla de vencimientos del mail diario).
+ *  Corre una sola vez; el resultado va a Registro. Devuelve el resultado solo en la corrida que lo hizo. */
+function marcarPagadasViejas_() {
+  if (props_().getProperty('PAGOS_CORTE')) return '';
+  let r = '';
+  conLock_(() => {
+    if (props_().getProperty('PAGOS_CORTE')) return;
+    r = ZA.marcarPagadasAnterioresA('31/10/2026');
+    registrar_(SpreadsheetApp.getActive(), [[new Date(), 'Sistema', 'Facturas a pagar', r, 'Aplicado', '']]);
+    props_().setProperty('PAGOS_CORTE', r);
+  });
+  return r;
 }
 
 // ---------------------------------------------------------------- mail diario de facturas

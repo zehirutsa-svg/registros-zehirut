@@ -359,8 +359,8 @@ acceso total.
   calendario se renombra "✓ PAGADA - …" (sin recordatorios) y se mueve si se corrige fecha/días (se busca por título).
   Mail diario: grilla "Facturas a pagar (vencidas y próximos 7 días)" arriba; sale aunque no haya facturas nuevas,
   pero recién después de la limpieza inicial (`ZA.marcarPagadasAnterioresA(fecha)` = vencidas antes de esa fecha
-  quedan pagadas con "Carga inicial", y prende la propiedad PAGOS_AVISO_ACTIVO de la biblioteca). **Pendiente: que el
-  usuario diga la fecha de corte.**
+  quedan pagadas con "Carga inicial", y prende la propiedad PAGOS_AVISO_ACTIVO de la biblioteca). **Hecho 31/10/2026 (v1.22.1,
+  marcarPagadasViejas_, propiedad PAGOS_CORTE):** corte = vencidas antes del 31/10/2026 → 51 de 87 quedaron pagadas.
 
 ## Usuarios (inicio)
 
