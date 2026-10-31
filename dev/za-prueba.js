@@ -22,7 +22,7 @@ module.exports = function crearZA() {
         verSoloPropias: false, puedeFondoFijo: false, puedeCombustible: false, puedeVerCombustible: true };
     }
     return { ok: true, nombre: u, puedeFacturas: true, puedeLluvias: true, puedeVerFacturas: true, puedeEliminarFacturas: pin === '1111',
-      verSoloPropias: pin === '2222', puedeFondoFijo: true, puedeCombustible: false, puedeVerCombustible: false };
+      verSoloPropias: pin === '2222', puedeFondoFijo: true, puedeCombustible: false, puedeVerCombustible: false, puedeMarcarPagos: pin === '1111' };
   };
   const orden = (f) => { const p = String(f || '').split('/'); return p.length === 3 ? Number(p[2]) * 10000 + Number(p[1]) * 100 + Number(p[0]) : 0; };
   const resumen = (f) => ({ id: f.id, fecha: f.fecha, numeroFactura: f.numeroFactura, proveedor: f.proveedor, ruc: f.ruc, moneda: f.moneda, monto: f.monto,
@@ -36,6 +36,26 @@ module.exports = function crearZA() {
       (!q || (f.numeroFactura + f.proveedor + f.ruc).toUpperCase().indexOf(q) !== -1))
       .sort((a, b) => orden(b.fecha) - orden(a.fecha));
   };
+  // Facturas a pagar: vencimiento = fecha + días de crédito (igual que Pagos.js).
+  const venc = (f) => {
+    const p = String(f.fecha || '').split('/'); const d = parseInt(String(f.diasCredito || '').match(/\d+/) || 0, 10);
+    if (p.length !== 3 || !d) return '';
+    const v = new Date(Date.UTC(+p[2], +p[1] - 1, +p[0] + d));
+    return ('0' + v.getUTCDate()).slice(-2) + '/' + ('0' + (v.getUTCMonth() + 1)).slice(-2) + '/' + v.getUTCFullYear();
+  };
+  const diasA = (ddmm) => {
+    const p = String(ddmm || '').split('/'); if (p.length !== 3) return null;
+    const h = new Date(); return Math.round((Date.UTC(+p[2], +p[1] - 1, +p[0]) - Date.UTC(h.getFullYear(), h.getMonth(), h.getDate())) / 86400000);
+  };
+  const conPago = (f) => Object.assign({}, f, { vencimiento: f.tipoComprobante === 'Factura Crédito' ? venc(f) : '', pagada: !!f.pagada });
+  // Ejemplos para ver la tarjeta con datos: una vencida, una que vence en días, una más adelante.
+  [[-40, 'Agro Sur', 'PYG', 3500000, 'Osmar Acosta'], [-25, 'Veterinaria Central', 'PYG', 980000, 'Enrique Delfante'],
+   [-5, 'Repuestos Chaco', 'USD', 1250.5, 'Enrique Delfante'], [20, 'Ferretería Loma', 'PYG', 450000, 'Osmar Acosta']].forEach(([dd, prov, mon, monto, usu], i) => {
+    const d = new Date(); d.setDate(d.getDate() + dd);
+    const fecha = ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
+    facturas.push({ id: 26090000 + i, fechaCarga: fecha, tipoComprobante: 'Factura Crédito', diasCredito: '30 días', fecha, numeroFactura: '001-001-000' + (100 + i),
+      proveedor: prov, ruc: '8000' + i, moneda: mon, monto, usuario: usu, cargadoAlbor: false, detalle: 'Ejemplo crédito' });
+  });
   const guardarArchivo = (nombre, base64) => { const aid = 'arch' + ++sec; archivos[aid] = { nombre, base64, tamanioKB: Math.max(1, Math.round((base64 || '').length * 0.75 / 1024)) }; return aid; };
 
   return {
@@ -101,7 +121,7 @@ module.exports = function crearZA() {
       if (s.verSoloPropias && f.usuario !== s.nombre) throw new Error('No tenés permiso para ver esta factura.');
       const arch = [f.archivoId].concat(docs.filter((d) => String(d.facturaId) === String(fid) && d.archivoId).map((d) => d.archivoId))
         .filter((a) => archivos[a]).map((a) => ({ id: a, nombre: archivos[a].nombre, mimeType: 'image/jpeg', tamanioKB: archivos[a].tamanioKB }));
-      return { factura: Object.assign({}, f), items: items[fid] || [], documentos: docs.filter((d) => String(d.facturaId) === String(fid)), archivos: arch };
+      return { factura: conPago(f), items: items[fid] || [], documentos: docs.filter((d) => String(d.facturaId) === String(fid)), archivos: arch };
     },
     eliminarFactura(pin, fid) {
       if (String(pin) !== '1111') throw new Error('No tenés permiso para eliminar facturas.');
@@ -120,6 +140,22 @@ module.exports = function crearZA() {
       const a = archivos[aid];
       if (!a) throw new Error('no existe');
       return { base64: a.base64, mimeType: 'application/octet-stream', nombre: a.nombre };
+    },
+    listarFacturasAPagar(pin, o) {
+      const s = sesion(pin);
+      const pagadas = !!(o && o.pagadas);
+      const filas = facturas.filter((f) => f.tipoComprobante === 'Factura Crédito' && !!f.pagada === pagadas && (!s.verSoloPropias || f.usuario === s.nombre))
+        .map((f) => Object.assign(resumen(f), { vencimiento: venc(f), dias: diasA(venc(f)), pagada: !!f.pagada, fechaPago: f.fechaPago || '', pagadaCon: f.pagadaCon || '', pagadaPor: f.pagadaPor || '' }));
+      filas.sort((a, b) => (pagadas ? orden(b.fechaPago) - orden(a.fechaPago) : a.dias - b.dias));
+      return { filas, total: filas.length, puedeMarcar: !!s.puedeMarcarPagos };
+    },
+    marcarFacturaPagada(pin, fid, d) {
+      const s = sesion(pin);
+      if (!s.puedeMarcarPagos) throw new Error('No tenés permiso para marcar facturas como pagadas.');
+      const f = buscar(fid);
+      if (f.tipoComprobante !== 'Factura Crédito') throw new Error('Solo las facturas a crédito se marcan como pagadas.');
+      Object.assign(f, d.pagada ? { pagada: true, fechaPago: d.fecha, pagadaCon: d.formaPago, pagadaPor: s.nombre } : { pagada: false, fechaPago: '', pagadaCon: '', pagadaPor: '' });
+      return 'ok';
     },
     exportarFacturasExcel(pin, o) {
       const s = sesion(pin);

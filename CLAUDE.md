@@ -319,7 +319,7 @@ acceso total.
   entrada (tipo | lista): la flecha vuelve ahí y después al grupo; al guardar se vuelve a la raíz.
 
 - No se copia la lógica: el script usa **ZehirutApp como biblioteca** (símbolo `ZA`, versión fija en
-  `appsscript.json`, hoy 142). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
+  `appsscript.json`, hoy 143). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
   salen de la hoja Usuarios de ESTE Sheet (ver "Una sola planilla de usuarios"). La web de ZehirutApp quedó
   apagada (v137: solo muestra un botón a Registros); el proyecto sigue como biblioteca y para el mail diario.
   v138 (01/10): sin Index.html ni Combustible.js; la planilla vieja de usuarios y la hoja "Combustible
@@ -348,6 +348,19 @@ acceso total.
   de otro contexto y `instanceof Date` falla en ZA (salen como "Fri Oct 23 2026…"); que ZA abra la planilla él mismo.
 - Fotos: se achican solo si pasan de 2400 px de lado mayor (JPEG 0,88) para que Gemini lea bien; los
   PDF no se tocan. Pendiente fase 2: cola offline de fotos ("pendiente de leer").
+- **Facturas a pagar (31/10/2026, v1.22.0, ZA 143; código en `ZehirutApp/Pagos.js`)**: cuarta tarjeta de Registros
+  contables. Solo "Factura Crédito"; vencimiento = fecha + días de crédito (sin días: 30 por defecto, sin marcar
+  nada aparte, pedido del usuario). Pendientes en 3 grupos (vencidas / próximos 7 días / más adelante) con total por
+  moneda; filtro Pagadas (últimas 100). Ve la lista quien ve facturas; con "Propias" (Osmar) solo las suyas. **Marca
+  pagada** (fecha + cómo se pagó) o desmarca solo quien tiene la casilla **"Marca pagos"** en Usuarios (esquema 23:
+  Enrique, Natalia, Raquel; nunca con Propias); se hace desde el detalle de la factura, y al subir una transferencia
+  o recibo a una factura a crédito pendiente la app ofrece marcarla. Columnas nuevas en Facturas (24-28):
+  Vencimiento, Pagada, Fecha de pago, Pagada con, Pagada por → salen solas en el Excel de Ver facturas. El evento del
+  calendario se renombra "✓ PAGADA - …" (sin recordatorios) y se mueve si se corrige fecha/días (se busca por título).
+  Mail diario: grilla "Facturas a pagar (vencidas y próximos 7 días)" arriba; sale aunque no haya facturas nuevas,
+  pero recién después de la limpieza inicial (`ZA.marcarPagadasAnterioresA(fecha)` = vencidas antes de esa fecha
+  quedan pagadas con "Carga inicial", y prende la propiedad PAGOS_AVISO_ACTIVO de la biblioteca). **Pendiente: que el
+  usuario diga la fecha de corte.**
 
 ## Usuarios (inicio)
 

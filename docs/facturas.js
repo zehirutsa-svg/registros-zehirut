@@ -20,6 +20,7 @@ const BIENES_USO = [
   ['HM-Des', 'Desmalezadoras Husqvarna'], ['INF-Tc', 'Tanque Combustible (Estático)'], ['BPY', 'Beechcraft Bonanza A36'], ['VARIOS', 'Varios'],
 ];
 const FORMAS_PAGO_BASE = ['Fondo Fijo', 'Contado', 'Tarjeta de Crédito', 'Transferencia Bancaria', 'Pago QR'];
+const FORMAS_PAGO_PAGOS = ['Transferencia Bancaria', 'Cheque', 'Contado', 'Tarjeta de Crédito', 'Pago QR'];   // al marcar pagada una factura a crédito
 const TIPOS_ASOCIADO = [['Nota de Crédito', '📄 Nota de crédito'], ['Comprobante de Transferencia', '🏦 Transferencia'], ['Recibo', '🧾 Recibo']];
 const FF_INICIO = '2026-09-01';
 const FOTO_MAX_PX = 2400;      // las fotos se achican solo si pasan de esto (queda bien legible)
@@ -135,11 +136,13 @@ function htmlFacturas() {
   const f = estadoFac();
   const p = zaP();
   const titulos = { lista: 'Ver facturas', tipo: 'Comprobantes', carga: 'Cargar factura', form: f.form && f.form.modo === 'editar' ? 'Corregir factura' : 'Revisá los datos',
-    detalle: 'Factura', comprobante: 'Agregar comprobante', vincular: 'Vincular anticipo', anticipo: 'Anticipo a proveedor', pagoSF: 'Pago sin factura' };
+    detalle: 'Factura', comprobante: 'Agregar comprobante', vincular: 'Vincular anticipo', anticipo: 'Anticipo a proveedor', pagoSF: 'Pago sin factura',
+    pagos: 'Facturas a pagar', pagar: 'Marcar pagada' };
   let cuerpo;
   if (!p) cuerpo = '<div class="aviso amarillo">' + esc((datos && datos.za && datos.za.error) || 'No se pudo conectar con los permisos de ZehirutApp.') + '</div>';
   else cuerpo = ({ lista: htmlFacLista, tipo: htmlFacTipo, carga: htmlFacCarga, form: htmlFacForm, detalle: htmlFacDetalle,
-    comprobante: htmlFacComprobante, vincular: htmlFacVincular, anticipo: htmlFacAnticipo, pagoSF: htmlFacPagoSF }[f.vista] || htmlFacLista)();
+    comprobante: htmlFacComprobante, vincular: htmlFacVincular, anticipo: htmlFacAnticipo, pagoSF: htmlFacPagoSF,
+    pagos: htmlFacPagos, pagar: htmlFacPagar }[f.vista] || htmlFacLista)();
   return barra(titulos[f.vista] || 'Comprobantes', true) + '<div class="contenido"><div class="form">' + cuerpo + '</div></div>';
 }
 
@@ -147,7 +150,7 @@ function htmlFacturas() {
 function atrasFacturas() {
   const f = estadoFac();
   if (f.vista === f.raiz) return false;
-  const antes = { carga: 'tipo', anticipo: 'tipo', pagoSF: 'tipo', detalle: 'lista', comprobante: 'detalle', vincular: 'detalle' };
+  const antes = { carga: 'tipo', anticipo: 'tipo', pagoSF: 'tipo', detalle: f.raiz === 'pagos' ? 'pagos' : 'lista', comprobante: 'detalle', vincular: 'detalle', pagar: 'detalle' };
   if (f.vista === 'form') {
     if (f.form && f.form.modo === 'editar') { f.vista = 'detalle'; render(); return true; }
     descartarCargaFac(); return true;
@@ -395,6 +398,111 @@ async function guardarFormFac() {
   }
 }
 
+// ---- facturas a pagar (las "Factura Crédito" con su vencimiento; ver Pagos.js de ZehirutApp)
+function estadoPag() {
+  const f = estadoFac();
+  if (!f.pag) f.pag = { pagadas: false, res: null, cargando: false, error: '' };
+  return f.pag;
+}
+
+/** Días de hoy a una fecha DD/MM/AAAA (negativo = ya pasó), o null. */
+function diasHastaFac(ddmm) {
+  const m = String(ddmm || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const h = hoyISO().split('-').map(Number);
+  return Math.round((Date.UTC(+m[3], +m[2] - 1, +m[1]) - Date.UTC(h[0], h[1] - 1, h[2])) / 86400000);
+}
+
+/** "Vence en 3 días", "Vencida hace 2 días"... y el color del chip. */
+function estadoVenc(dias) {
+  if (dias === null || dias === undefined) return ['Sin vencimiento', 'pend'];
+  if (dias < 0) return ['Vencida hace ' + (-dias) + (dias === -1 ? ' día' : ' días'), 'alerta'];
+  if (dias === 0) return ['Vence hoy', 'alerta'];
+  if (dias === 1) return ['Vence mañana', 'naranja'];
+  return ['Vence en ' + dias + ' días', dias <= 7 ? 'naranja' : 'azul'];
+}
+
+function htmlFacPagos() {
+  const g = estadoPag();
+  if (!g.res && !g.cargando && !g.error) setTimeout(cargarPagosFac, 0);
+  let h = '<div class="filtros">' + [[false, 'Pendientes'], [true, 'Pagadas']].map(([v, t]) =>
+    '<button class="chip-filtro' + (g.pagadas === v ? ' activo' : '') + '" data-a="fac" data-x="pagFiltro" data-v="' + v + '">' + t + '</button>').join('') + '</div>';
+  if (g.error) return h + '<p class="vacio">⚠️ ' + esc(g.error) + '</p>';
+  if (!g.res) return h + espera('Cargando…');
+  const filas = g.res.filas;
+  if (!filas.length) return h + '<p class="vacio">' + (g.pagadas ? 'Todavía no hay facturas marcadas como pagadas.' : 'No hay facturas a crédito pendientes de pago. 🎉') + '</p>';
+  const fila = (x) => {
+    const [txt, cls] = g.pagadas ? ['Pagada' + (x.fechaPago ? ' el ' + x.fechaPago : ''), 'verde'] : estadoVenc(x.dias);
+    return '<button class="mov factura" data-a="fac" data-x="abrir" data-id="' + esc(x.id) + '">' +
+      '<span class="cuerpo"><b>' + esc(x.proveedor || '(sin proveedor)') + '</b><small>' + esc(x.numeroFactura) + ' · vence ' + esc(x.vencimiento || '—') +
+      ' · ' + esc(String(x.usuario || '').split(' ')[0]) + '</small><small style="display:block;margin-top:4px"><span class="chip ' + cls + '">' + esc(txt) + '</span></small></span>' +
+      '<span class="num">' + fmtMonto(x.monto, x.moneda) + '<br><small style="font-weight:600;color:var(--gris)">' + esc(x.moneda) + '</small></span></button>';
+  };
+  if (g.pagadas) {
+    return h + filas.map(fila).join('') + (g.res.total > filas.length ? '<p class="vacio">Se muestran las últimas ' + filas.length + ' de ' + g.res.total + '.</p>' : '');
+  }
+  // Total pendiente por moneda (guaraníes y dólares no se suman entre sí).
+  const totales = {};
+  filas.forEach((x) => { const m = monedaNormal(x.moneda); totales[m] = (totales[m] || 0) + (parseFloat(x.monto) || 0); });
+  h += '<div class="tarjeta"><b>Total a pagar</b> <small>(' + filas.length + (filas.length === 1 ? ' factura' : ' facturas') + ')</small>' +
+    Object.keys(totales).map((m) => '<div class="monto-grande">' + fmtMonto(totales[m], m) + ' <small>' + esc(m) + '</small></div>').join('') + '</div>';
+  const grupos = [
+    ['🔴 Vencidas', filas.filter((x) => x.dias !== null && x.dias < 0)],
+    ['🟡 Vencen en los próximos 7 días', filas.filter((x) => x.dias !== null && x.dias >= 0 && x.dias <= 7)],
+    ['⚪ Más adelante', filas.filter((x) => x.dias === null || x.dias > 7)],
+  ];
+  return h + grupos.filter((gr) => gr[1].length).map(([t, l]) => '<h3 class="subt">' + t + ' <small>(' + l.length + ')</small></h3>' + l.map(fila).join('')).join('');
+}
+
+async function cargarPagosFac() {
+  const g = estadoPag();
+  g.cargando = true;
+  g.error = '';
+  try {
+    g.res = await za('listarFacturasAPagar', ['__PIN__', { pagadas: g.pagadas }], true);
+  } catch (e) {
+    g.error = e.message;
+  } finally {
+    g.cargando = false;
+    if (ui.pantalla === 'facturas' && estadoFac().vista === 'pagos') render();
+  }
+}
+
+/** Formulario para marcar pagada la factura abierta: fecha de pago y con qué se pagó. */
+function htmlFacPagar() {
+  const f = estadoFac();
+  const x = f.det && f.det.factura;
+  const m = f.marca || (f.marca = { fecha: hoyISO(), forma: '' });
+  if (!x) return espera('Cargando…');
+  return '<div class="tarjeta"><b>' + esc(x.proveedor) + '</b><br><small>N° ' + esc(x.numeroFactura) + ' · vence ' + esc(x.vencimiento || '—') + '</small>' +
+    '<div class="monto-grande">' + fmtMonto(x.monto, x.moneda) + ' <small>' + esc(x.moneda) + '</small></div></div>' +
+    '<div class="campo"><label for="fpag-fecha">Fecha de pago</label><input class="txt" type="date" id="fpag-fecha" value="' + esc(m.fecha) + '" max="' + hoyISO() + '"></div>' +
+    '<div class="campo"><span class="etq">¿Cómo se pagó?</span><div class="opciones">' + FORMAS_PAGO_PAGOS.map((v) =>
+      '<button class="' + (m.forma === v ? 'activo' : '') + '" data-a="fac" data-x="pagForma" data-v="' + esc(v) + '">' + esc(v) + '</button>').join('') + '</div></div>' +
+    '<button class="btn" data-a="fac" data-x="pagGuardar"' + (m.guardando ? ' disabled' : '') + '>' + (m.guardando ? rueda() + 'Guardando…' : '✓ Marcar pagada') + '</button>';
+}
+
+async function guardarPagoFac(pagada) {
+  const f = estadoFac();
+  const m = f.marca || {};
+  if (pagada) {
+    m.fecha = ($('#fpag-fecha') || {}).value || m.fecha;
+    if (!m.fecha) { toast('Elegí la fecha de pago.', 3000); return; }
+    if (!m.forma) { toast('Elegí cómo se pagó.', 3000); return; }
+    m.guardando = true; render();
+  }
+  try {
+    await za('marcarFacturaPagada', ['__PIN__', f.detId, { pagada, fecha: pagada ? isoADdmm(m.fecha) : '', formaPago: pagada ? m.forma : '' }]);
+    toast(pagada ? '✓ Factura marcada como pagada' : 'Factura desmarcada: vuelve a pendientes', 3000);
+    f.marca = null;
+    if (f.pag) f.pag.res = null;   // la lista se vuelve a pedir al volver
+    await abrirDetalleFac(f.detId);
+  } catch (e) {
+    m.guardando = false; render();
+    cartel({ icono: '⚠️', titulo: 'No se pudo guardar', html: '<p>' + esc(e.message) + '</p>', si: 'Entendido', no: '' });
+  }
+}
+
 // ---- detalle
 async function abrirDetalleFac(id) {
   const f = estadoFac();
@@ -427,10 +535,18 @@ function htmlFacDetalle() {
   let h = '<div class="tarjeta' + (x.cargadoAlbor ? ' albor' : '') + '"><div class="cab-factura"><div><b>' + esc(x.proveedor) + '</b><br><small>N° ' + esc(x.numeroFactura) + ' · ' + esc(x.fecha) + '</small></div>' +
     '<div class="monto-grande">' + fmtMonto(x.monto, x.moneda) + ' <small>' + esc(x.moneda) + '</small></div></div>' +
     '<label class="check-linea albor-check"><input type="checkbox" data-albor="1"' + (x.cargadoAlbor ? ' checked' : '') + '><span>Cargado a Albor</span></label></div>';
+  if (x.tipoComprobante === 'Factura Crédito') {
+    const [txt, cls] = x.pagada ? ['✓ Pagada', 'verde'] : estadoVenc(diasHastaFac(x.vencimiento));
+    h += '<div class="tarjeta' + (x.pagada ? ' albor' : '') + '"><h3 class="subt">Pago</h3><p style="margin:0 0 8px">Vence el <b>' + esc(x.vencimiento || '—') + '</b> <span class="chip ' + cls + '">' + esc(txt) + '</span></p>' +
+      (x.pagada ? '<p style="margin:0 0 8px">' + (x.fechaPago ? 'Pagada el <b>' + esc(x.fechaPago) + '</b>' : 'Pagada') + (x.pagadaCon ? ' con ' + esc(x.pagadaCon) : '') +
+        (x.pagadaPor ? '<br><small>Marcada por ' + esc(x.pagadaPor) + '</small>' : '') + '</p>' : '') +
+      (p.puedeMarcarPagos ? (x.pagada ? '<button class="btn sec chico" data-a="fac" data-x="pagDesmarcar">Desmarcar pagada</button>'
+        : '<button class="btn" data-a="fac" data-x="ir" data-v="pagar">✓ Marcar pagada</button>') : '') + '</div>';
+  }
   h += '<div class="tarjeta"><h3 class="subt">Datos contables</h3><table class="detalle copiable">' +
     fila('Unidad de negocio', x.unidadNegocio) + fila('Bien de uso', x.bienUso ? bien + ' (' + x.bienUso + ')' : '') + fila('Forma de pago', x.formaPago) + fila('Detalle', x.detalle || '—') + '</table>';
   h += '<h3 class="subt">Datos de la factura</h3><table class="detalle copiable">' +
-    fila('Tipo de comprobante', x.tipoComprobante) + fila('Días de crédito', x.diasCredito) + fila('Fecha de la factura', x.fecha) +
+    fila('Tipo de comprobante', x.tipoComprobante) + fila('Días de crédito', x.diasCredito) + fila('Vencimiento', x.vencimiento) + fila('Fecha de la factura', x.fecha) +
     fila('N° de factura', x.numeroFactura) + fila('Proveedor', x.proveedor) + fila('RUC proveedor', x.ruc) + fila('Factura electrónica', x.electronico) +
     fila('Timbrado', x.timbrado) + fila('Vto. timbrado', x.vtoTimbrado) + fila('Monto', fmtMonto(x.monto, x.moneda) + ' ' + x.moneda) +
     fila('IVA 5%', fmtMonto(x.iva5, x.moneda)) + fila('IVA 10%', fmtMonto(x.iva10, x.moneda)) + fila('Cargado por', x.usuario) + fila('Fecha de carga', x.fechaCarga) +
@@ -494,9 +610,15 @@ async function guardarCompFac() {
     const ids = [f.detId].concat(c.verOtras ? c.elegidas : []);
     await za('procesarComprobanteAsociado', [a.base64, a.tipo, a.nombre, ids, c.tipo, '__PIN__']);
     toast(ids.length > 1 ? '✓ Comprobante cargado en ' + ids.length + ' facturas' : '✓ Comprobante cargado', 3000);
+    const d = f.det && f.det.factura;
+    const ofrecerPago = c.tipo !== 'Nota de Crédito' && d && d.tipoComprobante === 'Factura Crédito' && !d.pagada && zaP().puedeMarcarPagos;
     f.comp = null;
     f.archivos = {};
     await abrirDetalleFac(f.detId);
+    if (ofrecerPago && await cartel({ icono: '✓', titulo: '¿Marcar la factura como pagada?', html: '<p>Es una factura a crédito que todavía figura sin pagar.</p>', si: 'Sí, marcar pagada', no: 'Ahora no' })) {
+      f.marca = { fecha: hoyISO(), forma: c.tipo === 'Comprobante de Transferencia' ? 'Transferencia Bancaria' : '' };
+      f.vista = 'pagar'; render(); window.scrollTo(0, 0);
+    }
   } catch (e) {
     c.guardando = false;
     render();
@@ -623,6 +745,7 @@ async function accionFac(b) {
   if (x === 'ir') {
     if (b.dataset.v === 'comprobante') f.comp = null;
     if (b.dataset.v === 'vincular') f.vinc = null;
+    if (b.dataset.v === 'pagar') f.marca = null;
     f.archivos = {};
     f.vista = b.dataset.v; render(); window.scrollTo(0, 0);
     if (b.dataset.v === 'carga') setTimeout(() => { /* el usuario elige cámara o archivo */ }, 0);
@@ -665,7 +788,7 @@ async function accionFac(b) {
     const ok = await cartel({ icono: '🗑️', titulo: 'Eliminar factura', si: 'Eliminar', peligro: true,
       html: '<p>Se borra la factura N° <b>' + esc(d.numeroFactura) + '</b> de ' + esc(d.proveedor) + ', sus ítems, sus comprobantes asociados y su carpeta de Drive (va a la papelera).</p>' });
     if (!ok) return;
-    try { await za('eliminarFactura', ['__PIN__', d.id]); toast('Factura eliminada'); f.vista = 'lista'; f.lista = null; render(); cargarListaFac(true); }
+    try { await za('eliminarFactura', ['__PIN__', d.id]); toast('Factura eliminada'); f.vista = f.raiz; f.lista = null; f.pag = null; render(); if (f.raiz === 'lista') cargarListaFac(true); }
     catch (e) { toast('No se pudo: ' + e.message, 4000); }
     return;
   }
@@ -676,6 +799,14 @@ async function accionFac(b) {
     if (!ok) return;
     try { await za('vincularAnticipoManual', ['__PIN__', f.detId, b.dataset.id]); toast('✓ Anticipo vinculado'); f.vinc = null; abrirDetalleFac(f.detId); }
     catch (e) { toast('No se pudo: ' + e.message, 4000); }
+    return;
+  }
+  if (x === 'pagFiltro') { const g = estadoPag(); g.pagadas = b.dataset.v === 'true'; g.res = null; g.error = ''; render(); return; }
+  if (x === 'pagForma') { f.marca.fecha = ($('#fpag-fecha') || {}).value || f.marca.fecha; f.marca.forma = b.dataset.v; render(); return; }
+  if (x === 'pagGuardar') { guardarPagoFac(true); return; }
+  if (x === 'pagDesmarcar') {
+    const ok = await cartel({ icono: '↩️', titulo: 'Desmarcar pagada', html: '<p>La factura N° <b>' + esc(f.det.factura.numeroFactura) + '</b> vuelve a quedar pendiente de pago.</p>', si: 'Desmarcar' });
+    if (ok) guardarPagoFac(false);
     return;
   }
   if (x === 'guardarAnticipo') { guardarAnticipoFac(); return; }

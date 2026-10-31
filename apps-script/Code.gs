@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '22';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '23';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
@@ -244,6 +244,7 @@ function configurar() {
   ecgenContenido_(ss, ins);
   principioBuserelina_(ss, ins);
   agregarTrabajos_(ss, 'TRABAJOS_V10', ['Aserraje', 'Trabajos de limpieza']);
+  asegurarMarcaPagos_(ss, usu);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
   [stock, mov, ins, des, usu, reg].forEach((h, i) => { ss.setActiveSheet(h); ss.moveActiveSheet(i + 1); });
@@ -534,6 +535,39 @@ function asegurarSanidad_(ss, ins, usu) {
     }
     usu.getRange(2, col, 200, 1).setDataValidation(SpreadsheetApp.newDataValidation()
       .requireValueInList(['Administrar', 'Cargar', 'Ver'], true).setAllowInvalid(false).build());
+  }
+}
+
+/** Esquema 23 (31/10/2026): casilla "Marca pagos" en Usuarios = quién marca las facturas a crédito como
+ *  pagadas (tarjeta Facturas a pagar). Pedido del usuario: Enrique, Natalia y Raquel. Además completa una vez
+ *  el vencimiento de las facturas a crédito ya cargadas (ZA.completarColumnasPago). Resultado en Registro. */
+function asegurarMarcaPagos_(ss, usu) {
+  const ancho = usu.getLastColumn();
+  const enc = usu.getRange(1, 1, 1, ancho).getValues()[0].map(String);
+  let col = enc.indexOf('Marca pagos') + 1;
+  if (!col) {
+    col = ancho + 1;
+    usu.getRange(1, col).setValue('Marca pagos').setFontWeight('bold').setBackground('#eeeeee');
+    const n = usu.getLastRow();
+    if (n > 1) {
+      const iFac = enc.indexOf('Facturas');
+      const filas = usu.getRange(2, 1, n - 1, ancho).getValues();
+      const primerNombre = (f) => String(f[0]).trim().split(/\s+/)[0].normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const marcados = filas.map((f) => [['enrique', 'natalia', 'raquel'].indexOf(primerNombre(f)) !== -1]);
+      usu.getRange(2, col, n - 1, 1).setValues(marcados);
+      const quienes = filas.filter((f, i) => marcados[i][0]).map((f) => String(f[0]).trim() + ' (Facturas: ' + (String(f[iFac] || '').trim() || 'sin permiso') + ')');
+      registrar_(ss, [[new Date(), 'Sistema', 'Marca pagos', 'Casilla tildada para: ' + (quienes.join(', ') || 'nadie'), 'Aplicado', '']]);
+    }
+  }
+  usu.getRange(2, col, 200, 1).insertCheckboxes();
+  if (!props_().getProperty('PAGOS_COLUMNAS')) {
+    try {
+      const r = ZA.completarColumnasPago();
+      registrar_(ss, [[new Date(), 'Sistema', 'Facturas a pagar', 'Vencimientos completados: ' + r, 'Aplicado', '']]);
+      props_().setProperty('PAGOS_COLUMNAS', r);
+    } catch (e) {
+      registrar_(ss, [[new Date(), 'Sistema', 'Facturas a pagar', 'No se pudieron completar los vencimientos: ' + e, 'Error', '']]);
+    }
   }
 }
 
@@ -1977,7 +2011,7 @@ const ZA_PERMITIDAS = {
   marcarCargadoAlbor: 1, actualizarFactura: 1, descargarArchivoAdjunto: 1, exportarFacturasExcel: 1,
   buscarAnticiposPendientes: 1, vincularAnticipoManual: 1, listarFacturasMismoProveedor: 1,
   procesarComprobanteAsociado: 1, obtenerResumenFondoFijo: 1, registrarFondeoFondoFijo: 1,
-  eliminarFondeoFondoFijo: 1, exportarFondoFijoExcel: 1,
+  eliminarFondeoFondoFijo: 1, exportarFondoFijoExcel: 1, listarFacturasAPagar: 1, marcarFacturaPagada: 1,
 };
 
 function facturasVisibles_(u) {
