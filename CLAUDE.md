@@ -348,7 +348,8 @@ acceso total.
   de otro contexto y `instanceof Date` falla en ZA (salen como "Fri Oct 23 2026…"); que ZA abra la planilla él mismo.
 - Fotos: se achican solo si pasan de 2400 px de lado mayor (JPEG 0,88) para que Gemini lea bien; los
   PDF no se tocan. Pendiente fase 2: cola offline de fotos ("pendiente de leer").
-- **Facturas a pagar (31/10/2026, v1.22.0, ZA 143; código en `ZehirutApp/Pagos.js`)**: cuarta tarjeta de Registros
+- **Facturas a crédito (31/10/2026, v1.22.0, ZA 143; código en `ZehirutApp/Pagos.js`; tarjeta 📅 "Facturas a crédito"
+  desde v1.22.3, antes 💳 "Facturas a pagar")**: cuarta tarjeta de Registros
   contables. Solo "Factura Crédito"; vencimiento = fecha + días de crédito (sin días: 30 por defecto, sin marcar
   nada aparte, pedido del usuario). Pendientes en 3 grupos (vencidas / próximos 7 días / más adelante) con total por
   moneda; filtro Pagadas (últimas 100). Ve la lista quien ve facturas; con "Propias" (Osmar) solo las suyas. **Marca

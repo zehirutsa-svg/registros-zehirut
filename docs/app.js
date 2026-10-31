@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.22.2';
+const VERSION = '1.22.3';
 
 
 const DIAS_HISTORIAL = 60;
@@ -538,7 +538,7 @@ function tarjetasModulos() {
   // Registros contables: cargar comprobantes (factura, anticipo, pago sin factura) y ver facturas, por separado.
   if (za && za.puedeFacturas) g.comprobantes.push(tarjeta('facturas', 'data-p="facturas" data-fv="tipo"', '🧾', 'Comprobantes', 'Factura, anticipo o pago sin factura'));
   if (za && (za.puedeFacturas || za.puedeVerFacturas)) g.comprobantes.push(tarjeta('facturas', 'data-p="facturas" data-fv="lista"', '🔎', 'Ver facturas', 'Buscar las facturas cargadas'));
-  if (za && (za.puedeFacturas || za.puedeVerFacturas)) g.comprobantes.push(tarjeta('facturas', 'data-p="facturas" data-fv="pagos"', '💳', 'Facturas a pagar', 'Crédito: vencimientos y pagos'));
+  if (za && (za.puedeFacturas || za.puedeVerFacturas)) g.comprobantes.push(tarjeta('facturas', 'data-p="facturas" data-fv="pagos"', '📅', 'Facturas a crédito', 'Vencimientos y pagos'));
   if (za && za.puedeFondoFijo) g.comprobantes.push(tarjeta('fondofijo', 'data-p="fondofijo"', '💵', 'Fondo fijo', 'Caja chica'));
   ['Facturas', 'Fondo fijo'].filter((m) => puede(m, 'VER') && !za).forEach((m) => {
     g.comprobantes.push('<div class="modulo pronto"><span class="ico">' + ({ Facturas: '🧾', 'Fondo fijo': '💵' }[m]) +
@@ -555,7 +555,7 @@ function tarjetasModulos() {
 
 const GRUPOS = {
   stocks: { titulo: 'Stocks', ico: '📦', sub: 'Insumos · Combustible · Horómetro · Sanidad' },
-  comprobantes: { titulo: 'Registros contables', ico: '🗂️', sub: 'Comprobantes · Ver facturas · A pagar · Fondo fijo' },
+  comprobantes: { titulo: 'Registros contables', ico: '🗂️', sub: 'Comprobantes · Ver facturas · A crédito · Fondo fijo' },
 };
 
 // Inicio: Comprobantes, Stocks y Lluvias. Un grupo con un solo módulo muestra ese módulo

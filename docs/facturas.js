@@ -137,7 +137,7 @@ function htmlFacturas() {
   const p = zaP();
   const titulos = { lista: 'Ver facturas', tipo: 'Comprobantes', carga: 'Cargar factura', form: f.form && f.form.modo === 'editar' ? 'Corregir factura' : 'Revisá los datos',
     detalle: 'Factura', comprobante: 'Agregar comprobante', vincular: 'Vincular anticipo', anticipo: 'Anticipo a proveedor', pagoSF: 'Pago sin factura',
-    pagos: 'Facturas a pagar', pagar: 'Marcar pagada' };
+    pagos: 'Facturas a crédito', pagar: 'Marcar pagada' };
   let cuerpo;
   if (!p) cuerpo = '<div class="aviso amarillo">' + esc((datos && datos.za && datos.za.error) || 'No se pudo conectar con los permisos de ZehirutApp.') + '</div>';
   else cuerpo = ({ lista: htmlFacLista, tipo: htmlFacTipo, carga: htmlFacCarga, form: htmlFacForm, detalle: htmlFacDetalle,
