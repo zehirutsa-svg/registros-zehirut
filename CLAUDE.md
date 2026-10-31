@@ -367,7 +367,8 @@ acceso total.
   calendario se renombra "✓ PAGADA - …" (sin recordatorios) y se mueve si se corrige fecha/días (se busca por título).
   **Mail de vencimientos (v1.25.0, ZA 147, `ZehirutApp/AvisoVencimientos.js`):** aparte del mail de facturas cargadas
   (que ya no lleva vencimientos), solo a quien tiene la casilla **"Aviso vencimientos"** en Usuarios (esquema 24: solo
-  Enrique). Sale cuando una factura pendiente entra en los 7 días antes de vencer (una vez por fecha de vencimiento,
+  Enrique; esquema 25 la destildó en su segunda fila, Facturas = Ver, correo laprudencia.com.py: llega solo a su
+  Gmail). Sale cuando una factura pendiente entra en los 7 días antes de vencer (una vez por fecha de vencimiento,
   propiedad AVISO_VENC_FECHAS de la biblioteca; si un día no corrió, sale al siguiente); arriba el total pendiente y las vencidas, después lo que vence, abajo
   todo lo pendiente por proveedor (sin saludo ni botón, v1.25.1). Lo dispara avisoFacturasDiario_ (primer doPost desde las 8). Limpieza
   inicial: `ZA.marcarPagadasAnterioresA(fecha)` = vencidas antes de esa fecha quedan pagadas con "Carga inicial". **Hecho 31/10/2026 (v1.22.1,

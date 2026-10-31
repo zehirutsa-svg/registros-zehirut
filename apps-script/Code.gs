@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '24';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '25';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
@@ -246,6 +246,7 @@ function configurar() {
   agregarTrabajos_(ss, 'TRABAJOS_V10', ['Aserraje', 'Trabajos de limpieza']);
   asegurarMarcaPagos_(ss, usu);
   asegurarAvisoVencimientos_(ss, usu);
+  avisoVencimientosSoloUno_(ss, usu);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
   [stock, mov, ins, des, usu, reg].forEach((h, i) => { ss.setActiveSheet(h); ss.moveActiveSheet(i + 1); });
@@ -592,6 +593,25 @@ function asegurarAvisoVencimientos_(ss, usu) {
     }
   }
   usu.getRange(2, col, 200, 1).insertCheckboxes();
+}
+
+/** Esquema 25 (31/10/2026): el aviso de vencimientos salió también al correo de la segunda fila "Enrique Delfante"
+ *  (Facturas = Ver, correo de laprudencia.com.py) y el usuario lo quiere solo para él: queda tildado solo en la fila
+ *  con Facturas = Administrar. Una sola vez; el resultado va a Registro. */
+function avisoVencimientosSoloUno_(ss, usu) {
+  if (props_().getProperty('AVISO_VENC_UNO')) return;
+  const valores = usu.getDataRange().getValues();
+  const enc = valores[0].map(String);
+  const iAv = enc.indexOf('Aviso vencimientos'), iFac = enc.indexOf('Facturas');
+  if (iAv === -1) return;
+  const quitados = [];
+  valores.forEach((f, i) => {
+    if (i === 0 || f[iAv] !== true || String(f[iFac]).trim() === 'Administrar') return;
+    usu.getRange(i + 1, iAv + 1).setValue(false);
+    quitados.push(String(f[0]).trim() + ' (Facturas: ' + (String(f[iFac]).trim() || 'sin permiso') + ')');
+  });
+  registrar_(ss, [[new Date(), 'Sistema', 'Aviso vencimientos', 'Destildado en: ' + (quitados.join(', ') || 'nadie'), 'Aplicado', '']]);
+  props_().setProperty('AVISO_VENC_UNO', quitados.join(', ') || 'nadie');
 }
 
 /** Agrega un nombre de Tapfeed a un insumo (sin borrar los que ya tiene), si todavía no lo tiene. */
