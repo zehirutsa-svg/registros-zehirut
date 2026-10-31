@@ -149,6 +149,10 @@ module.exports = function crearZA() {
       filas.sort((a, b) => (pagadas ? orden(b.fechaPago) - orden(a.fechaPago) : a.dias - b.dias));
       return { filas, total: filas.length, puedeMarcar: !!s.puedeMarcarPagos };
     },
+    // Arreglos de una sola vez que corre Registros (en la prueba no hacen nada).
+    completarColumnasPago: () => '0 facturas a crédito completadas',
+    marcarPagadasAnterioresA: () => '0 facturas marcadas como pagadas',
+    recalcularVencimientosProveedores: () => '0 vencimientos recalculados, 0 vueltas a pendientes',
     marcarFacturaPagada(pin, fid, d) {
       const s = sesion(pin);
       if (!s.puedeMarcarPagos) throw new Error('No tenés permiso para marcar facturas como pagadas.');
