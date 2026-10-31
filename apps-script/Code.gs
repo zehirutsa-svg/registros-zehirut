@@ -2012,7 +2012,7 @@ const ZA_PERMITIDAS = {
   marcarCargadoAlbor: 1, actualizarFactura: 1, descargarArchivoAdjunto: 1, exportarFacturasExcel: 1,
   buscarAnticiposPendientes: 1, vincularAnticipoManual: 1, listarFacturasMismoProveedor: 1,
   procesarComprobanteAsociado: 1, obtenerResumenFondoFijo: 1, registrarFondeoFondoFijo: 1,
-  eliminarFondeoFondoFijo: 1, exportarFondoFijoExcel: 1, listarFacturasAPagar: 1, marcarFacturaPagada: 1,
+  eliminarFondeoFondoFijo: 1, exportarFondoFijoExcel: 1, listarFacturasAPagar: 1, marcarFacturaPagada: 1, marcarFacturasPagadas: 1,
 };
 
 function facturasVisibles_(u) {

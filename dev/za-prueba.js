@@ -157,6 +157,12 @@ module.exports = function crearZA() {
     completarColumnasPago: () => '0 facturas a crédito completadas',
     marcarPagadasAnterioresA: () => '0 facturas marcadas como pagadas',
     recalcularVencimientosProveedores: () => '0 vencimientos recalculados, 0 vueltas a pendientes',
+    marcarFacturasPagadas(pin, ids, d) {
+      const s = sesion(pin);
+      if (!s.puedeMarcarPagos) throw new Error('No tenés permiso para marcar facturas como pagadas.');
+      ids.forEach((fid) => Object.assign(buscar(fid), d.pagada ? { pagada: true, fechaPago: d.fecha, pagadaCon: d.formaPago, pagadaPor: s.nombre } : { pagada: false, fechaPago: '', pagadaCon: '', pagadaPor: '' }));
+      return 'ok';
+    },
     marcarFacturaPagada(pin, fid, d) {
       const s = sesion(pin);
       if (!s.puedeMarcarPagos) throw new Error('No tenés permiso para marcar facturas como pagadas.');

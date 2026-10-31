@@ -137,7 +137,7 @@ function htmlFacturas() {
   const p = zaP();
   const titulos = { lista: 'Ver facturas', tipo: 'Comprobantes', carga: 'Cargar factura', form: f.form && f.form.modo === 'editar' ? 'Corregir factura' : 'Revisá los datos',
     detalle: 'Factura', comprobante: 'Agregar comprobante', vincular: 'Vincular anticipo', anticipo: 'Anticipo a proveedor', pagoSF: 'Pago sin factura',
-    pagos: 'Facturas a crédito', pagar: 'Marcar pagada' };
+    pagos: 'Facturas a crédito', pagar: f.marca && f.marca.ids ? 'Marcar pagadas' : 'Marcar pagada' };
   let cuerpo;
   if (!p) cuerpo = '<div class="aviso amarillo">' + esc((datos && datos.za && datos.za.error) || 'No se pudo conectar con los permisos de ZehirutApp.') + '</div>';
   else cuerpo = ({ lista: htmlFacLista, tipo: htmlFacTipo, carga: htmlFacCarga, form: htmlFacForm, detalle: htmlFacDetalle,
@@ -150,7 +150,7 @@ function htmlFacturas() {
 function atrasFacturas() {
   const f = estadoFac();
   if (f.vista === f.raiz) return false;
-  const antes = { carga: 'tipo', anticipo: 'tipo', pagoSF: 'tipo', detalle: f.raiz === 'pagos' ? 'pagos' : 'lista', comprobante: 'detalle', vincular: 'detalle', pagar: 'detalle' };
+  const antes = { carga: 'tipo', anticipo: 'tipo', pagoSF: 'tipo', detalle: f.raiz === 'pagos' ? 'pagos' : 'lista', comprobante: 'detalle', vincular: 'detalle', pagar: f.marca && f.marca.ids ? 'pagos' : 'detalle' };
   if (f.vista === 'form') {
     if (f.form && f.form.modo === 'editar') { f.vista = 'detalle'; render(); return true; }
     descartarCargaFac(); return true;
@@ -401,7 +401,7 @@ async function guardarFormFac() {
 // ---- facturas a pagar (las "Factura Crédito" con su vencimiento; ver Pagos.js de ZehirutApp)
 function estadoPag() {
   const f = estadoFac();
-  if (!f.pag) f.pag = { pagadas: false, res: null, cargando: false, error: '', abiertos: {} };
+  if (!f.pag) f.pag = { pagadas: false, res: null, cargando: false, error: '', abiertos: {}, sel: {} };
   return f.pag;
 }
 
@@ -438,6 +438,14 @@ function htmlFacPagos() {
     filas.length + (filas.length === 1 ? ' factura' : ' facturas') + ')</small>' +
     Object.keys(totales).map((m) => '<div class="monto-grande">' + fmtMonto(totales[m], m) + ' <small>' + esc(m) + '</small></div>').join('') + '</div>';
   h += provs.map((p) => htmlProveedorPago(p, g)).join('');
+  const elegidas = filas.filter((x) => g.sel[x.id]);
+  if (!g.pagadas && elegidas.length) {
+    const t = sumarPorMoneda(elegidas);
+    h += '<div class="barra-sel"><div><b>' + elegidas.length + (elegidas.length === 1 ? ' factura' : ' facturas') + '</b><br><small>' +
+      Object.keys(t).map((m) => fmtMonto(t[m], m) + ' ' + esc(m)).join(' · ') + '</small></div>' +
+      '<button class="btn sec chico" data-a="fac" data-x="pagSelLimpiar">Quitar</button>' +
+      '<button class="btn chico" data-a="fac" data-x="pagSelMarcar">✓ Marcar pagadas</button></div>';
+  }
   if (g.pagadas && g.res.total > filas.length) h += '<p class="vacio">Se muestran las últimas ' + filas.length + ' de ' + g.res.total + ' pagadas.</p>';
   return h;
 }
@@ -490,7 +498,10 @@ function htmlProveedorPago(p, g) {
     '<small style="display:block;margin-top:4px"><span class="chip ' + aviso[1] + '">' + esc(aviso[0]) + '</span></small></span>' +
     '<span class="num">' + Object.keys(tot).map((m) => fmtMonto(tot[m], m) + '<br><small style="font-weight:600;color:var(--gris)">' + esc(m) + '</small>').join('<br>') + '</span></button>';
   if (!abierto) return h;
-  const factura = (x) => {
+  const conCasilla = !g.pagadas && g.res.puedeMarcar;
+  const factura = (x) => (conCasilla ? '<div class="fila-check"><label class="check-fac" aria-label="Elegir para marcar pagada"><input type="checkbox" data-selpago="' +
+    esc(x.id) + '"' + (g.sel[x.id] ? ' checked' : '') + '></label>' + botonFactura(x) + '</div>' : botonFactura(x));
+  const botonFactura = (x) => {
     const [txt, cls] = g.pagadas ? ['Pagada' + (x.fechaPago ? ' el ' + x.fechaPago : '') + (x.pagadaCon ? ' · ' + x.pagadaCon : ''), 'verde'] : estadoVenc(x.dias);
     return '<button class="mov factura sub" data-a="fac" data-x="abrir" data-id="' + esc(x.id) + '"><span class="cuerpo"><b>' + esc(x.numeroFactura || '(sin número)') +
       '</b><small>' + esc(x.fecha) + ' · vence ' + esc(x.vencimiento || '—') + ' · ' + esc(String(x.usuario || '').split(' ')[0]) + '</small>' +
@@ -507,7 +518,9 @@ function htmlProveedorPago(p, g) {
     });
     return h + '<div class="prov-facturas">' + porFecha.map((q) => {
       const t = sumarPorMoneda(q.filas);
-      return '<div class="pago-fecha"><span>Pago del ' + esc(q.venc || '—') + '</span><span>' + Object.keys(t).map((m) => fmtMonto(t[m], m) + ' ' + esc(m)).join(' · ') + '</span></div>' +
+      const todas = q.filas.every((x) => g.sel[x.id]);
+      return '<div class="pago-fecha"><span>' + (conCasilla ? '<label class="check-grupo"><input type="checkbox" data-selgrupo="' + esc(q.filas.map((x) => x.id).join(',')) + '"' +
+        (todas ? ' checked' : '') + '> </label>' : '') + 'Pago del ' + esc(q.venc || '—') + '</span><span>' + Object.keys(t).map((m) => fmtMonto(t[m], m) + ' ' + esc(m)).join(' · ') + '</span></div>' +
         q.filas.map(factura).join('');
     }).join('') + '</div>';
   }
@@ -531,15 +544,24 @@ async function cargarPagosFac() {
 /** Formulario para marcar pagada la factura abierta: fecha de pago y con qué se pagó. */
 function htmlFacPagar() {
   const f = estadoFac();
-  const x = f.det && f.det.factura;
   const m = f.marca || (f.marca = { fecha: hoyISO(), forma: '' });
-  if (!x) return espera('Cargando…');
-  return '<div class="tarjeta"><b>' + esc(x.proveedor) + '</b><br><small>N° ' + esc(x.numeroFactura) + ' · vence ' + esc(x.vencimiento || '—') + '</small>' +
-    '<div class="monto-grande">' + fmtMonto(x.monto, x.moneda) + ' <small>' + esc(x.moneda) + '</small></div></div>' +
+  let cab;
+  if (m.ids) {
+    const t = sumarPorMoneda(m.facturas);
+    cab = '<div class="tarjeta"><b>' + m.facturas.length + ' facturas</b>' + m.facturas.map((x) => '<div class="item-det"><div>' + esc(x.proveedor) + '<br><small>N° ' +
+      esc(x.numeroFactura) + ' · vence ' + esc(x.vencimiento || '—') + '</small></div><div>' + fmtMonto(x.monto, x.moneda) + ' <small>' + esc(x.moneda) + '</small></div></div>').join('') +
+      Object.keys(t).map((k) => '<div class="monto-grande">' + fmtMonto(t[k], k) + ' <small>' + esc(k) + '</small></div>').join('') + '</div>';
+  } else {
+    const x = f.det && f.det.factura;
+    if (!x) return espera('Cargando…');
+    cab = '<div class="tarjeta"><b>' + esc(x.proveedor) + '</b><br><small>N° ' + esc(x.numeroFactura) + ' · vence ' + esc(x.vencimiento || '—') + '</small>' +
+      '<div class="monto-grande">' + fmtMonto(x.monto, x.moneda) + ' <small>' + esc(x.moneda) + '</small></div></div>';
+  }
+  return cab +
     '<div class="campo"><label for="fpag-fecha">Fecha de pago</label><input class="txt" type="date" id="fpag-fecha" value="' + esc(m.fecha) + '" max="' + hoyISO() + '"></div>' +
     '<div class="campo"><span class="etq">¿Cómo se pagó?</span><div class="opciones">' + FORMAS_PAGO_PAGOS.map((v) =>
       '<button class="' + (m.forma === v ? 'activo' : '') + '" data-a="fac" data-x="pagForma" data-v="' + esc(v) + '">' + esc(v) + '</button>').join('') + '</div></div>' +
-    '<button class="btn" data-a="fac" data-x="pagGuardar"' + (m.guardando ? ' disabled' : '') + '>' + (m.guardando ? rueda() + 'Guardando…' : '✓ Marcar pagada') + '</button>';
+    '<button class="btn" data-a="fac" data-x="pagGuardar"' + (m.guardando ? ' disabled' : '') + '>' + (m.guardando ? rueda() + 'Guardando…' : m.ids ? '✓ Marcar pagadas las ' + m.ids.length : '✓ Marcar pagada') + '</button>';
 }
 
 async function guardarPagoFac(pagada) {
@@ -552,7 +574,16 @@ async function guardarPagoFac(pagada) {
     m.guardando = true; render();
   }
   try {
-    await za('marcarFacturaPagada', ['__PIN__', f.detId, { pagada, fecha: pagada ? isoADdmm(m.fecha) : '', formaPago: pagada ? m.forma : '' }]);
+    const datosPago = { pagada, fecha: pagada ? isoADdmm(m.fecha) : '', formaPago: pagada ? m.forma : '' };
+    if (m.ids) {
+      await za('marcarFacturasPagadas', ['__PIN__', m.ids, datosPago]);
+      toast('✓ ' + m.ids.length + ' facturas marcadas como pagadas', 3000);
+      f.marca = null;
+      const g = estadoPag(); g.res = null; g.sel = {};
+      f.vista = 'pagos'; render(); window.scrollTo(0, 0);
+      return;
+    }
+    await za('marcarFacturaPagada', ['__PIN__', f.detId, datosPago]);
     toast(pagada ? '✓ Factura marcada como pagada' : 'Factura desmarcada: vuelve a pendientes', 3000);
     f.marca = null;
     if (f.pag) f.pag.res = null;   // la lista se vuelve a pedir al volver
@@ -862,7 +893,15 @@ async function accionFac(b) {
     return;
   }
   if (x === 'pagProv') { const g = estadoPag(); g.abiertos[b.dataset.k] = !g.abiertos[b.dataset.k]; render(); return; }
-  if (x === 'pagFiltro') { const g = estadoPag(); g.pagadas = b.dataset.v === 'true'; g.res = null; g.error = ''; render(); return; }
+  if (x === 'pagFiltro') { const g = estadoPag(); g.pagadas = b.dataset.v === 'true'; g.res = null; g.error = ''; g.sel = {}; render(); return; }
+  if (x === 'pagSelLimpiar') { estadoPag().sel = {}; render(); return; }
+  if (x === 'pagSelMarcar') {
+    const g = estadoPag();
+    const elegidas = g.res.filas.filter((r) => g.sel[r.id]);
+    f.marca = { ids: elegidas.map((r) => r.id), facturas: elegidas, fecha: hoyISO(), forma: '' };
+    f.vista = 'pagar'; render(); window.scrollTo(0, 0);
+    return;
+  }
   if (x === 'pagForma') { f.marca.fecha = ($('#fpag-fecha') || {}).value || f.marca.fecha; f.marca.forma = b.dataset.v; render(); return; }
   if (x === 'pagGuardar') { guardarPagoFac(true); return; }
   if (x === 'pagDesmarcar') {
@@ -1012,6 +1051,12 @@ function despuesDeRenderFac() {
   }
   const mes = $('#fac-mes');
   if (mes) mes.addEventListener('change', () => { estadoFac().mes = mes.value; cargarListaFac(true); });
+  document.querySelectorAll('[data-selpago]').forEach((c) => c.addEventListener('change', () => {
+    const g = estadoPag(); if (c.checked) g.sel[c.dataset.selpago] = true; else delete g.sel[c.dataset.selpago]; render();
+  }));
+  document.querySelectorAll('[data-selgrupo]').forEach((c) => c.addEventListener('change', () => {
+    const g = estadoPag(); c.dataset.selgrupo.split(',').forEach((id) => { if (c.checked) g.sel[id] = true; else delete g.sel[id]; }); render();
+  }));
   const albor = document.querySelector('[data-albor]');
   if (albor) albor.addEventListener('change', async () => {
     const f = estadoFac();

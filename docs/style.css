@@ -411,3 +411,11 @@ label.btn { text-align: center; cursor: pointer; }
 .prov-facturas { margin: -4px 0 12px 14px; padding-left: 10px; border-left: 3px solid var(--azul-claro); }
 .mov.sub { padding-top: 10px; padding-bottom: 10px; }
 .pago-fecha { display: flex; justify-content: space-between; gap: 8px; margin: 10px 0 6px; font-size: 14px; font-weight: 700; color: var(--azul); }
+/* Facturas a crédito: casilla para marcar varias pagadas y barra de abajo con lo tildado */
+.fila-check { display: flex; align-items: center; gap: 6px; }
+.fila-check .mov { flex: 1; min-width: 0; }
+.check-fac { display: flex; align-items: center; justify-content: center; width: 40px; min-height: 48px; margin-bottom: 8px; }
+.check-fac input, .check-grupo input { width: 24px; height: 24px; accent-color: var(--azul); }
+.check-grupo { display: inline-flex; vertical-align: middle; margin-right: 6px; }
+.barra-sel { position: sticky; bottom: 0; display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 12px; box-shadow: var(--sombra); padding: 10px 12px; margin-top: 12px; }
+.barra-sel > div { flex: 1; }
