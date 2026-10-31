@@ -319,7 +319,7 @@ acceso total.
   entrada (tipo | lista): la flecha vuelve ahí y después al grupo; al guardar se vuelve a la raíz.
 
 - No se copia la lógica: el script usa **ZehirutApp como biblioteca** (símbolo `ZA`, versión fija en
-  `appsscript.json`, hoy 147). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
+  `appsscript.json`, hoy 148). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
   salen de la hoja Usuarios de ESTE Sheet (ver "Una sola planilla de usuarios"). La web de ZehirutApp quedó
   apagada (v137: solo muestra un botón a Registros); el proyecto sigue como biblioteca y para el mail diario.
   v138 (01/10): sin Index.html ni Combustible.js; la planilla vieja de usuarios y la hoja "Combustible
@@ -368,8 +368,8 @@ acceso total.
   **Mail de vencimientos (v1.25.0, ZA 147, `ZehirutApp/AvisoVencimientos.js`):** aparte del mail de facturas cargadas
   (que ya no lleva vencimientos), solo a quien tiene la casilla **"Aviso vencimientos"** en Usuarios (esquema 24: solo
   Enrique). Sale cuando una factura pendiente entra en los 7 días antes de vencer (una vez por fecha de vencimiento,
-  propiedad AVISO_VENC_FECHAS de la biblioteca; si un día no corrió, sale al siguiente); arriba lo que vence, abajo
-  todo lo pendiente por proveedor y las vencidas. Lo dispara avisoFacturasDiario_ (primer doPost desde las 8). Limpieza
+  propiedad AVISO_VENC_FECHAS de la biblioteca; si un día no corrió, sale al siguiente); arriba el total pendiente y las vencidas, después lo que vence, abajo
+  todo lo pendiente por proveedor (sin saludo ni botón, v1.25.1). Lo dispara avisoFacturasDiario_ (primer doPost desde las 8). Limpieza
   inicial: `ZA.marcarPagadasAnterioresA(fecha)` = vencidas antes de esa fecha quedan pagadas con "Carga inicial". **Hecho 31/10/2026 (v1.22.1,
   marcarPagadasViejas_, propiedad PAGOS_CORTE):** corte = vencidas antes del 31/10/2026 → 51 de 87 quedaron pagadas.
   **Crédito por mes (31/10/2026, v1.22.2, ZA 144):** Chaco Poty SACI cobra lo facturado en un mes el **5 del mes +2**
