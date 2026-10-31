@@ -401,7 +401,7 @@ async function guardarFormFac() {
 // ---- facturas a pagar (las "Factura Crédito" con su vencimiento; ver Pagos.js de ZehirutApp)
 function estadoPag() {
   const f = estadoFac();
-  if (!f.pag) f.pag = { pagadas: false, res: null, cargando: false, error: '', abiertos: {}, sel: {} };
+  if (!f.pag) f.pag = { pagadas: false, res: null, cargando: false, error: '', abiertos: {}, cerrados: {}, sel: {} };
   return f.pag;
 }
 
@@ -437,6 +437,7 @@ function htmlFacPagos() {
   h += '<div class="tarjeta"><b>' + (g.pagadas ? 'Total pagado' : 'Total a pagar') + '</b> <small>(' + provs.length + (provs.length === 1 ? ' proveedor · ' : ' proveedores · ') +
     filas.length + (filas.length === 1 ? ' factura' : ' facturas') + ')</small>' +
     Object.keys(totales).map((m) => '<div class="monto-grande">' + fmtMonto(totales[m], m) + ' <small>' + esc(m) + '</small></div>').join('') + '</div>';
+  if (!g.pagadas && g.res.puedeMarcar) h += '<p class="ayuda-sel">Tildá las facturas que pagaste (o el proveedor entero) y tocá <b>✓ Marcar pagadas</b> abajo.</p>';
   h += provs.map((p) => htmlProveedorPago(p, g)).join('');
   const elegidas = filas.filter((x) => g.sel[x.id]);
   if (!g.pagadas && elegidas.length) {
@@ -479,7 +480,9 @@ function agruparPorProveedor(filas, pagadas) {
 }
 
 function htmlProveedorPago(p, g) {
-  const abierto = !!g.abiertos[p.clave];
+  // Pendientes: abiertos salvo que se cierren (para tildar sin entrar a nada). Pagadas: cerrados salvo que se abran.
+  const abierto = g.pagadas ? !!g.abiertos[p.clave] : !g.cerrados[p.clave];
+  const conCasilla = !g.pagadas && g.res.puedeMarcar;
   const tot = sumarPorMoneda(p.filas);
   const n = p.filas.length;
   let aviso;
@@ -497,8 +500,13 @@ function htmlProveedorPago(p, g) {
     '<span class="cuerpo"><b>' + (abierto ? '▾ ' : '▸ ') + esc(p.nombre) + '</b><small>' + n + (n === 1 ? ' factura' : ' facturas') + '</small>' +
     '<small style="display:block;margin-top:4px"><span class="chip ' + aviso[1] + '">' + esc(aviso[0]) + '</span></small></span>' +
     '<span class="num">' + Object.keys(tot).map((m) => fmtMonto(tot[m], m) + '<br><small style="font-weight:600;color:var(--gris)">' + esc(m) + '</small>').join('<br>') + '</span></button>';
+  // Casilla del proveedor: tilda o destilda todas sus facturas pendientes.
+  if (conCasilla) {
+    const todas = p.filas.every((x) => g.sel[x.id]);
+    h = '<div class="fila-check"><label class="check-fac" aria-label="Elegir todas las facturas de este proveedor"><input type="checkbox" data-selgrupo="' +
+      esc(p.filas.map((x) => x.id).join(',')) + '"' + (todas ? ' checked' : '') + '></label>' + h + '</div>';
+  }
   if (!abierto) return h;
-  const conCasilla = !g.pagadas && g.res.puedeMarcar;
   const factura = (x) => (conCasilla ? '<div class="fila-check"><label class="check-fac" aria-label="Elegir para marcar pagada"><input type="checkbox" data-selpago="' +
     esc(x.id) + '"' + (g.sel[x.id] ? ' checked' : '') + '></label>' + botonFactura(x) + '</div>' : botonFactura(x));
   const botonFactura = (x) => {
@@ -892,7 +900,11 @@ async function accionFac(b) {
     catch (e) { toast('No se pudo: ' + e.message, 4000); }
     return;
   }
-  if (x === 'pagProv') { const g = estadoPag(); g.abiertos[b.dataset.k] = !g.abiertos[b.dataset.k]; render(); return; }
+  if (x === 'pagProv') {
+    const g = estadoPag(); const k = b.dataset.k;
+    if (g.pagadas) g.abiertos[k] = !g.abiertos[k]; else g.cerrados[k] = !g.cerrados[k];
+    render(); return;
+  }
   if (x === 'pagFiltro') { const g = estadoPag(); g.pagadas = b.dataset.v === 'true'; g.res = null; g.error = ''; g.sel = {}; render(); return; }
   if (x === 'pagSelLimpiar') { estadoPag().sel = {}; render(); return; }
   if (x === 'pagSelMarcar') {

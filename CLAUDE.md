@@ -357,7 +357,9 @@ acceso total.
   despliega con sus facturas; los de crédito por mes (creditoPorMes) muestran sus facturas por "Pago del DD/MM" con
   subtotal. Pagadas: también por proveedor, el último pagado primero. **Varias juntas (v1.24.0, ZA 146):** quien marca pagos ve una
   casilla al lado de cada factura pendiente (y "todas" en cada "Pago del"); con alguna tildada aparece abajo la barra
-  "✓ Marcar pagadas" → una fecha y forma de pago para todas (ZA.marcarFacturasPagadas, todo o nada). Ve la lista quien ve facturas; con "Propias" (Osmar) solo las suyas. **Marca
+  "✓ Marcar pagadas" → una fecha y forma de pago para todas (ZA.marcarFacturasPagadas, todo o nada). v1.24.1: en Pendientes los proveedores
+  arrancan **abiertos** (casillas a la vista sin tocar nada; se pueden cerrar) y cada proveedor tiene su casilla para
+  tildar todas sus facturas (antes, cerrados: el usuario no encontraba las casillas). Ve la lista quien ve facturas; con "Propias" (Osmar) solo las suyas. **Marca
   pagada** (fecha + cómo se pagó) o desmarca solo quien tiene la casilla **"Marca pagos"** en Usuarios (esquema 23:
   Enrique, Natalia, Raquel; nunca con Propias); se hace desde el detalle de la factura, y al subir una transferencia
   o recibo a una factura a crédito pendiente la app ofrece marcarla. Columnas nuevas en Facturas (24-28):

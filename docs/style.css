@@ -419,3 +419,4 @@ label.btn { text-align: center; cursor: pointer; }
 .check-grupo { display: inline-flex; vertical-align: middle; margin-right: 6px; }
 .barra-sel { position: sticky; bottom: 0; display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 12px; box-shadow: var(--sombra); padding: 10px 12px; margin-top: 12px; }
 .barra-sel > div { flex: 1; }
+.ayuda-sel { margin: 4px 2px 12px; font-size: 14px; color: var(--gris); }
