@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '23';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '24';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
@@ -245,6 +245,7 @@ function configurar() {
   principioBuserelina_(ss, ins);
   agregarTrabajos_(ss, 'TRABAJOS_V10', ['Aserraje', 'Trabajos de limpieza']);
   asegurarMarcaPagos_(ss, usu);
+  asegurarAvisoVencimientos_(ss, usu);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
   [stock, mov, ins, des, usu, reg].forEach((h, i) => { ss.setActiveSheet(h); ss.moveActiveSheet(i + 1); });
@@ -569,6 +570,28 @@ function asegurarMarcaPagos_(ss, usu) {
       registrar_(ss, [[new Date(), 'Sistema', 'Facturas a pagar', 'No se pudieron completar los vencimientos: ' + e, 'Error', '']]);
     }
   }
+}
+
+/** Esquema 24 (31/10/2026): casilla "Aviso vencimientos" en Usuarios = quién recibe el mail de facturas a crédito
+ *  por vencer (ZA.avisarVencimientos). Pedido del usuario: solo Enrique. Resultado en Registro. */
+function asegurarAvisoVencimientos_(ss, usu) {
+  const ancho = usu.getLastColumn();
+  const enc = usu.getRange(1, 1, 1, ancho).getValues()[0].map(String);
+  let col = enc.indexOf('Aviso vencimientos') + 1;
+  if (!col) {
+    col = ancho + 1;
+    usu.getRange(1, col).setValue('Aviso vencimientos').setFontWeight('bold').setBackground('#eeeeee');
+    const n = usu.getLastRow();
+    if (n > 1) {
+      const filas = usu.getRange(2, 1, n - 1, ancho).getValues();
+      const iMail = enc.indexOf('Email');
+      const marcados = filas.map((f) => [String(f[0]).trim() === 'Enrique Delfante']);
+      usu.getRange(2, col, n - 1, 1).setValues(marcados);
+      const quienes = filas.filter((f, i) => marcados[i][0]).map((f) => String(f[0]).trim() + ' (' + (String(f[iMail] || '').trim() ? 'con email' : 'SIN email') + ')');
+      registrar_(ss, [[new Date(), 'Sistema', 'Aviso vencimientos', 'Casilla tildada para: ' + (quienes.join(', ') || 'nadie'), 'Aplicado', '']]);
+    }
+  }
+  usu.getRange(2, col, 200, 1).insertCheckboxes();
 }
 
 /** Agrega un nombre de Tapfeed a un insumo (sin borrar los que ya tiene), si todavía no lo tiene. */
@@ -2105,5 +2128,13 @@ function avisoFacturasDiario_() {
   } catch (e) {   // nunca frena la app
     try { registrar_(SpreadsheetApp.getActive(), [[new Date(), 'Sistema', 'Mail diario de facturas', String(e), 'Error', '']]); }
     catch (e2) { console.error('Aviso de facturas: ' + e); }
+  }
+  // Facturas a crédito por vencer (31/10/2026): otro mail, solo a quien tiene "Aviso vencimientos".
+  try {
+    const r = ZA.avisarVencimientos();
+    if (/^enviado/.test(r)) registrar_(SpreadsheetApp.getActive(), [[new Date(), 'Sistema', 'Aviso vencimientos', r, 'Aplicado', '']]);
+  } catch (e) {
+    try { registrar_(SpreadsheetApp.getActive(), [[new Date(), 'Sistema', 'Aviso vencimientos', String(e), 'Error', '']]); }
+    catch (e2) { console.error('Aviso vencimientos: ' + e); }
   }
 }

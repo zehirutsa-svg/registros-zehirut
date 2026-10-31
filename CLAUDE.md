@@ -319,7 +319,7 @@ acceso total.
   entrada (tipo | lista): la flecha vuelve ahí y después al grupo; al guardar se vuelve a la raíz.
 
 - No se copia la lógica: el script usa **ZehirutApp como biblioteca** (símbolo `ZA`, versión fija en
-  `appsscript.json`, hoy 146). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
+  `appsscript.json`, hoy 147). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
   salen de la hoja Usuarios de ESTE Sheet (ver "Una sola planilla de usuarios"). La web de ZehirutApp quedó
   apagada (v137: solo muestra un botón a Registros); el proyecto sigue como biblioteca y para el mail diario.
   v138 (01/10): sin Index.html ni Combustible.js; la planilla vieja de usuarios y la hoja "Combustible
@@ -365,9 +365,12 @@ acceso total.
   o recibo a una factura a crédito pendiente la app ofrece marcarla. Columnas nuevas en Facturas (24-28):
   Vencimiento, Pagada, Fecha de pago, Pagada con, Pagada por → salen solas en el Excel de Ver facturas. El evento del
   calendario se renombra "✓ PAGADA - …" (sin recordatorios) y se mueve si se corrige fecha/días (se busca por título).
-  Mail diario: grilla "Facturas a pagar (vencidas y próximos 7 días)" arriba; sale aunque no haya facturas nuevas,
-  pero recién después de la limpieza inicial (`ZA.marcarPagadasAnterioresA(fecha)` = vencidas antes de esa fecha
-  quedan pagadas con "Carga inicial", y prende la propiedad PAGOS_AVISO_ACTIVO de la biblioteca). **Hecho 31/10/2026 (v1.22.1,
+  **Mail de vencimientos (v1.25.0, ZA 147, `ZehirutApp/AvisoVencimientos.js`):** aparte del mail de facturas cargadas
+  (que ya no lleva vencimientos), solo a quien tiene la casilla **"Aviso vencimientos"** en Usuarios (esquema 24: solo
+  Enrique). Sale cuando una factura pendiente entra en los 7 días antes de vencer (una vez por fecha de vencimiento,
+  propiedad AVISO_VENC_FECHAS de la biblioteca; si un día no corrió, sale al siguiente); arriba lo que vence, abajo
+  todo lo pendiente por proveedor y las vencidas. Lo dispara avisoFacturasDiario_ (primer doPost desde las 8). Limpieza
+  inicial: `ZA.marcarPagadasAnterioresA(fecha)` = vencidas antes de esa fecha quedan pagadas con "Carga inicial". **Hecho 31/10/2026 (v1.22.1,
   marcarPagadasViejas_, propiedad PAGOS_CORTE):** corte = vencidas antes del 31/10/2026 → 51 de 87 quedaron pagadas.
   **Crédito por mes (31/10/2026, v1.22.2, ZA 144):** Chaco Poty SACI cobra lo facturado en un mes el **5 del mes +2**
   (enero → 5/3), sin importar los días de crédito; se reconoce por el nombre (REGLAS_VENCIMIENTO_PROVEEDOR en

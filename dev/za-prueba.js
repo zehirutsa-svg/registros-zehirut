@@ -156,6 +156,7 @@ module.exports = function crearZA() {
     // Arreglos de una sola vez que corre Registros (en la prueba no hacen nada).
     completarColumnasPago: () => '0 facturas a crédito completadas',
     marcarPagadasAnterioresA: () => '0 facturas marcadas como pagadas',
+    avisarVencimientos: () => 'nada nuevo por vencer',
     recalcularVencimientosProveedores: () => '0 vencimientos recalculados, 0 vueltas a pendientes',
     marcarFacturasPagadas(pin, ids, d) {
       const s = sesion(pin);
