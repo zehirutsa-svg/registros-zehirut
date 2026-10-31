@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '27';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '28';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
@@ -249,6 +249,7 @@ function configurar() {
   avisoVencimientosSoloUno_(ss, usu);
   marcaPagosSinDonEnrique_(ss, usu);
   renombrarQuique_(ss, usu);
+  avisoVencimientosTres_(ss, usu);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
   [stock, mov, ins, des, usu, reg].forEach((h, i) => { ss.setActiveSheet(h); ss.moveActiveSheet(i + 1); });
@@ -651,6 +652,24 @@ function renombrarQuique_(ss, usu) {
   if (filas.length === 1) { usu.getRange(filas[0], 1).setValue('Quique Delfante'); r = 'fila ' + filas[0] + ': Enrique Delfante → Quique Delfante'; }
   registrar_(ss, [[new Date(), 'Sistema', 'Usuarios', r, filas.length === 1 ? 'Aplicado' : 'Error', '']]);
   props_().setProperty('RENOMBRE_QUIQUE', r);
+}
+
+/** Esquema 28 (31/10/2026, OK del usuario): el aviso de vencimientos les llega a Quique, Enrique (su papá) y Natalia.
+ *  Se tilda "Aviso vencimientos" en las filas Enrique Delfante y Natalia Fernández. Una sola vez; resultado en Registro. */
+function avisoVencimientosTres_(ss, usu) {
+  if (props_().getProperty('AVISO_VENC_TRES')) return;
+  const valores = usu.getDataRange().getValues();
+  const iAv = valores[0].map(String).indexOf('Aviso vencimientos');
+  if (iAv === -1) return;
+  const tildados = [];
+  valores.forEach((f, i) => {
+    const nombre = String(f[0]).trim();
+    if (i === 0 || ['Enrique Delfante', 'Natalia Fernández'].indexOf(nombre) === -1) return;
+    usu.getRange(i + 1, iAv + 1).setValue(true);
+    tildados.push(nombre);
+  });
+  registrar_(ss, [[new Date(), 'Sistema', 'Aviso vencimientos', 'Tildado para: ' + (tildados.join(', ') || 'nadie'), 'Aplicado', '']]);
+  props_().setProperty('AVISO_VENC_TRES', tildados.join(', ') || 'nadie');
 }
 
 /** Agrega un nombre de Tapfeed a un insumo (sin borrar los que ya tiene), si todavía no lo tiene. */
