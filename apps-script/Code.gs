@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '25';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '26';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
@@ -247,6 +247,7 @@ function configurar() {
   asegurarMarcaPagos_(ss, usu);
   asegurarAvisoVencimientos_(ss, usu);
   avisoVencimientosSoloUno_(ss, usu);
+  marcaPagosSinDonEnrique_(ss, usu);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
   [stock, mov, ins, des, usu, reg].forEach((h, i) => { ss.setActiveSheet(h); ss.moveActiveSheet(i + 1); });
@@ -612,6 +613,25 @@ function avisoVencimientosSoloUno_(ss, usu) {
   });
   registrar_(ss, [[new Date(), 'Sistema', 'Aviso vencimientos', 'Destildado en: ' + (quitados.join(', ') || 'nadie'), 'Aplicado', '']]);
   props_().setProperty('AVISO_VENC_UNO', quitados.join(', ') || 'nadie');
+}
+
+/** Esquema 26 (31/10/2026): hay dos usuarios "Enrique Delfante": el usuario de la app (Quique, Facturas = Administrar)
+ *  y su papá (Facturas = Ver). Marca pagos se había tildado por nombre en los dos; marcan pagos solo Quique, Natalia y
+ *  Raquel. Se destilda en la fila con Facturas = Ver. Una sola vez; el resultado va a Registro. */
+function marcaPagosSinDonEnrique_(ss, usu) {
+  if (props_().getProperty('MARCA_PAGOS_UNO')) return;
+  const valores = usu.getDataRange().getValues();
+  const enc = valores[0].map(String);
+  const iMp = enc.indexOf('Marca pagos'), iFac = enc.indexOf('Facturas');
+  if (iMp === -1) return;
+  const quitados = [];
+  valores.forEach((f, i) => {
+    if (i === 0 || f[iMp] !== true || String(f[0]).trim() !== 'Enrique Delfante' || String(f[iFac]).trim() === 'Administrar') return;
+    usu.getRange(i + 1, iMp + 1).setValue(false);
+    quitados.push(String(f[0]).trim() + ' (Facturas: ' + (String(f[iFac]).trim() || 'sin permiso') + ')');
+  });
+  registrar_(ss, [[new Date(), 'Sistema', 'Marca pagos', 'Destildado en: ' + (quitados.join(', ') || 'nadie'), 'Aplicado', '']]);
+  props_().setProperty('MARCA_PAGOS_UNO', quitados.join(', ') || 'nadie');
 }
 
 /** Agrega un nombre de Tapfeed a un insumo (sin borrar los que ya tiene), si todavía no lo tiene. */

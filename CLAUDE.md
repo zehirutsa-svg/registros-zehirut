@@ -380,7 +380,11 @@ acceso total.
 
 ## Usuarios (inicio)
 
-- **Enrique Delfante**: todo.
+- **Ojo: hay DOS usuarios "Enrique Delfante"** (31/10/2026): el que usa y pide cambios en la app es **Quique**
+  (Gmail, todo en Administrar, Configurar) y el otro es **su papá, Don Enrique** (correo laprudencia.com.py, todo en Ver,
+  recibe el mail diario de facturas cargadas). Nunca tildar algo "para Enrique" por nombre: usar la fila con
+  Facturas = Administrar (esquemas 25 y 26 corrigieron Aviso vencimientos y Marca pagos tildados en las dos).
+- **Enrique Delfante (Quique)**: todo.
 - **Configurar** (casilla en Usuarios): editar listas de insumos y destinos. Solo Enrique (pedido 28/09).
 - **Osmar Acosta**: todos los registros (stocks, lluvias, combustible, fondo fijo) con las mismas
   limitaciones que tiene en ZehirutApp para facturas (ver solo las propias, no eliminar).
