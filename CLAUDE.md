@@ -319,7 +319,7 @@ acceso total.
   entrada (tipo | lista): la flecha vuelve ahí y después al grupo; al guardar se vuelve a la raíz.
 
 - No se copia la lógica: el script usa **ZehirutApp como biblioteca** (símbolo `ZA`, versión fija en
-  `appsscript.json`, hoy 143). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
+  `appsscript.json`, hoy 144). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
   salen de la hoja Usuarios de ESTE Sheet (ver "Una sola planilla de usuarios"). La web de ZehirutApp quedó
   apagada (v137: solo muestra un botón a Registros); el proyecto sigue como biblioteca y para el mail diario.
   v138 (01/10): sin Index.html ni Combustible.js; la planilla vieja de usuarios y la hoja "Combustible
@@ -361,6 +361,10 @@ acceso total.
   pero recién después de la limpieza inicial (`ZA.marcarPagadasAnterioresA(fecha)` = vencidas antes de esa fecha
   quedan pagadas con "Carga inicial", y prende la propiedad PAGOS_AVISO_ACTIVO de la biblioteca). **Hecho 31/10/2026 (v1.22.1,
   marcarPagadasViejas_, propiedad PAGOS_CORTE):** corte = vencidas antes del 31/10/2026 → 51 de 87 quedaron pagadas.
+  **Crédito por mes (31/10/2026, v1.22.2, ZA 144):** Chaco Poty SACI cobra lo facturado en un mes el **5 del mes +2**
+  (enero → 5/3), sin importar los días de crédito; se reconoce por el nombre (REGLAS_VENCIMIENTO_PROVEEDOR en
+  ZehirutApp/Calendario.js; otro proveedor así = agregar una línea + ZA.recalcularVencimientosProveedores). Una vez
+  (recalcularVencChaco_, propiedad VENC_CHACO): 43 vencimientos recalculados, 8 "Carga inicial" volvieron a pendientes.
 
 ## Usuarios (inicio)
 

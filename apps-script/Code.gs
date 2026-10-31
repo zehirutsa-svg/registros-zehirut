@@ -629,7 +629,7 @@ function doGet() {
   papeleraInformesViejos_();
   limpiarReemplazosTapfeed_(SpreadsheetApp.getActive());
   publicarDatosInforme_(SpreadsheetApp.getActive());
-  const pagos = marcarPagadasViejas_();
+  const pagos = marcarPagadasViejas_() + recalcularVencChaco_();
   const url = SpreadsheetApp.getActive().getUrl();
   return HtmlService.createHtmlOutput(
     '<div style="font-family:sans-serif;font-size:20px;padding:24px">' +
@@ -2071,6 +2071,21 @@ function marcarPagadasViejas_() {
     r = ZA.marcarPagadasAnterioresA('31/10/2026');
     registrar_(SpreadsheetApp.getActive(), [[new Date(), 'Sistema', 'Facturas a pagar', r, 'Aplicado', '']]);
     props_().setProperty('PAGOS_CORTE', r);
+  });
+  return r;
+}
+
+/** 31/10/2026, pedido del usuario: Chaco Poty SACI cobra lo facturado en un mes el 5 del mes +2 (regla en
+ *  ZA, REGLAS_VENCIMIENTO_PROVEEDOR). Recalcula una vez sus facturas ya cargadas; las que la limpieza inicial dio por
+ *  pagadas y todavía no vencen vuelven a pendientes. Corre una sola vez; el resultado va a Registro. */
+function recalcularVencChaco_() {
+  if (props_().getProperty('VENC_CHACO')) return '';
+  let r = '';
+  conLock_(() => {
+    if (props_().getProperty('VENC_CHACO')) return;
+    r = 'Chaco Poty: ' + ZA.recalcularVencimientosProveedores('31/10/2026');
+    registrar_(SpreadsheetApp.getActive(), [[new Date(), 'Sistema', 'Facturas a pagar', r, 'Aplicado', '']]);
+    props_().setProperty('VENC_CHACO', r);
   });
   return r;
 }
