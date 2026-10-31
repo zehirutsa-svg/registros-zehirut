@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '26';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '27';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
@@ -248,6 +248,7 @@ function configurar() {
   asegurarAvisoVencimientos_(ss, usu);
   avisoVencimientosSoloUno_(ss, usu);
   marcaPagosSinDonEnrique_(ss, usu);
+  renombrarQuique_(ss, usu);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
   [stock, mov, ins, des, usu, reg].forEach((h, i) => { ss.setActiveSheet(h); ss.moveActiveSheet(i + 1); });
@@ -632,6 +633,24 @@ function marcaPagosSinDonEnrique_(ss, usu) {
   });
   registrar_(ss, [[new Date(), 'Sistema', 'Marca pagos', 'Destildado en: ' + (quitados.join(', ') || 'nadie'), 'Aplicado', '']]);
   props_().setProperty('MARCA_PAGOS_UNO', quitados.join(', ') || 'nadie');
+}
+
+/** Esquema 27 (31/10/2026, pedido del usuario): la fila "Enrique Delfante" de Quique (Facturas = Administrar, con
+ *  Configurar) pasa a llamarse "Quique Delfante", para no confundirla con la de su papá. Lo ya cargado sigue con el
+ *  nombre viejo. Una sola vez; el resultado va a Registro. */
+function renombrarQuique_(ss, usu) {
+  if (props_().getProperty('RENOMBRE_QUIQUE')) return;
+  const valores = usu.getDataRange().getValues();
+  const enc = valores[0].map(String);
+  const iFac = enc.indexOf('Facturas'), iConf = enc.indexOf('Configurar');
+  const filas = [];
+  valores.forEach((f, i) => {
+    if (i > 0 && String(f[0]).trim() === 'Enrique Delfante' && String(f[iFac]).trim() === 'Administrar' && f[iConf] === true) filas.push(i + 1);
+  });
+  let r = 'no se encontró la fila (' + filas.length + ')';
+  if (filas.length === 1) { usu.getRange(filas[0], 1).setValue('Quique Delfante'); r = 'fila ' + filas[0] + ': Enrique Delfante → Quique Delfante'; }
+  registrar_(ss, [[new Date(), 'Sistema', 'Usuarios', r, filas.length === 1 ? 'Aplicado' : 'Error', '']]);
+  props_().setProperty('RENOMBRE_QUIQUE', r);
 }
 
 /** Agrega un nombre de Tapfeed a un insumo (sin borrar los que ya tiene), si todavía no lo tiene. */
