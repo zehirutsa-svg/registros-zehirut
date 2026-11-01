@@ -25,7 +25,7 @@
  */
 
 const ZONA = 'America/Asuncion';
-const ESQUEMA = '28';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
+const ESQUEMA = '29';   // subir cuando cambien hojas: la próxima llamada vuelve a preparar todo
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
 
 const MODULOS = ['Stock', 'Lluvias', 'Facturas', 'Combustible', 'Fondo fijo', 'Sanidad'];
@@ -250,6 +250,7 @@ function configurar() {
   marcaPagosSinDonEnrique_(ss, usu);
   renombrarQuique_(ss, usu);
   avisoVencimientosTres_(ss, usu);
+  asegurarVeTambienProveedor_(ss, usu);
   ins.getRange(2, 5, 200, 1).insertCheckboxes();
   des.getRange(2, 2, 200, 1).insertCheckboxes();
   [stock, mov, ins, des, usu, reg].forEach((h, i) => { ss.setActiveSheet(h); ss.moveActiveSheet(i + 1); });
@@ -670,6 +671,28 @@ function avisoVencimientosTres_(ss, usu) {
   });
   registrar_(ss, [[new Date(), 'Sistema', 'Aviso vencimientos', 'Tildado para: ' + (tildados.join(', ') || 'nadie'), 'Aplicado', '']]);
   props_().setProperty('AVISO_VENC_TRES', tildados.join(', ') || 'nadie');
+}
+
+/** Esquema 29 (01/11/2026, pedido del usuario): columna "Ve también proveedor" en Usuarios. Con Facturas = Propias,
+ *  además de las suyas ve las facturas de esos proveedores (texto, varios separados por coma; sin importar mayúsculas
+ *  ni espacios) y les adjunta comprobantes; la regla está en ZA.facturaVisiblePara. Al crearla: CHACO POTY para Osmar. */
+function asegurarVeTambienProveedor_(ss, usu) {
+  const ancho = usu.getLastColumn();
+  const enc = usu.getRange(1, 1, 1, ancho).getValues()[0].map(String);
+  if (enc.indexOf('Ve también proveedor') !== -1) return;
+  const col = ancho + 1;
+  usu.getRange(1, col).setValue('Ve también proveedor').setFontWeight('bold').setBackground('#eeeeee');
+  const n = usu.getLastRow();
+  const puestos = [];
+  if (n > 1) {
+    const filas = usu.getRange(2, 1, n - 1, 1).getValues();
+    usu.getRange(2, col, n - 1, 1).setValues(filas.map((f) => {
+      if (String(f[0]).trim() !== 'Osmar Acosta') return [''];
+      puestos.push('Osmar Acosta');
+      return ['CHACO POTY'];
+    }));
+  }
+  registrar_(ss, [[new Date(), 'Sistema', 'Usuarios', 'Ve también proveedor = CHACO POTY para: ' + (puestos.join(', ') || 'nadie'), 'Aplicado', '']]);
 }
 
 /** Agrega un nombre de Tapfeed a un insumo (sin borrar los que ya tiene), si todavía no lo tiene. */

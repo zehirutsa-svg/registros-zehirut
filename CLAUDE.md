@@ -319,7 +319,7 @@ acceso total.
   entrada (tipo | lista): la flecha vuelve ahí y después al grupo; al guardar se vuelve a la raíz.
 
 - No se copia la lógica: el script usa **ZehirutApp como biblioteca** (símbolo `ZA`, versión fija en
-  `appsscript.json`, hoy 148). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
+  `appsscript.json`, hoy 149). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
   salen de la hoja Usuarios de ESTE Sheet (ver "Una sola planilla de usuarios"). La web de ZehirutApp quedó
   apagada (v137: solo muestra un botón a Registros); el proyecto sigue como biblioteca y para el mail diario.
   v138 (01/10): sin Index.html ni Combustible.js; la planilla vieja de usuarios y la hoja "Combustible
@@ -389,6 +389,13 @@ acceso total.
 - **Configurar** (casilla en Usuarios): editar listas de insumos y destinos. Solo Enrique (pedido 28/09).
 - **Osmar Acosta**: todos los registros (stocks, lluvias, combustible, fondo fijo) con las mismas
   limitaciones que tiene en ZehirutApp para facturas (ver solo las propias, no eliminar).
+- **Regla de "Propias" + columna "Ve también proveedor" (01/11/2026, v1.25.6, ZA 149, esquema 29):** con Facturas =
+  Propias, la persona ve una factura si **la cargó ella O si el proveedor está en su "Ve también proveedor"** (texto en
+  Usuarios, varios separados por coma; se compara sin tildes, mayúsculas ni espacios, así "CHACO POTY" vale para
+  "Chaco Poty SACI"). Vale para todo: Ver facturas, detalle, buscar, Excel, Facturas a crédito, comprobantes del mismo
+  proveedor, Albor y **adjuntar NC/recibos/transferencias** (procesarComprobanteAsociado). Sigue sin poder eliminar ni
+  marcar pagadas. Una sola función: `facturaVisiblePara(sesion, fila)` en `ZehirutApp/Usuarios.js` (no repetir el
+  chequeo en otro lado). Osmar: CHACO POTY. Otro proveedor = escribirlo en la hoja, sin tocar código.
 - PINs: nunca en el código (el repo de GitHub es público); viven en la planilla.
 
 Referencia de grupos y dietas: `Zehirut S.A\CONFINAMIENTO 2026\Dietas y otros\Proyeccion_comida_60_dias.xlsx`.
