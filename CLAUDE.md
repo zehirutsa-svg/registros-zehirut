@@ -319,7 +319,7 @@ acceso total.
   entrada (tipo | lista): la flecha vuelve ahí y después al grupo; al guardar se vuelve a la raíz.
 
 - No se copia la lógica: el script usa **ZehirutApp como biblioteca** (símbolo `ZA`, versión fija en
-  `appsscript.json`, hoy 149). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
+  `appsscript.json`, hoy 150). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
   salen de la hoja Usuarios de ESTE Sheet (ver "Una sola planilla de usuarios"). La web de ZehirutApp quedó
   apagada (v137: solo muestra un botón a Registros); el proyecto sigue como biblioteca y para el mail diario.
   v138 (01/10): sin Index.html ni Combustible.js; la planilla vieja de usuarios y la hoja "Combustible
@@ -393,8 +393,9 @@ acceso total.
   Propias, la persona ve una factura si **la cargó ella O si el proveedor está en su "Ve también proveedor"** (texto en
   Usuarios, varios separados por coma; se compara sin tildes, mayúsculas ni espacios, así "CHACO POTY" vale para
   "Chaco Poty SACI"). Vale para todo: Ver facturas, detalle, buscar, Excel, Facturas a crédito, comprobantes del mismo
-  proveedor, Albor y **adjuntar NC/recibos/transferencias** (procesarComprobanteAsociado). Sigue sin poder eliminar ni
-  marcar pagadas. Una sola función: `facturaVisiblePara(sesion, fila)` en `ZehirutApp/Usuarios.js` (no repetir el
+  proveedor, Albor, **adjuntar NC/recibos/transferencias** (procesarComprobanteAsociado) y vincular anticipos. Sigue sin
+  poder eliminar ni marcar pagadas, y **"Corregir datos" solo en lo que cargó ella** (v1.25.7, ZA 150:
+  facturaCorregiblePara; el detalle trae `puedeCorregir` y la app oculta el botón). Una sola función: `facturaVisiblePara(sesion, fila)` en `ZehirutApp/Usuarios.js` (no repetir el
   chequeo en otro lado). Osmar: CHACO POTY. Otro proveedor = escribirlo en la hoja, sin tocar código.
 - PINs: nunca en el código (el repo de GitHub es público); viven en la planilla.
 

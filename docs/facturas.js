@@ -670,8 +670,8 @@ function htmlFacDetalle() {
     : '<p class="vacio">Sin comprobantes asociados.</p>') + '</div>';
   const acciones = [];
   if (p.puedeFacturas) {
-    acciones.push('<button class="btn" data-a="fac" data-x="editar">✏️ Corregir datos</button>',
-      '<button class="btn sec" data-a="fac" data-x="ir" data-v="comprobante">📎 Agregar comprobante (NC, transferencia, recibo)</button>',
+    if (f.det.puedeCorregir !== false) acciones.push('<button class="btn" data-a="fac" data-x="editar">✏️ Corregir datos</button>');
+    acciones.push('<button class="btn sec" data-a="fac" data-x="ir" data-v="comprobante">📎 Agregar comprobante (NC, transferencia, recibo)</button>',
       '<button class="btn sec" data-a="fac" data-x="ir" data-v="vincular">💸 Vincular anticipo</button>');
   }
   if (p.puedeEliminarFacturas) acciones.push('<button class="btn sec rojo-txt" data-a="fac" data-x="eliminar">🗑️ Eliminar factura</button>');
