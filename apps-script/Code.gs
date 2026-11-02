@@ -784,6 +784,35 @@ function destinoBeefUnaVez_(ss) {
   });
 }
 
+// Una sola vez (01/11/2026, pedido del usuario): la mezcla BEEF cargada con fecha 19/09/2025 era del 19/10/2026, y las
+// 5 bolsas de Beef sin destino del 31/10 quedaron de una carga que se repitió bien (15 bolsas): se anulan. Queda en Registro.
+function correccionesBeefUnaVez_(ss) {
+  const props = props_();
+  if (props.getProperty('correccionBeef1')) return;
+  conLock_(() => {
+    const sh = ss.getSheetByName('Movimientos');
+    const ahora = new Date();
+    const quien = 'Claude (pedido de Quique Delfante)';
+    const log = [];
+    leerMovimientos_(ss).forEach((m) => {
+      if (['mvgqjzyul6vq4u', 'mvgqkfhjgjy0lk'].indexOf(m.id) !== -1 && m.fecha === '2025-09-19') {
+        const celda = sh.getRange(m.fila, COLS_MOV.indexOf('Fecha') + 1);
+        const v = celda.getValue();
+        if (v instanceof Date) { const d = new Date(v.getTime()); d.setFullYear(2026, 9, 19); celda.setValue(d); }
+        else celda.setValue(String(v).replace('2025-09-19', '2026-10-19').replace('19/09/2025', '19/10/2026'));
+        log.push([ahora, quien, 'Cambio de fecha', m.insumo + ' ' + m.cantidad + ' ' + m.unidad + ': 19/09/2025 → 19/10/2026', 'aplicado', m.id]);
+      }
+      if (m.id === 'mvyick1ovi7n1q' && !m.anulado) {
+        sh.getRange(m.fila, 16, 1, 2).setValues([[true, quien + ': repetido, la mezcla del 31/10 lleva 15 bolsas (ya cargadas)']]);
+        log.push([ahora, quien, 'Anula', 'Consumo ' + m.insumo + ' ' + m.cantidad + ' (' + ddmmaaaa_(m.fecha) + ')', 'aplicado', m.id]);
+      }
+    });
+    registrar_(ss, log);
+    if (log.length) reconstruirStock_(ss);
+    props.setProperty('correccionBeef1', String(log.length));
+  });
+}
+
 function conLock_(fn) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -799,6 +828,7 @@ function doGet() {
   papeleraInformesViejos_();
   limpiarReemplazosTapfeed_(SpreadsheetApp.getActive());
   destinoBeefUnaVez_(SpreadsheetApp.getActive());
+  correccionesBeefUnaVez_(SpreadsheetApp.getActive());
   publicarDatosInforme_(SpreadsheetApp.getActive());
   const pagos = marcarPagadasViejas_() + recalcularVencChaco_();
   const url = SpreadsheetApp.getActive().getUrl();

@@ -156,6 +156,8 @@ opcional. Valores fijos por cabeza (no se escalan por peso). **Fardos por UNIDAD
 - v1.26.1: los 18 consumos de la mezcla BEEF (maíz quebrado y Beef, 28/09 al 30/10) pasaron de "Autoconsumos"/"AC D Norte"
   al destino **"Autoconsumo BEEF"** (destinoBeefUnaVez_, propiedad destinoBeef1, anotado en Registro). Quedan para revisar
   con el usuario: mvgqjzyul6vq4u / mvgqkfhjgjy0lk con fecha 19/09/**2025** y mvyick1ovi7n1q (Beef 5 bolsas 31/10 sin destino).
+- v1.26.2 (correccionesBeefUnaVez_, propiedad correccionBeef1, en Registro): esas dos pasaron al 19/10/2026 y las 5 bolsas
+  sin destino del 31/10 se anularon (carga repetida; la mezcla lleva 15). Beef quedó en 4.180 kg.
 Parámetros (300). Código: leerDatosBase_ y publicarDatosInforme_.
 
 - Botón "Subir informe Tapfeed" al pie de Stock (solo casilla Configurar). El PDF "Uso de ingredientes
