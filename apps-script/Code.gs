@@ -159,11 +159,14 @@ const PARAM_ESTANCIA_INFORME = 'Estancia de los insumos por estancia (Fardos)';
 // Después se editan en la hoja. Con Categoría, las cabezas salen de Tapfeed (corrales de esa categoría en Corrales).
 const ESPERADO_INSUMOS = ['Silo micropicado Gatton', 'Maíz molido', 'Maíz quebrado', 'Balanceado Pre destete', 'Concentrado Desarrollo',
   'Concentrado Beef 1.000 M', 'Suplemento E-PRO 35', 'Fardos'];
+const BEEF_NOTA = 'Mezcla de la hoja de reparto (30/10): 32,5 bolsas de 40 kg por día para 210 cabezas; receta 1.000 kg de ' +
+  'maíz MOLIDO + 200 kg de Beef = 1.200 kg. Silo: de otro lado, no cuenta';
 const ESPERADO_INICIAL = [
   ['Desmamantes C6O', 'C6O', '', '', 6.6, 0.5, '', 2.4, '', '', '', '', 'Dieta C6O (peso de referencia 190 kg)'],
   ['Machos C6P', 'C6P', '', '', 11.6, 2, '', '', 1.1, '', '', '', 'Dieta C6P (peso de referencia 277,5 kg)'],
-  // El silo del autoconsumo sale de otro lado (no del stock de Gatton); los BEEF comen maíz quebrado, no molido.
-  ['Toretones C4/C5 – autoconsumo BEEF', '', 160, '28/09/2026', '', '', 5.1, '', '', 1.04, '', '', 'Ración Beef 1.000 M (peso de referencia 470 kg) con maíz quebrado. Silo: de otro lado, no cuenta'],
+  // El silo del autoconsumo sale de otro lado (no del stock de Gatton). Los BEEF comían maíz quebrado; desde el
+  // 01/11/2026 la mezcla se hace con maíz MOLIDO (se terminó el quebrado). Valores de la hoja de reparto del 30/10.
+  ['Toretones C4/C5 – autoconsumo BEEF', '', 210, '28/09/2026', '', 5.16, '', '', '', 1.03, '', '', BEEF_NOTA],
   ['Toretones C4/C5 – Concentrado Desarrollo', '', 790, '28/09/2026', '', '', '', '', 1.85, '', '', '', 'Desarrollo 0,5 % del PV, al peso medio de 370 kg. Silo: de otro lado, no cuenta'],
   ['Hembras C6P – E-PRO 35', '', 853, '', '', '', '', '', '', '', 0.3, '', 'E-PRO 35 (tope 300 g), al peso medio de 226 kg'],
   // Fardos: en fardos (no kg). Esta fila es el total del grupo (Cabezas = 1).
@@ -186,9 +189,25 @@ function escribirConsumoEsperado_(h) {
 // Una sola vez (03/10/2026, tercer ajuste): maíz quebrado (BEEF) y fardos por unidad (9 fardos/día del grupo).
 function ajustarConsumoEsperado_(h) {
   const props = props_();
-  if (props.getProperty('esperadoAjuste3')) return;
-  escribirConsumoEsperado_(h);
-  props.setProperty('esperadoAjuste3', '1');
+  if (!props.getProperty('esperadoAjuste3')) {
+    escribirConsumoEsperado_(h);
+    props.setProperty('esperadoAjuste3', '1');
+  }
+  // Una sola vez (01/11/2026): la fila BEEF pasa de maíz quebrado a maíz molido, con la hoja de reparto del 30/10.
+  // Solo toca esa fila (el resto de la hoja lo edita el usuario).
+  if (props.getProperty('esperadoAjuste4')) return;
+  const datos = h.getDataRange().getValues();
+  const enc = datos[0].map((x) => String(x).trim());
+  const fila = datos.findIndex((f, i) => i > 0 && /BEEF/i.test(String(f[0])));
+  if (fila !== -1) {
+    const poner = (col, v) => { const c = enc.indexOf(col); if (c !== -1) h.getRange(fila + 1, c + 1).setValue(v); };
+    poner('Cabezas', 210);
+    poner('Maíz molido', 5.16);
+    poner('Maíz quebrado', '');
+    poner('Concentrado Beef 1.000 M', 1.03);
+    poner('Nota', BEEF_NOTA);
+  }
+  props.setProperty('esperadoAjuste4', '1');
 }
 const SECTORES_POR_FINCA = {
   'LA PRUDENCIA': ['A', 'C', 'D', 'F'],
@@ -1792,7 +1811,10 @@ function publicarDatosInforme_(ss) {
       return r;
     };
     // Consumo esperado de un día: kg por cabeza de cada grupo × cabezas. Los grupos con Categoría toman
-    // las cabezas del último Tapfeed hasta ese día (corrales de esa categoría en la hoja Corrales).
+    // las cabezas del último Tapfeed hasta ese día (corrales de esa categoría en la hoja Corrales) y son los
+    // del mixer; los otros se reparten a mano (BEEF, Desarrollo de toretones, E-PRO, fardos). Devuelve
+    // { mixer, mano } por insumo: el real de Tapfeed solo se compara con lo del mixer (01/11/2026: el maíz
+    // molido va al mixer y a la mezcla BEEF).
     const esperadoAl = (fecha) => {
       const diaTf = diasTf.filter((d) => d <= fecha).pop();
       const cabCat = {};
@@ -1803,11 +1825,12 @@ function publicarDatosInforme_(ss) {
         const cat = base.categoria[t.corral];
         if (cat) cabCat[cat] = (cabCat[cat] || 0) + t.cabezas;
       });
-      const r = {};
+      const r = { mixer: {}, mano: {} };
       base.grupos.forEach((g) => {
         if (g.desde && fecha < g.desde) return;
         const cab = g.categoria ? (cabCat[g.categoria] || 0) : g.cabezas;
-        Object.keys(g.kg).forEach((ins) => { r[ins] = (r[ins] || 0) + g.kg[ins] * cab; });
+        const d = g.categoria ? r.mixer : r.mano;
+        Object.keys(g.kg).forEach((ins) => { d[ins] = (d[ins] || 0) + g.kg[ins] * cab; });
       });
       return r;
     };
@@ -1830,11 +1853,11 @@ function publicarDatosInforme_(ss) {
           if (p[0] === ins && p[1] <= f && p[1] >= INFORME_ACUM_DESDE) acum += ajusteDia[k];
         });
         const saldo = saldos[ins] || 0;
-        // El esperado nunca es menor que el consumo real de Tapfeed (pedido 20/10/2026): el del día, o si ese
-        // día todavía no tiene Tapfeed (hoy), el del último día con Tapfeed. Lo cargado a mano (Beef, maíz
-        // quebrado: se carga lo que se lleva, no lo que se come ese día) no cuenta: queda la dieta.
+        // Lo del mixer nunca es menor que el consumo real de Tapfeed (pedido 20/10/2026): el del día, o si ese
+        // día todavía no tiene Tapfeed (hoy), el del último día con Tapfeed. Lo repartido a mano (mezcla BEEF:
+        // se carga lo que se lleva, no lo que se come ese día) queda con la dieta y se suma aparte.
         const diaReal = diasTf.indexOf(f) !== -1 ? f : (diasTf.filter((d) => d <= f).pop() || f);
-        const esp = Math.max(esperado[ins] || 0, mezclaDia[ins + '|' + diaReal] || 0);
+        const esp = Math.max(esperado.mixer[ins] || 0, mezclaDia[ins + '|' + diaReal] || 0) + (esperado.mano[ins] || 0);
         stockDia.push([ddmmaaaa_(f), ins, unidadRep(ins), r0(consumoDia[ins + '|' + f] || 0), r0(acum), r0(siete / 7), r0(esp), r0(saldo),
           esp > 0 ? Math.max(0, Math.floor(saldo / esp)) : '—']);
       });
@@ -1873,7 +1896,7 @@ function publicarDatosInforme_(ss) {
       ['Unidades', 'En kg, redondeado, salvo lo que se cuenta por unidad (Fardos: en fardos); ver columna Unidad de Stock por día.' +
         (base.estancia ? ' Fardos: solo ' + nombreEstancia_(base.estancia) + '.' : '') + ' Consumo = confinamiento (Tapfeed) + otros destinos (autoconsumo, cargado en la app).'],
       ['Consumo esperado', base.error ? 'NO SE PUDO CALCULAR: ' + base.error
-        : 'Según las dietas de la hoja "' + HOJA_ESPERADO + '" de Datos base confinamiento (cantidad por cabeza × cabezas; confinamiento con las cabezas de Tapfeed). Nunca menor que el consumo real de Tapfeed del día (o del último día con Tapfeed); lo cargado a mano no cuenta. Días de stock = saldo ÷ consumo esperado.'],
+        : 'Según las dietas de la hoja "' + HOJA_ESPERADO + '" de Datos base confinamiento (cantidad por cabeza × cabezas; confinamiento con las cabezas de Tapfeed). La parte del mixer nunca es menor que el consumo real de Tapfeed del día (o del último día con Tapfeed); lo repartido a mano (ej. mezcla BEEF con maíz molido) va con la dieta y se suma. Días de stock = saldo ÷ consumo esperado.'],
       ['Peso del stock', 'Stock por día: el consumo del confinamiento es el peso CARGADO al mixer (informe "Uso ingrediente & premezcla"). ' +
         'Corrales por día e Ingredientes por día: peso ENTREGADO a los corrales (informe "Uso de ingredientes por grupo").'],
       ['Ajuste de stock', hastaAj ? 'Peso cargado − consumo registrado del ' + ddmmaaaa_(INFORME_ACUM_DESDE) + ' al ' + ddmmaaaa_(hastaAj) +
