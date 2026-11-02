@@ -119,6 +119,7 @@ const PRODUCTOS_SANIDAD = [
 // producto nunca se contó, desde su primer ingreso.
 
 const PREFIJO_ESTANCIA = 'SAN-';
+const PROP_LOTES_ESTANCIA = 'LOTES_ESTANCIA';
 const USUARIO_ESTANCIA = 'App de la estancia';
 
 /** Una sola vez: guarda la clave compartida con el servidor de la estancia. Si ya hay una no la
@@ -149,6 +150,13 @@ function estancia_(body) {
   const clave = props_().getProperty('CLAVE_ESTANCIA');
   if (!clave || String(body.clave || '') !== clave) throw new Error('clave incorrecta');
   const ss = SpreadsheetApp.getActive();
+  // Cabezas activas por lote (01/11/2026): el consumo esperado del informe de confinamiento las usa para
+  // los grupos que comen a mano (columna "Lotes (estancia)" de Consumo esperado). Se guardan tal cual.
+  if (Array.isArray(body.lotes) && body.lotes.length) {
+    props_().setProperty(PROP_LOTES_ESTANCIA, JSON.stringify({
+      actualizado: Utilities.formatDate(new Date(), ZONA, 'dd/MM/yyyy HH:mm'),
+      lotes: body.lotes.map((l) => [String(l.lote || '').trim().toUpperCase(), Number(l.cabezas) || 0]) }));
+  }
   return conLock_(() => {
     const insumos = leerInsumos_(ss).filter((i) => i.modulo === 'Sanidad');
     const r = aplicarConsumosEstancia_(ss, insumos, body);

@@ -155,33 +155,48 @@ const PARAM_FUERA_INFORME = 'Insumos fuera del informe (separados por ;)';
 const ORDEN_STOCK_INFORME = ['Balanceado Pre destete', 'Concentrado Desarrollo', 'Concentrado Beef 1.000 M', 'Suplemento E-PRO 35',
   'Maíz molido', 'Maíz quebrado', 'Silo micropicado Gatton', 'Fardos'];
 const PARAM_ESTANCIA_INFORME = 'Estancia de los insumos por estancia (Fardos)';
+// Mezcla BEEF (01/11/2026): stock de bolsas de mezcla ya hechas, que el script calcula solo. Entra: cada consumo de maíz
+// molido con destino Beef (ej. "Autoconsumo Beef"), 1.000 kg = 30 bolsas de 40 kg. Sale: lo teórico del grupo BEEF de
+// Consumo esperado. Parte del parámetro (última mezcla o conteo: bolsas al empezar ese día; lo mezclado ese mismo
+// día ya está contado). Días de BEEF = días de mezcla hecha + lo que alcanza el depósito (Beef o maíz, el menor).
+const PARAM_MEZCLA_BEEF = 'Mezcla BEEF: última mezcla o conteo (fecha; bolsas de 40 kg)';
+const MEZCLA_BOLSAS_POR_KG_MAIZ = 30 / 1000;
+const MEZCLA_KG_BOLSA = 40;
+const MEZCLA_INSUMO_MAIZ = 'Maíz molido';
+const MEZCLA_INSUMO_BEEF = 'Concentrado Beef 1.000 M';
 // Valores iniciales (Proyeccion_comida_60_dias.xlsx, hojas Dietas y Grupos, con los ajustes del usuario del 03/10/2026).
 // Después se editan en la hoja. Con Categoría, las cabezas salen de Tapfeed (corrales de esa categoría en Corrales).
 const ESPERADO_INSUMOS = ['Silo micropicado Gatton', 'Maíz molido', 'Maíz quebrado', 'Balanceado Pre destete', 'Concentrado Desarrollo',
   'Concentrado Beef 1.000 M', 'Suplemento E-PRO 35', 'Fardos'];
-const BEEF_NOTA = 'Mezcla de la hoja de reparto (30/10): 32,5 bolsas de 40 kg por día para 210 cabezas; receta 1.000 kg de ' +
-  'maíz MOLIDO + 200 kg de Beef = 1.200 kg. Silo: de otro lado, no cuenta';
-// 01/11/2026: el Desarrollo lo comen solo los 230 toretones de AC Torta Frente y Fondo (12 bolsas de 40 kg por día).
-const DESARROLLO_NOTA = 'Solo los 230 toretones de AC Torta Frente y Fondo (desde 01/11/2026): 12 bolsas de 40 kg por día ' +
-  '(hoja de reparto del 30/10). Silo: de otro lado, no cuenta';
+// Grupos que comen a mano (01/11/2026, hoja de reparto del 30/10 y lotes de la app de la estancia): las cabezas salen
+// solas de la columna "Lotes (estancia)" (cabezas activas de esos lotes, que manda la estancia cada 15 min); si la
+// estancia todavía no mandó lotes, de la columna Cabezas. Los kg por cabeza son los de la hoja de reparto.
+const COL_LOTES_ESPERADO = 'Lotes (estancia)';
+const BEEF_NOTA = 'Mezcla BEEF (hoja de reparto 30/10): 32,5 bolsas de 40 kg/día para 210 cab = 6,19 kg de mezcla/cab; receta ' +
+  '1.000 kg de maíz MOLIDO + 200 kg de Beef (5 bolsas) = 30 bolsas. Silo: de otro lado, no cuenta';
+const DESARROLLO_NOTA = 'Hoja de reparto 30/10: 25 bolsas de 40 kg/día para 509 cab (Torta 12, BM Frente 7, BM Fondo 6). ' +
+  'Silo: de otro lado, no cuenta';
+const EPRO_NOTA = 'Teórico de la hoja de reparto 30/10 (0,2 % del PV, sin tope); el stock baja con lo que realmente se da';
 const ESPERADO_INICIAL = [
-  ['Desmamantes C6O', 'C6O', '', '', 6.6, 0.5, '', 2.4, '', '', '', '', 'Dieta C6O (peso de referencia 190 kg)'],
-  ['Machos C6P', 'C6P', '', '', 11.6, 2, '', '', 1.1, '', '', '', 'Dieta C6P (peso de referencia 277,5 kg)'],
-  // El silo del autoconsumo sale de otro lado (no del stock de Gatton). Los BEEF comían maíz quebrado; desde el
-  // 01/11/2026 la mezcla se hace con maíz MOLIDO (se terminó el quebrado). Valores de la hoja de reparto del 30/10.
-  ['Toretones C4/C5 – autoconsumo BEEF', '', 210, '28/09/2026', '', 5.16, '', '', '', 1.03, '', '', BEEF_NOTA],
-  ['Toretones C4/C5 – Concentrado Desarrollo', '', 230, '28/09/2026', '', '', '', '', 2.09, '', '', '', DESARROLLO_NOTA],
-  ['Hembras C6P – E-PRO 35', '', 853, '', '', '', '', '', '', '', 0.3, '', 'E-PRO 35 (tope 300 g), al peso medio de 226 kg'],
+  ['Desmamantes C6O', 'C6O', '', '', 6.6, 0.5, '', 2.4, '', '', '', '', 'Dieta C6O (peso de referencia 190 kg)', ''],
+  ['Machos C6P', 'C6P', '', '', 11.6, 2, '', '', 1.1, '', '', '', 'Dieta C6P (peso de referencia 277,5 kg)', ''],
+  ['Toretones C4/C5 – autoconsumo BEEF', '', 210, '', '', 5.16, '', '', '', 1.03, '', '', BEEF_NOTA, 'AC BEEF CAB; AC BEEF COLA'],
+  ['Toretones C4/C5 – Concentrado Desarrollo', '', 509, '', '', '', '', '', 1.96, '', '', '', DESARROLLO_NOTA,
+    'AC TORTA FRENTE; AC TORTA FONDO; AC BM FRENTE; AC BM FONDO'],
+  ['Hembras C6P – E-PRO 35 DH Cabecera', '', 287, '', '', '', '', '', '', '', 0.52, '', '5 bolsas de 30 kg para 287 cab. ' + EPRO_NOTA, 'DH CABECERA'],
+  ['Hembras C6P – E-PRO 35 DH Media', '', 282, '', '', '', '', '', '', '', 0.47, '', '4,5 bolsas de 30 kg para 285 cab. ' + EPRO_NOTA, 'DH MEDIA'],
+  ['Hembras C6P – E-PRO 35 DH Cola', '', 150, '', '', '', '', '', '', '', 0.37, '', '3,5 bolsas de 30 kg para 281 cab. ' + EPRO_NOTA, 'DH COLA'],
   // Fardos: en fardos (no kg). Esta fila es el total del grupo (Cabezas = 1).
-  ['Hembras C6P – fardo', '', 1, '', '', '', '', '', '', '', '', 9, 'Fardos por día para todo el grupo (6 a 9). Todavía no se empezó a dar'],
+  ['Hembras C6P – fardo', '', 1, '', '', '', '', '', '', '', '', 9, 'Fardos por día para todo el grupo (6 a 9). Todavía no se empezó a dar', ''],
 ];
 const ESPERADO_NOTA = 'Kg tal cual por cabeza y por día; Fardos en fardos (no kg). Con Cabezas = 1 el valor es el total del grupo. Con Categoría, ' +
-  'las cabezas salen del último Tapfeed (corrales de esa categoría en la hoja Corrales); si no, de la columna Cabezas. "Desde" es ' +
-  'opcional. Los nombres de las columnas de insumos tienen que ser los de Registros.';
+  'las cabezas salen del último Tapfeed (corrales de esa categoría en la hoja Corrales); con "Lotes (estancia)" (separados por ;), ' +
+  'de las cabezas activas de esos lotes en la app de la estancia; si no, de la columna Cabezas. "Desde" es opcional. Los nombres ' +
+  'de las columnas de insumos tienen que ser los de Registros. Los grupos sin Categoría se reparten a mano y se suman aparte de lo del mixer.';
 
 /** Escribe la hoja "Consumo esperado" entera con los valores de arriba. */
 function escribirConsumoEsperado_(h) {
-  const enc = ['Grupo', 'Categoría (cabezas de Tapfeed)', 'Cabezas', 'Desde'].concat(ESPERADO_INSUMOS, ['Nota']);
+  const enc = ['Grupo', 'Categoría (cabezas de Tapfeed)', 'Cabezas', 'Desde'].concat(ESPERADO_INSUMOS, ['Nota', COL_LOTES_ESPERADO]);
   h.clear();
   h.getRange(1, 1, 1, enc.length).setValues([enc]).setFontWeight('bold').setBackground('#eeeeee').setWrap(true);
   h.getRange(2, 1, ESPERADO_INICIAL.length, enc.length).setValues(ESPERADO_INICIAL);
@@ -189,31 +204,13 @@ function escribirConsumoEsperado_(h) {
   h.setFrozenRows(1);
 }
 
-// Una sola vez (03/10/2026, tercer ajuste): maíz quebrado (BEEF) y fardos por unidad (9 fardos/día del grupo).
+// Una sola vez (01/11/2026, séptimo ajuste): hoja de reparto del 30/10, BEEF con maíz molido, E-PRO por lote y columna
+// "Lotes (estancia)". Se reescribe entera: hasta hoy solo la cambió el script.
 function ajustarConsumoEsperado_(h) {
   const props = props_();
-  if (!props.getProperty('esperadoAjuste3')) {
-    escribirConsumoEsperado_(h);
-    props.setProperty('esperadoAjuste3', '1');
-  }
-  // Una sola vez (01/11/2026): la fila BEEF pasa de maíz quebrado a maíz molido, con la hoja de reparto del 30/10.
-  // Solo toca esa fila (el resto de la hoja lo edita el usuario).
-  const datos = h.getDataRange().getValues();
-  const enc = datos[0].map((x) => String(x).trim());
-  const ponerEn = (re, valores) => {
-    const fila = datos.findIndex((f, i) => i > 0 && re.test(String(f[0])));
-    if (fila === -1) return;
-    Object.keys(valores).forEach((col) => { const c = enc.indexOf(col); if (c !== -1) h.getRange(fila + 1, c + 1).setValue(valores[col]); });
-  };
-  if (!props.getProperty('esperadoAjuste4')) {
-    ponerEn(/BEEF/i, { 'Cabezas': 210, 'Maíz molido': 5.16, 'Maíz quebrado': '', 'Concentrado Beef 1.000 M': 1.03, 'Nota': BEEF_NOTA });
-    props.setProperty('esperadoAjuste4', '1');
-  }
-  // Una sola vez (01/11/2026): el Desarrollo de toretones queda solo para los 230 de AC Torta (12 bolsas/día).
-  if (!props.getProperty('esperadoAjuste5')) {
-    ponerEn(/^Toretones.*Desarrollo/i, { 'Cabezas': 230, 'Concentrado Desarrollo': 2.09, 'Nota': DESARROLLO_NOTA });
-    props.setProperty('esperadoAjuste5', '1');
-  }
+  if (props.getProperty('esperadoAjuste7')) return;
+  escribirConsumoEsperado_(h);
+  props.setProperty('esperadoAjuste7', '1');
 }
 const SECTORES_POR_FINCA = {
   'LA PRUDENCIA': ['A', 'C', 'D', 'F'],
@@ -1746,6 +1743,8 @@ function publicarDatosInforme_(ss) {
     // sale igual, sin consumo esperado, y queda anotado en Resumen.
     let base = { grupos: [], categoria: {}, error: '' };
     try { base = leerDatosBase_(); } catch (e) { base.error = String(e.message || e); }
+    let lotesEst = null;   // cabezas por lote que manda la app de la estancia (Sanidad.gs, estancia_)
+    try { lotesEst = JSON.parse(props_().getProperty(PROP_LOTES_ESTANCIA) || 'null'); } catch (e) { lotesEst = null; }
     const kgDe = (insumo, cant) => {
       const i = porNombre[insumo] || {};
       if (i.kgUnidad) return cant * i.kgUnidad;
@@ -1778,7 +1777,8 @@ function publicarDatosInforme_(ss) {
 
     const corrales = [['Fecha', 'Corral', 'Cabezas', 'Kg tal cual', 'Kg MS']];
     const ingred = [['Fecha', 'Ingrediente', 'Kg tal cual', 'Kg MS']];
-    diasTf.filter((f) => f >= desde).forEach((f) => {
+    // Del día más nuevo al más viejo (01/11/2026), como Stock por día: la tarea ve solo las primeras ~65 filas.
+    diasTf.filter((f) => f >= desde).reverse().forEach((f) => {
       const delDia = tf.filter((t) => t.fecha === f);
       const pc = {};
       const pi = {};
@@ -1821,6 +1821,11 @@ function publicarDatosInforme_(ss) {
     // del mixer; los otros se reparten a mano (BEEF, Desarrollo de toretones, E-PRO, fardos). Devuelve
     // { mixer, mano } por insumo: el real de Tapfeed solo se compara con lo del mixer (01/11/2026: el maíz
     // molido va al mixer y a la mezcla BEEF).
+    // Cabezas de un grupo que come a mano: las activas de sus lotes en la app de la estancia (si ya mandó
+    // lotes); si no, la columna Cabezas.
+    const cabLote = {};
+    if (lotesEst) lotesEst.lotes.forEach((l) => { cabLote[l[0]] = (cabLote[l[0]] || 0) + l[1]; });
+    const cabezasGrupo = (g) => (g.lotes && g.lotes.length && lotesEst ? g.lotes.reduce((t, l) => t + (cabLote[l] || 0), 0) : g.cabezas);
     const esperadoAl = (fecha) => {
       const diaTf = diasTf.filter((d) => d <= fecha).pop();
       const cabCat = {};
@@ -1831,20 +1836,47 @@ function publicarDatosInforme_(ss) {
         const cat = base.categoria[t.corral];
         if (cat) cabCat[cat] = (cabCat[cat] || 0) + t.cabezas;
       });
-      const r = { mixer: {}, mano: {} };
+      // mezclaBolsas: bolsas de mezcla BEEF por día (grupos con "BEEF" en el nombre: kg de maíz + Beef ÷ 40).
+      const r = { mixer: {}, mano: {}, mezclaBolsas: 0 };
       base.grupos.forEach((g) => {
         if (g.desde && fecha < g.desde) return;
-        const cab = g.categoria ? (cabCat[g.categoria] || 0) : g.cabezas;
+        const cab = g.categoria ? (cabCat[g.categoria] || 0) : cabezasGrupo(g);
         const d = g.categoria ? r.mixer : r.mano;
         Object.keys(g.kg).forEach((ins) => { d[ins] = (d[ins] || 0) + g.kg[ins] * cab; });
+        if (!g.categoria && /BEEF/i.test(g.grupo)) {
+          r.mezclaBolsas += ((g.kg[MEZCLA_INSUMO_MAIZ] || 0) + (g.kg[MEZCLA_INSUMO_BEEF] || 0)) * cab / MEZCLA_KG_BOLSA;
+        }
       });
       return r;
     };
+    // Mezcla BEEF hecha (bolsas) al final de un día: punto de partida del parámetro + mezclas cargadas después
+    // (consumo de maíz molido con destino Beef) − lo teórico de cada día desde el punto de partida (incluido).
+    const mezclaHechaDia = {};   // fecha -> bolsas que entraron ese día
+    movsInf.filter((m) => m.tipo === 'Consumo' && m.insumo === MEZCLA_INSUMO_MAIZ && /beef/i.test(m.destino || '') && !esAjusteStock_(m))
+      .forEach((m) => { mezclaHechaDia[m.fecha] = (mezclaHechaDia[m.fecha] || 0) + kgDe(m.insumo, m.cantidad) * MEZCLA_BOLSAS_POR_KG_MAIZ; });
+    const mezclaAl = (fecha) => {
+      if (!base.mezcla || fecha < base.mezcla.fecha) return null;
+      let bolsas = base.mezcla.bolsas;
+      let comidas = 0;
+      for (let d = base.mezcla.fecha; d <= fecha; d = sumarDias_(d, 1)) {
+        if (d > base.mezcla.fecha) bolsas += mezclaHechaDia[d] || 0;
+        const c = esperadoAl(d).mezclaBolsas;
+        bolsas -= c;
+        comidas += c;
+      }
+      return { saldo: Math.max(0, bolsas), hechas: mezclaHechaDia[fecha] || 0, comidas, porDia: esperadoAl(fecha).mezclaBolsas };
+    };
     const stockDia = [['Fecha', 'Ingrediente', 'Unidad', 'Consumo del día', 'Consumo acumulado (desde 21/09/2026)',
       'Promedio diario 7 días', 'Consumo esperado por día', 'Saldo', 'Días de stock']];
+    // Del día más nuevo al más viejo (01/11/2026): la conexión de la tarea muestra solo las primeras ~65 filas
+    // de cada hoja, y lo que hace falta es lo último.
+    const bloques = [];
     for (let f = desde; f <= hoy; f = sumarDias_(f, 1)) {
       const saldos = saldosAl(f);
       const esperado = esperadoAl(f);
+      const filasDia = [];
+      bloques.push(filasDia);
+      const diasDe = {};   // insumo -> días de stock sin redondear (para los días de BEEF en total)
       ingStock.forEach((ins) => {
         let acum = 0;
         let siete = 0;
@@ -1864,10 +1896,25 @@ function publicarDatosInforme_(ss) {
         // se carga lo que se lleva, no lo que se come ese día) queda con la dieta y se suma aparte.
         const diaReal = diasTf.indexOf(f) !== -1 ? f : (diasTf.filter((d) => d <= f).pop() || f);
         const esp = Math.max(esperado.mixer[ins] || 0, mezclaDia[ins + '|' + diaReal] || 0) + (esperado.mano[ins] || 0);
-        stockDia.push([ddmmaaaa_(f), ins, unidadRep(ins), r0(consumoDia[ins + '|' + f] || 0), r0(acum), r0(siete / 7), r0(esp), r0(saldo),
+        filasDia.push([ddmmaaaa_(f), ins, unidadRep(ins), r0(consumoDia[ins + '|' + f] || 0), r0(acum), r0(siete / 7), r0(esp), r0(saldo),
           esp > 0 ? Math.max(0, Math.floor(saldo / esp)) : '—']);
+        diasDe[ins] = esp > 0 ? saldo / esp : null;
       });
+      // Mezcla BEEF (01/11/2026): bolsas ya hechas y días de BEEF en total = días de mezcla hecha + lo que alcanza el
+      // depósito para seguir mezclando (Beef o maíz molido, el menor). Consumo del día = lo teórico; acumulado = lo
+      // comido desde la última mezcla o conteo del parámetro.
+      const mz = mezclaAl(f);
+      if (mz) {
+        const r1 = (n) => Math.round(n * 10) / 10;
+        const diasMz = mz.porDia > 0 ? mz.saldo / mz.porDia : null;
+        filasDia.push([ddmmaaaa_(f), 'Mezcla BEEF hecha', 'bolsas', r1(mz.porDia), r1(mz.comidas), r1(mz.porDia), r1(mz.porDia), r1(mz.saldo),
+          diasMz === null ? '—' : Math.floor(diasMz)]);
+        const deposito = [diasDe[MEZCLA_INSUMO_BEEF], diasDe[MEZCLA_INSUMO_MAIZ]].filter((x) => x !== null && x !== undefined);
+        filasDia.push([ddmmaaaa_(f), 'BEEF total (mezcla hecha + depósito)', 'días', '', '', '', '', '',
+          diasMz === null || !deposito.length ? '—' : Math.floor(diasMz + Math.min.apply(null, deposito))]);
+      }
     }
+    bloques.reverse().forEach((b) => b.forEach((fila) => stockDia.push(fila)));
 
     const saldos = calcularStock_(insumos, movs);
     const stock = [['Insumo', 'Estancia', 'Saldo', 'Unidad', 'Saldo kg']];
@@ -1903,6 +1950,11 @@ function publicarDatosInforme_(ss) {
         (base.estancia ? ' Fardos: solo ' + nombreEstancia_(base.estancia) + '.' : '') + ' Consumo = confinamiento (Tapfeed) + otros destinos (autoconsumo, cargado en la app).'],
       ['Consumo esperado', base.error ? 'NO SE PUDO CALCULAR: ' + base.error
         : 'Según las dietas de la hoja "' + HOJA_ESPERADO + '" de Datos base confinamiento (cantidad por cabeza × cabezas; confinamiento con las cabezas de Tapfeed). La parte del mixer nunca es menor que el consumo real de Tapfeed del día (o del último día con Tapfeed); lo repartido a mano (ej. mezcla BEEF con maíz molido) va con la dieta y se suma. Días de stock = saldo ÷ consumo esperado.'],
+      ['Cabezas de los grupos a mano', lotesEst ? 'Activas en los lotes de la app de la estancia (columna "Lotes (estancia)" de Consumo esperado), al ' +
+        lotesEst.actualizado : 'Columna Cabezas de Consumo esperado (la app de la estancia todavía no mandó los lotes)'],
+      ['Mezcla BEEF', base.mezcla ? 'Bolsas de 40 kg ya mezcladas: desde ' + ddmmaaaa_(base.mezcla.fecha) + ' (' + base.mezcla.bolsas +
+        ' bolsas, parámetro "' + PARAM_MEZCLA_BEEF + '"), + 30 bolsas por cada 1.000 kg de maíz molido cargado con destino Beef, − lo teórico ' +
+        'del grupo BEEF. "BEEF total" = días de mezcla hecha + días del depósito (Beef o maíz molido, el menor).' : 'sin punto de partida'],
       ['Peso del stock', 'Stock por día: el consumo del confinamiento es el peso CARGADO al mixer (informe "Uso ingrediente & premezcla"). ' +
         'Corrales por día e Ingredientes por día: peso ENTREGADO a los corrales (informe "Uso de ingredientes por grupo").'],
       ['Ajuste de stock', hastaAj ? 'Peso cargado − consumo registrado del ' + ddmmaaaa_(INFORME_ACUM_DESDE) + ' al ' + ddmmaaaa_(hastaAj) +
@@ -1959,6 +2011,13 @@ function leerDatosBase_() {
     const est = filas.find((f) => String(f[0]).trim() === PARAM_ESTANCIA_INFORME);
     if (est) r.estancia = String(est[1] || '').trim().toUpperCase();
     else { par.appendRow([PARAM_ESTANCIA_INFORME, 'La Paciencia']); r.estancia = 'LA PACIENCIA'; }
+    // Mezcla BEEF: punto de partida "fecha; bolsas" (la última mezcla o un conteo de bolsas). 01/11/2026: la
+    // mezcla del 31/10 (3.000 kg de maíz molido + 15 bolsas de Beef = 90 bolsas).
+    const mz = filas.find((f) => String(f[0]).trim() === PARAM_MEZCLA_BEEF);
+    if (!mz) par.appendRow([PARAM_MEZCLA_BEEF, '31/10/2026; 90']);
+    const pm = String(mz ? mz[1] : '31/10/2026; 90').split(';');
+    const fm = iso_(pm[0].trim());
+    if (esFecha_(fm) && Number(pm[1]) >= 0) r.mezcla = { fecha: fm, bolsas: Number(pm[1]) };
   }
 
   let h = db.getSheetByName(HOJA_ESPERADO);
@@ -1966,7 +2025,7 @@ function leerDatosBase_() {
   if (!h) {
     h = db.insertSheet(HOJA_ESPERADO);
     escribirConsumoEsperado_(h);
-    props_().setProperty('esperadoAjuste3', '1');
+    props_().setProperty('esperadoAjuste7', '1');
   }
   const datos = h.getDataRange().getValues();
   const enc = datos[0].map((x) => String(x).trim());
@@ -1976,13 +2035,15 @@ function leerDatosBase_() {
     const cabezas = Number(f[2]) || 0;
     if (!grupo || (!categoria && !cabezas)) return;
     const kg = {};
+    let lotes = [];
     enc.forEach((ins, c) => {
       if (c < 4 || !ins || ins === 'Nota') return;
+      if (ins === COL_LOTES_ESPERADO) { lotes = String(f[c] || '').split(';').map((x) => x.trim().toUpperCase()).filter(Boolean); return; }
       const v = Number(String(f[c]).replace(',', '.'));
       if (v > 0) kg[ins] = v;
     });
     const desde = f[3] ? iso_(f[3]) : '';
-    r.grupos.push({ grupo, categoria, cabezas, desde: esFecha_(desde) ? desde : '', kg });
+    r.grupos.push({ grupo, categoria, cabezas, lotes, desde: esFecha_(desde) ? desde : '', kg });
   });
   return r;
 }
