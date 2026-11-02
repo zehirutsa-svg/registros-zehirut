@@ -472,6 +472,20 @@ function papeleraInformesViejos_() {
   props.setProperty('papeleraInf1618', '1');
 }
 
+/** 01/11/2026: los informes del 31/10 y 01/11 salieron antes de anular las 5 bolsas de Beef repetidas y con la mezcla
+ *  BEEF en dos filas confusas: a la papelera para que la tarea los rehaga. Una sola vez. */
+function papeleraInformes3110_() {
+  const props = props_();
+  if (props.getProperty('papeleraInf3110')) return;
+  ['1qxLpR0EVh8FF5LaGKt-nU4acwqnYg5Iy', '1D4JEbpggnKMQhKbFP6CD131CPAFmqq-N'].forEach((id) => {
+    try {
+      const f = DriveApp.getFileById(id);
+      if (!f.isTrashed() && /(31 OCT|01 NOV) 26\.pdf$/.test(f.getName())) f.setTrashed(true);
+    } catch (e) { console.error('No se pudo mandar a la papelera ' + id + ': ' + e); }
+  });
+  props.setProperty('papeleraInf3110', '1');
+}
+
 /** Una sola vez (03/10/2026): la bolsa de E-PRO 35 es de 30 kg, no de 40. Corrige Insumos y los kg de sus movimientos. */
 function eproBolsa30_(ss) {
   const props = props_();
@@ -826,6 +840,7 @@ function doGet() {
   fardosAjusteAConteo_(SpreadsheetApp.getActive());
   eproBolsa30_(SpreadsheetApp.getActive());
   papeleraInformesViejos_();
+  papeleraInformes3110_();
   limpiarReemplazosTapfeed_(SpreadsheetApp.getActive());
   destinoBeefUnaVez_(SpreadsheetApp.getActive());
   correccionesBeefUnaVez_(SpreadsheetApp.getActive());
@@ -1955,17 +1970,17 @@ function publicarDatosInforme_(ss) {
           esp > 0 ? Math.max(0, Math.floor(saldo / esp)) : '—']);
         diasDe[ins] = esp > 0 ? saldo / esp : null;
       });
-      // Mezcla BEEF (01/11/2026): bolsas ya hechas y días de BEEF en total = días de mezcla hecha + lo que alcanza el
-      // depósito para seguir mezclando (Beef o maíz molido, el menor). Consumo del día = lo teórico; acumulado = lo
-      // comido desde la última mezcla o conteo del parámetro.
+      // Mezcla BEEF (01/11/2026; una sola fila desde v1.26.3 porque "Mezcla BEEF hecha" con 32,5 "bolsas" se leía como Beef):
+      // en bolsas de MEZCLA de 40 kg. Consumo = lo teórico del grupo BEEF; acumulado = lo comido desde la última mezcla o
+      // conteo del parámetro; saldo = bolsas ya preparadas; días = días de mezcla preparada + lo que alcanza el depósito
+      // para seguir mezclando (Beef o maíz molido, el menor; el maíz molido ya cuenta lo del mixer).
       const mz = mezclaAl(f);
       if (mz) {
         const r1 = (n) => Math.round(n * 10) / 10;
         const diasMz = mz.porDia > 0 ? mz.saldo / mz.porDia : null;
-        filasDia.push([ddmmaaaa_(f), 'Mezcla BEEF hecha', 'bolsas', r1(mz.porDia), r1(mz.comidas), r1(mz.porDia), r1(mz.porDia), r1(mz.saldo),
-          diasMz === null ? '—' : Math.floor(diasMz)]);
         const deposito = [diasDe[MEZCLA_INSUMO_BEEF], diasDe[MEZCLA_INSUMO_MAIZ]].filter((x) => x !== null && x !== undefined);
-        filasDia.push([ddmmaaaa_(f), 'BEEF total (mezcla hecha + depósito)', 'días', '', '', '', '', '',
+        filasDia.push([ddmmaaaa_(f), 'Mezcla BEEF preparada (días = mezcla + depósito)', 'bolsas de mezcla', r1(mz.porDia), r1(mz.comidas),
+          r1(mz.porDia), r1(mz.porDia), r1(mz.saldo),
           diasMz === null || !deposito.length ? '—' : Math.floor(diasMz + Math.min.apply(null, deposito))]);
       }
     }
@@ -2009,7 +2024,8 @@ function publicarDatosInforme_(ss) {
         lotesEst.actualizado : 'Columna Cabezas de Consumo esperado (la app de la estancia todavía no mandó los lotes)'],
       ['Mezcla BEEF', base.mezcla ? 'Bolsas de 40 kg ya mezcladas: desde ' + ddmmaaaa_(base.mezcla.fecha) + ' (' + base.mezcla.bolsas +
         ' bolsas, parámetro "' + PARAM_MEZCLA_BEEF + '"), + 30 bolsas por cada 1.000 kg de maíz molido cargado con destino Beef, − lo teórico ' +
-        'del grupo BEEF. "BEEF total" = días de mezcla hecha + días del depósito (Beef o maíz molido, el menor).' : 'sin punto de partida'],
+        'del grupo BEEF ((kg de maíz molido + kg de Beef de su dieta) × cabezas ÷ 40). Sus días = días de mezcla preparada + días del ' +
+        'depósito (Beef o maíz molido, el menor).' : 'sin punto de partida'],
       ['Peso del stock', 'Stock por día: el consumo del confinamiento es el peso CARGADO al mixer (informe "Uso ingrediente & premezcla"). ' +
         'Corrales por día e Ingredientes por día: peso ENTREGADO a los corrales (informe "Uso de ingredientes por grupo").'],
       ['Ajuste de stock', hastaAj ? 'Peso cargado − consumo registrado del ' + ddmmaaaa_(INFORME_ACUM_DESDE) + ' al ' + ddmmaaaa_(hastaAj) +

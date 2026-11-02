@@ -158,6 +158,9 @@ opcional. Valores fijos por cabeza (no se escalan por peso). **Fardos por UNIDAD
   con el usuario: mvgqjzyul6vq4u / mvgqkfhjgjy0lk con fecha 19/09/**2025** y mvyick1ovi7n1q (Beef 5 bolsas 31/10 sin destino).
 - v1.26.2 (correccionesBeefUnaVez_, propiedad correccionBeef1, en Registro): esas dos pasaron al 19/10/2026 y las 5 bolsas
   sin destino del 31/10 se anularon (carga repetida; la mezcla lleva 15). Beef quedó en 4.180 kg.
+- v1.26.3: la mezcla va en UNA fila "Mezcla BEEF preparada (días = mezcla + depósito)", unidad "bolsas de mezcla" (las
+  dos filas anteriores con 32,5 "bolsas" se leían como bolsas de Beef). Informes 31/10 y 01/11 a la papelera
+  (papeleraInformes3110_) y rehechos con RemoteTrigger run.
 Parámetros (300). Código: leerDatosBase_ y publicarDatosInforme_.
 
 - Botón "Subir informe Tapfeed" al pie de Stock (solo casilla Configurar). El PDF "Uso de ingredientes
