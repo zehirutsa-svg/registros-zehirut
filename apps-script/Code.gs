@@ -161,13 +161,16 @@ const ESPERADO_INSUMOS = ['Silo micropicado Gatton', 'Maíz molido', 'Maíz queb
   'Concentrado Beef 1.000 M', 'Suplemento E-PRO 35', 'Fardos'];
 const BEEF_NOTA = 'Mezcla de la hoja de reparto (30/10): 32,5 bolsas de 40 kg por día para 210 cabezas; receta 1.000 kg de ' +
   'maíz MOLIDO + 200 kg de Beef = 1.200 kg. Silo: de otro lado, no cuenta';
+// 01/11/2026: el Desarrollo lo comen solo los 230 toretones de AC Torta Frente y Fondo (12 bolsas de 40 kg por día).
+const DESARROLLO_NOTA = 'Solo los 230 toretones de AC Torta Frente y Fondo (desde 01/11/2026): 12 bolsas de 40 kg por día ' +
+  '(hoja de reparto del 30/10). Silo: de otro lado, no cuenta';
 const ESPERADO_INICIAL = [
   ['Desmamantes C6O', 'C6O', '', '', 6.6, 0.5, '', 2.4, '', '', '', '', 'Dieta C6O (peso de referencia 190 kg)'],
   ['Machos C6P', 'C6P', '', '', 11.6, 2, '', '', 1.1, '', '', '', 'Dieta C6P (peso de referencia 277,5 kg)'],
   // El silo del autoconsumo sale de otro lado (no del stock de Gatton). Los BEEF comían maíz quebrado; desde el
   // 01/11/2026 la mezcla se hace con maíz MOLIDO (se terminó el quebrado). Valores de la hoja de reparto del 30/10.
   ['Toretones C4/C5 – autoconsumo BEEF', '', 210, '28/09/2026', '', 5.16, '', '', '', 1.03, '', '', BEEF_NOTA],
-  ['Toretones C4/C5 – Concentrado Desarrollo', '', 790, '28/09/2026', '', '', '', '', 1.85, '', '', '', 'Desarrollo 0,5 % del PV, al peso medio de 370 kg. Silo: de otro lado, no cuenta'],
+  ['Toretones C4/C5 – Concentrado Desarrollo', '', 230, '28/09/2026', '', '', '', '', 2.09, '', '', '', DESARROLLO_NOTA],
   ['Hembras C6P – E-PRO 35', '', 853, '', '', '', '', '', '', '', 0.3, '', 'E-PRO 35 (tope 300 g), al peso medio de 226 kg'],
   // Fardos: en fardos (no kg). Esta fila es el total del grupo (Cabezas = 1).
   ['Hembras C6P – fardo', '', 1, '', '', '', '', '', '', '', '', 9, 'Fardos por día para todo el grupo (6 a 9). Todavía no se empezó a dar'],
@@ -195,19 +198,22 @@ function ajustarConsumoEsperado_(h) {
   }
   // Una sola vez (01/11/2026): la fila BEEF pasa de maíz quebrado a maíz molido, con la hoja de reparto del 30/10.
   // Solo toca esa fila (el resto de la hoja lo edita el usuario).
-  if (props.getProperty('esperadoAjuste4')) return;
   const datos = h.getDataRange().getValues();
   const enc = datos[0].map((x) => String(x).trim());
-  const fila = datos.findIndex((f, i) => i > 0 && /BEEF/i.test(String(f[0])));
-  if (fila !== -1) {
-    const poner = (col, v) => { const c = enc.indexOf(col); if (c !== -1) h.getRange(fila + 1, c + 1).setValue(v); };
-    poner('Cabezas', 210);
-    poner('Maíz molido', 5.16);
-    poner('Maíz quebrado', '');
-    poner('Concentrado Beef 1.000 M', 1.03);
-    poner('Nota', BEEF_NOTA);
+  const ponerEn = (re, valores) => {
+    const fila = datos.findIndex((f, i) => i > 0 && re.test(String(f[0])));
+    if (fila === -1) return;
+    Object.keys(valores).forEach((col) => { const c = enc.indexOf(col); if (c !== -1) h.getRange(fila + 1, c + 1).setValue(valores[col]); });
+  };
+  if (!props.getProperty('esperadoAjuste4')) {
+    ponerEn(/BEEF/i, { 'Cabezas': 210, 'Maíz molido': 5.16, 'Maíz quebrado': '', 'Concentrado Beef 1.000 M': 1.03, 'Nota': BEEF_NOTA });
+    props.setProperty('esperadoAjuste4', '1');
   }
-  props.setProperty('esperadoAjuste4', '1');
+  // Una sola vez (01/11/2026): el Desarrollo de toretones queda solo para los 230 de AC Torta (12 bolsas/día).
+  if (!props.getProperty('esperadoAjuste5')) {
+    ponerEn(/^Toretones.*Desarrollo/i, { 'Cabezas': 230, 'Concentrado Desarrollo': 2.09, 'Nota': DESARROLLO_NOTA });
+    props.setProperty('esperadoAjuste5', '1');
+  }
 }
 const SECTORES_POR_FINCA = {
   'LA PRUDENCIA': ['A', 'C', 'D', 'F'],
