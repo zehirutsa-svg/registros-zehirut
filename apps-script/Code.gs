@@ -760,6 +760,30 @@ function hoja_(ss, nombre, encabezado) {
   return h;
 }
 
+// Una sola vez (01/11/2026, pedido del usuario): los consumos de la mezcla BEEF (maíz quebrado y Beef, desde el 28/09)
+// estaban con destino "Autoconsumos" o "AC D Norte"; pasan al destino nuevo "Autoconsumo BEEF". Queda en Registro.
+const DESTINO_BEEF = 'Autoconsumo BEEF';
+const IDS_DESTINO_BEEF = ['muo6xce4nv03gf', 'muv8r03py5rzu6', 'muvvoelf5dxd73', 'muvvolcs7g9qqr', 'muvwxu8fe4etr4', 'muvwy61dpzit13',
+  'muxav1cosdygv0', 'muxavdddo8h4va', 'mv198o3ndp9i3f', 'mv199h6epb1r98', 'mv8ttjkzyhe34t', 'mv8tu7znvzupne', 'mvgqjzyul6vq4u',
+  'mvgqkfhjgjy0lk', 'mvpadn3vnf6qm1', 'mvpaehhsizs2l9', 'mvyhluwi4blwev', 'mvyhnog64g8u1f'];
+function destinoBeefUnaVez_(ss) {
+  const props = props_();
+  if (props.getProperty('destinoBeef1')) return;
+  conLock_(() => {
+    const sh = ss.getSheetByName('Movimientos');
+    const col = COLS_MOV.indexOf('Destino') + 1;
+    const ahora = new Date();
+    const log = [];
+    leerMovimientos_(ss).filter((m) => IDS_DESTINO_BEEF.indexOf(m.id) !== -1 && m.destino !== DESTINO_BEEF).forEach((m) => {
+      sh.getRange(m.fila, col).setValue(DESTINO_BEEF);
+      log.push([ahora, 'Claude (pedido de Quique Delfante)', 'Cambio de destino',
+        m.insumo + ' ' + m.cantidad + ' ' + m.unidad + ' (' + ddmmaaaa_(m.fecha) + '): ' + (m.destino || '(vacío)') + ' → ' + DESTINO_BEEF, 'aplicado', m.id]);
+    });
+    registrar_(ss, log);
+    props.setProperty('destinoBeef1', String(log.length));
+  });
+}
+
 function conLock_(fn) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -774,6 +798,7 @@ function doGet() {
   eproBolsa30_(SpreadsheetApp.getActive());
   papeleraInformesViejos_();
   limpiarReemplazosTapfeed_(SpreadsheetApp.getActive());
+  destinoBeefUnaVez_(SpreadsheetApp.getActive());
   publicarDatosInforme_(SpreadsheetApp.getActive());
   const pagos = marcarPagadasViejas_() + recalcularVencChaco_();
   const url = SpreadsheetApp.getActive().getUrl();

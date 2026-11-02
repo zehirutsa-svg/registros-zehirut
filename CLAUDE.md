@@ -153,6 +153,9 @@ opcional. Valores fijos por cabeza (no se escalan por peso). **Fardos por UNIDAD
   Filas extra en Stock por día: "Mezcla BEEF hecha" (bolsas, días) y "BEEF total (mezcla hecha + depósito)" (días =
   días de mezcla + mín(días Beef, días maíz molido)). Para corregir con un conteo: cambiar el parámetro.
 - Stock por día y Corrales por día van **del día más nuevo al más viejo**: read_file_content muestra ~65 filas.
+- v1.26.1: los 18 consumos de la mezcla BEEF (maíz quebrado y Beef, 28/09 al 30/10) pasaron de "Autoconsumos"/"AC D Norte"
+  al destino **"Autoconsumo BEEF"** (destinoBeefUnaVez_, propiedad destinoBeef1, anotado en Registro). Quedan para revisar
+  con el usuario: mvgqjzyul6vq4u / mvgqkfhjgjy0lk con fecha 19/09/**2025** y mvyick1ovi7n1q (Beef 5 bolsas 31/10 sin destino).
 Parámetros (300). Código: leerDatosBase_ y publicarDatosInforme_.
 
 - Botón "Subir informe Tapfeed" al pie de Stock (solo casilla Configurar). El PDF "Uso de ingredientes
