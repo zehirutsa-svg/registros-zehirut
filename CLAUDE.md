@@ -341,7 +341,7 @@ acceso total.
   entrada (tipo | lista): la flecha vuelve ahí y después al grupo; al guardar se vuelve a la raíz.
 
 - No se copia la lógica: el script usa **ZehirutApp como biblioteca** (símbolo `ZA`, versión fija en
-  `appsscript.json`, hoy 150). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
+  `appsscript.json`, hoy 152). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
   salen de la hoja Usuarios de ESTE Sheet (ver "Una sola planilla de usuarios"). La web de ZehirutApp quedó
   apagada (v137: solo muestra un botón a Registros); el proyecto sigue como biblioteca y para el mail diario.
   v138 (01/10): sin Index.html ni Combustible.js; la planilla vieja de usuarios y la hoja "Combustible
@@ -365,6 +365,8 @@ acceso total.
   doPost desde las 8:00 (Asunción) de cada día llama a `ZA.revisarYNotificarComprobantesNuevos` (avisoFacturasDiario_,
   propiedad AVISO_FACTURAS_REVISADO); la idempotencia real es ULTIMO_AVISO_ENVIADO en las propiedades de la biblioteca,
   así que si el disparador viejo revive no hay mails dobles. Un error queda en la hoja Registro.
+  "Nuevas" = cargadas ayer u hoy **menos los Ids que ya salieron en el último mail** (propiedad ULTIMO_AVISO_IDS,
+  03/11/2026, v1.27.1, ZA 152): antes, lo cargado un día antes del mail salía ese día y otra vez al siguiente.
   Requiere el permiso send_mail autorizado en Registros (autorizar() lo pide; el dueño lo aceptó el 26/10/2026).
   **Ojo con fechas a través de la biblioteca:** si Registros abre la planilla y le pasa la hoja a ZA, los Date llegan
   de otro contexto y `instanceof Date` falla en ZA (salen como "Fri Oct 23 2026…"); que ZA abra la planilla él mismo.
