@@ -250,8 +250,10 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
   500 ml). Columnas "Contenido por unidad" + "Unidad del contenido" (frasco de 500 ml, caja de 100 un):
   el saldo se guarda en frascos **con decimales** y se muestra también en ml/un. Sin destinos (corrales).
 - **Alta y edición de productos, de a uno** (pedido 30/09, la lista larga de Configurar era engorrosa): "➕ Nuevo
-  producto" al pie de cada stock y "✏️ Editar datos del producto" en la ficha (solo con Configurar; acción
-  'producto' → guardarProducto_ en Sanidad.gs, escribe solo esa fila). Cambio de nombre con movimientos (03/10):
+  producto" al pie de cada stock y "✏️ Editar datos del producto" en la ficha (acción
+  'producto' → guardarProducto_ en Sanidad.gs, escribe solo esa fila).
+  Permisos (03/11/2026, v1.27.0, pedido para Jose): **agrega productos nuevos quien tiene Sanidad = Cargar o más**;
+  editar uno existente, Sanidad = Administrar o Configurar (`puedeProducto` en app.js, mismo control en el script). Cambio de nombre con movimientos (03/10):
   en Semen y Materiales sanitarios se renombran también sus movimientos (columna Insumo); en Medicamentos no
   (la app de la estancia lo nombra así): se desactiva y se crea otro.
 - Lista inicial: `apps-script/Sanidad.gs` (PRODUCTOS_SANIDAD, 98 productos de la hoja INVENTARIO de la

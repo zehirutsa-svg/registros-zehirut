@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.26.3';
+const VERSION = '1.27.0';
 
 
 const DIAS_HISTORIAL = 60;
@@ -134,6 +134,9 @@ function nivel(modulo) {
   return NIVELES[String((sesion.permisos || {})[modulo] || '').toUpperCase()] || 0;
 }
 const puede = (modulo, minimo) => nivel(modulo) >= NIVELES[minimo];
+/** Sanidad (03/11/2026): agrega productos nuevos quien carga en Sanidad (Jose: veterinarios, materiales,
+ *  pajuelas); editar los que ya existen, quien administra Sanidad o tiene Configurar. */
+const puedeProducto = (nuevo) => !!sesion && (sesion.configura || puede('Sanidad', nuevo ? 'CARGAR' : 'ADMINISTRAR'));
 
 // ---------------------------------------------------------------- avisos y carteles
 let toastTimer = null;
@@ -595,8 +598,8 @@ function htmlStock() {
   const i = ui.insumoVer && stockDatos().insumos.find((x) => x.nombre === ui.insumoVer);
   if ((ui.vistaStock === 'ficha' || ui.vistaStock === 'form') && !i) ui.vistaStock = 'lista';
   if (ui.vistaStock === 'form' && !(ui.form && ui.form.clase)) ui.vistaStock = 'ficha';
-  if (((ui.vistaStock === 'config' || ui.vistaStock === 'producto') && (!sesion.configura || esCombustible())) ||
-    (ui.vistaStock === 'config' && esSanidad()) || (ui.vistaStock === 'producto' && !ui.prod) ||
+  if ((ui.vistaStock === 'config' && (!sesion.configura || esCombustible())) ||
+    (ui.vistaStock === 'config' && esSanidad()) || (ui.vistaStock === 'producto' && (!ui.prod || !esSanidad() || !puedeProducto(!ui.prod.original))) ||
     (ui.vistaStock === 'tapfeed' && (!sesion.configura || ui.modStock !== 'Stock'))) ui.vistaStock = 'lista';
   const vistas = {
     lista: [esSanidad() ? ui.rubro : esCombustible() ? 'Combustible' : 'Stock de insumos', htmlSaldo],
@@ -679,7 +682,7 @@ function htmlSaldo() {
     '<div class="pie-stock"><button class="btn sec chico" data-a="vista" data-v="excel">📥 Bajar Excel</button>' +
     (sesion.configura && ui.modStock === 'Stock' ? '<button class="btn sec chico" data-a="vista" data-v="tapfeed">📄 Subir informe TAP Feed</button>' +
       '<button class="btn sec chico" data-a="vista" data-v="config">⚙ Configurar insumos y corrales</button>' : '') +
-    (sesion.configura && esSanidad() ? '<button class="btn sec chico" data-a="nuevoProducto">➕ Nuevo producto</button>' : '') + '</div>';
+    (esSanidad() && puedeProducto(true) ? '<button class="btn sec chico" data-a="nuevoProducto">➕ Nuevo producto</button>' : '') + '</div>';
 }
 
 /** Lo aplicado a los animales llega solo desde la app de la estancia: cuándo fue la última vez y
@@ -817,7 +820,7 @@ function htmlFicha(nombre) {
       cajas += '<table class="detalle" style="margin-top:10px">' + f.map(([a, b]) => '<tr><td>' + esc(a) + '</td><td>' + esc(b) + '</td></tr>').join('') + '</table>' +
         (i.rubro === RUBRO_MATERIALES ? '<p class="nota-estancia" style="margin-top:8px">No se aplica a animales: el uso se carga acá, con Consumo.</p>'
           : ui.rubro !== 'Semen' ? '<p class="nota-estancia" style="margin-top:8px">El uso se carga en la app de la estancia (Sanidades) y se descuenta solo.</p>' : '') +
-        (sesion.configura ? '<button class="btn sec chico" data-a="editarProducto" style="margin-top:4px">✏️ Editar datos del producto</button>' : '');
+        (puedeProducto(false) ? '<button class="btn sec chico" data-a="editarProducto" style="margin-top:4px">✏️ Editar datos del producto</button>' : '');
     }
   }
   const mostrar = ui.movsVisibles || 15;
@@ -1466,8 +1469,8 @@ function htmlConfig() {
     '</div>';
 }
 
-/** Sanidad: alta o edición de UN producto (desde "➕ Nuevo producto" o la ficha). Solo quien tiene
- *  Configurar; necesita señal. Un Medicamento con movimientos no cambia de nombre (lo controla el script). */
+/** Sanidad: alta o edición de UN producto (desde "➕ Nuevo producto" o la ficha). Permisos en
+ *  puedeProducto; necesita señal. Un Medicamento con movimientos no cambia de nombre (lo controla el script). */
 function productoForm(i) {
   const v = (x) => (x == null ? '' : String(x).replace('.', ','));
   return i ? { original: i.nombre, nombre: i.nombre, principio: i.principio || '', rubro: i.rubro, unidad: i.unidad, contenido: v(i.contenido),

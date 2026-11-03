@@ -407,15 +407,18 @@ function migrarRubrosSanidad_(ss, ins) {
 }
 
 // ---------------------------------------------------------------- un producto (alta o edición)
-// Desde la ficha del producto ("✏️ Editar datos") o "➕ Nuevo producto" (solo quien tiene Configurar).
+// Desde la ficha del producto ("✏️ Editar datos") o "➕ Nuevo producto". Alta: quien carga en Sanidad
+// (03/11/2026, para Jose); editar uno que ya existe: quien administra Sanidad o tiene Configurar.
 // Se escribe solo su fila de Insumos. Cambiar el nombre de un producto con movimientos: en Semen y
 // Materiales sanitarios se renombran también sus movimientos (no pasan por la app de la estancia);
 // en Medicamentos no, porque la estancia lo nombra así (se desactiva y se crea otro).
 function guardarProducto_(body) {
   const ss = SpreadsheetApp.getActive();
   const u = usuarioDe_(ss, body.pin);
-  if (!u.configura) throw new Error('no tenés permiso para cambiar la lista de productos');
   const x = body.producto || {};
+  if (!u.configura && nivel_(u, 'Sanidad') < (body.original ? NIVELES.ADMINISTRAR : NIVELES.CARGAR)) {
+    throw new Error(body.original ? 'no tenés permiso para editar productos' : 'no tenés permiso para agregar productos');
+  }
   return conLock_(() => {
     const sh = ss.getSheetByName('Insumos');
     const insumos = leerInsumos_(ss);
