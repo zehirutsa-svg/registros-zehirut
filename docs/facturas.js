@@ -513,6 +513,7 @@ function htmlProveedorPago(p, g) {
     const [txt, cls] = g.pagadas ? ['Pagada' + (x.fechaPago ? ' el ' + x.fechaPago : '') + (x.pagadaCon ? ' · ' + x.pagadaCon : ''), 'verde'] : estadoVenc(x.dias);
     return '<button class="mov factura sub" data-a="fac" data-x="abrir" data-id="' + esc(x.id) + '"><span class="cuerpo"><b>' + esc(x.numeroFactura || '(sin número)') +
       '</b><small>' + esc(x.fecha) + ' · vence ' + esc(x.vencimiento || '—') + ' · ' + esc(String(x.usuario || '').split(' ')[0]) + '</small>' +
+      (x.detalle ? '<small style="display:block">' + esc(x.detalle) + '</small>' : '') +
       '<small style="display:block;margin-top:4px"><span class="chip ' + cls + '">' + esc(txt) + '</span></small></span>' +
       '<span class="num">' + fmtMonto(x.monto, x.moneda) + '<br><small style="font-weight:600;color:var(--gris)">' + esc(x.moneda) + '</small></span></button>';
   };
