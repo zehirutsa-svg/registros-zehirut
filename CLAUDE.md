@@ -341,7 +341,7 @@ acceso total.
   entrada (tipo | lista): la flecha vuelve ahí y después al grupo; al guardar se vuelve a la raíz.
 
 - No se copia la lógica: el script usa **ZehirutApp como biblioteca** (símbolo `ZA`, versión fija en
-  `appsscript.json`, hoy 152). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
+  `appsscript.json`, hoy 154). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
   salen de la hoja Usuarios de ESTE Sheet (ver "Una sola planilla de usuarios"). La web de ZehirutApp quedó
   apagada (v137: solo muestra un botón a Registros); el proyecto sigue como biblioteca y para el mail diario.
   v138 (01/10): sin Index.html ni Combustible.js; la planilla vieja de usuarios y la hoja "Combustible
@@ -401,6 +401,12 @@ acceso total.
   (enero → 5/3), sin importar los días de crédito; se reconoce por el nombre (REGLAS_VENCIMIENTO_PROVEEDOR en
   ZehirutApp/Calendario.js; otro proveedor así = agregar una línea + ZA.recalcularVencimientosProveedores). Una vez
   (recalcularVencChaco_, propiedad VENC_CHACO): 43 vencimientos recalculados, 8 "Carga inicial" volvieron a pendientes.
+
+- **Facturas repetidas (06/11/2026, v1.27.4, ZA 154):** el N° se compara normalizado (sin guiones, espacios ni ceros de
+  relleno: "001-001-0001234" = "0010010001234" = "1-1-1234"; RUC igual) — `normalizarNumeroFactura` / `buscarFacturaDuplicada`
+  en `ZehirutApp/Código.js`. Si las dos tienen timbrado distinto, no es la misma. **Ya no se puede "cargar igual"**: al leer
+  avisa y descarta; `guardarFactura` (con LockService) y `actualizarFactura` lo vuelven a chequear y rechazan.
+  Al 06/11 había 2 cargadas dos veces (Chortitzer 006-001-0034030 y Tonina 010-001-0012087, la segunda de cada una por Osmar).
 
 ## Usuarios (inicio)
 

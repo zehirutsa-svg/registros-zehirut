@@ -261,9 +261,11 @@ async function leerFacturaElegida(file) {
   }
   if (r.duplicado && r.facturaExistente) {
     const d = r.facturaExistente;
-    const ok = await cartel({ icono: '⚠️', titulo: 'Esta factura ya está cargada', si: 'Sí, cargar igual', no: 'No, descartar',
-      html: '<p>N° <b>' + esc(d.numeroFactura) + '</b> de ' + esc(d.proveedor) + ', cargada el ' + esc(d.fechaCarga) + ' por ' + esc(d.usuario) + '.</p>' });
-    if (!ok) { descartar(); return; }
+    // Desde 06/11/2026 no se puede cargar dos veces (el N° se compara sin guiones; ver ZehirutApp).
+    await cartel({ icono: '🚫', titulo: 'Esta factura ya está cargada', si: 'Entendido', no: '',
+      html: '<p>N° <b>' + esc(d.numeroFactura) + '</b> de ' + esc(d.proveedor) + ', cargada el ' + esc(d.fechaCarga) + ' por ' + esc(d.usuario) + '.</p><p>No se carga de nuevo.</p>' });
+    descartar();
+    return;
   }
   const elegidos = [];
   if (r.anticiposPendientes && r.anticiposPendientes.length) {
