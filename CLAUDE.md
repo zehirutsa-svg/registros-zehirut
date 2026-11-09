@@ -406,7 +406,8 @@ acceso total.
   relleno: "001-001-0001234" = "0010010001234" = "1-1-1234"; RUC igual) — `normalizarNumeroFactura` / `buscarFacturaDuplicada`
   en `ZehirutApp/Código.js`. Si las dos tienen timbrado distinto, no es la misma. **Ya no se puede "cargar igual"**: al leer
   avisa y descarta; `guardarFactura` (con LockService) y `actualizarFactura` lo vuelven a chequear y rechazan.
-  Al 06/11 había 2 cargadas dos veces (Chortitzer 006-001-0034030 y Tonina 010-001-0012087, la segunda de cada una por Osmar).
+  Al 06/11 había 2 cargadas dos veces (Chortitzer 006-001-0034030 y Tonina 010-001-0012087, la segunda de cada una por Osmar); el 09/11/2026, con OK
+  del usuario, se borraron las de Osmar (Ids 261009170313 y 261019081251, sin comprobantes ni anticipos; carpetas a la papelera).
 
 ## Usuarios (inicio)
 
