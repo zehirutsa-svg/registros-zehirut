@@ -44,6 +44,11 @@ Probar local: `node dev/servidor-prueba.js 8766` → <http://localhost:8766> (`/
 Esperas (v1.21.16): todo lo que procesa muestra la **ruedita**. Mensaje central: `espera('Cargando…')`; botón
 ocupado: `rueda() + 'Guardando…'`; un `toast` cuyo texto termina en "…" la muestra solo. En Ver facturas, si ya
 hay resultados y se busca de nuevo, aparece "Buscando…" arriba (`#fac-buscando`) sin borrar la lista.
+Buscador de Ver facturas (v1.27.5, 10/11/2026, "tarda mucho y a veces queda girando"): al llegar la respuesta se
+redibuja solo `#fac-res` (no el campo: antes se cerraba el teclado); cada búsqueda lleva turno y solo vale la última;
+mínimo 2 letras, espera 700 ms de tipeo; a los 60 s sin respuesta muestra error + Reintentar. En ZA 155 los ítems se
+buscan en un índice en CacheService (`leerIndiceItems`, 30 min, se invalida al guardar/corregir/eliminar ítems) y
+`listarFacturas` devuelve `ms` (tiempo del lado de Google).
 
 ## Google (clasp, cuenta zehirutsa@gmail.com)
 
@@ -341,7 +346,7 @@ acceso total.
   entrada (tipo | lista): la flecha vuelve ahí y después al grupo; al guardar se vuelve a la raíz.
 
 - No se copia la lógica: el script usa **ZehirutApp como biblioteca** (símbolo `ZA`, versión fija en
-  `appsscript.json`, hoy 154). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
+  `appsscript.json`, hoy 155). Misma planilla, carpetas de Drive y clave de Gemini; los permisos
   salen de la hoja Usuarios de ESTE Sheet (ver "Una sola planilla de usuarios"). La web de ZehirutApp quedó
   apagada (v137: solo muestra un botón a Registros); el proyecto sigue como biblioteca y para el mail diario.
   v138 (01/10): sin Index.html ni Combustible.js; la planilla vieja de usuarios y la hoja "Combustible

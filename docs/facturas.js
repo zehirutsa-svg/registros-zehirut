@@ -160,18 +160,37 @@ function atrasFacturas() {
 }
 
 // ---- lista
+// 10/11/2026 (el buscador tardaba y a veces quedaba girando): al llegar la respuesta se redibujan solo
+// los resultados (#fac-res), no el campo de búsqueda (antes se cerraba el teclado y se perdía lo tipeado);
+// cada búsqueda lleva un número y solo vale la última (una respuesta vieja ya no pisa a la nueva); si
+// Google no contesta en 60 s se avisa con "Reintentar" en vez de quedar girando.
+const FAC_MIN_LETRAS = 2;
+const FAC_ESPERA_MAX = 60000;
+
+function facFiltroActivo(f) {
+  return !!(f.mes || (f.q && f.q.length >= FAC_MIN_LETRAS));
+}
+
 function htmlFacLista() {
   const f = estadoFac();
-  const p = zaP();
   // No se trae nada hasta que se busca algo o se elige un mes (antes cargaba todas al entrar).
-  const buscando = !!(f.q || f.mes);
-  if (buscando && !f.lista && !f.cargando) setTimeout(() => cargarListaFac(true), 0);
-  let h = '';
-  h += '<div class="filtros"><input class="txt" id="fac-q" placeholder="Buscar N°, proveedor, RUC o ítem" value="' + esc(f.q) + '" autocomplete="off">' +
+  if (facFiltroActivo(f) && !f.lista && !f.cargando && !f.error) setTimeout(() => cargarListaFac(true), 0);
+  return '<div class="filtros"><input class="txt" id="fac-q" placeholder="Buscar N°, proveedor, RUC o ítem" value="' + esc(f.q) + '" autocomplete="off">' +
     '<input class="txt" type="month" id="fac-mes" value="' + esc(f.mes) + '" style="flex:0 1 170px"></div>' +
-    '<p class="buscando-mas" id="fac-buscando"' + (f.cargando && f.lista ? '' : ' hidden') + '>' + rueda() + 'Buscando…</p>';
-  if (!buscando) return h + '<p class="vacio" style="padding:20px 8px">Escribí un N°, proveedor, RUC o lo que se compró (ej. adaptador), o elegí un mes.</p>';
-  if (!f.lista) return h + (f.error ? '<p class="vacio">⚠️ ' + esc(f.error) + '</p>' : espera('Buscando…'));
+    '<p class="buscando-mas" id="fac-buscando"' + (f.cargando && f.lista ? '' : ' hidden') + '>' + rueda() + 'Buscando…</p>' +
+    '<div id="fac-res">' + htmlFacResultados() + '</div>';
+}
+
+function htmlFacResultados() {
+  const f = estadoFac();
+  if (!facFiltroActivo(f)) {
+    return '<p class="vacio" style="padding:20px 8px">' + (f.q ? 'Escribí al menos ' + FAC_MIN_LETRAS + ' letras' : 'Escribí un N°, proveedor, RUC o lo que se compró (ej. adaptador)') + ', o elegí un mes.</p>';
+  }
+  if (f.error) {
+    return '<p class="vacio">⚠️ ' + esc(f.error) + '</p><button class="btn sec" data-a="fac" data-x="reintentar">Reintentar</button>';
+  }
+  if (!f.lista) return espera('Buscando…');
+  let h = '';
   if (!f.lista.filas.length) h += '<p class="vacio">No hay facturas con ese filtro.</p>';
   h += f.lista.filas.map((x) =>
     '<button class="mov factura' + (x.cargadoAlbor ? ' albor' : '') + '" data-a="fac" data-x="abrir" data-id="' + esc(x.id) + '">' +
@@ -180,27 +199,50 @@ function htmlFacLista() {
     (x.cargadoAlbor ? ' <span class="chip verde">✓ Albor</span>' : '') + '</small>' +
     (x.itemCoincidente ? '<small class="item-buscado">🔎 ' + esc(x.itemCoincidente) + '</small>' : '') + '</span>' +
     '<span class="num">' + fmtMonto(x.monto, x.moneda) + '<br><small style="font-weight:600;color:var(--gris)">' + esc(x.moneda) + '</small></span></button>').join('');
-  if (f.lista.hayMas) h += '<button class="btn sec" data-a="fac" data-x="mas">Ver más (' + (f.lista.total - f.lista.filas.length) + ')</button>';
+  if (f.lista.hayMas) h += '<button class="btn sec" data-a="fac" data-x="mas"' + (f.cargando ? ' disabled' : '') + '>Ver más (' + (f.lista.total - f.lista.filas.length) + ')</button>';
   if (f.lista.filas.length) h += '<div class="pie-stock"><button class="btn sec chico" data-a="fac" data-x="excel">📥 Bajar Excel (con este filtro)</button></div>';
   return h;
 }
 
+/** Redibuja solo los resultados si la lista está a la vista (el campo de búsqueda queda como está). */
+function refrescarResultadosFac() {
+  const f = estadoFac();
+  if (ui.pantalla !== 'facturas' || f.vista !== 'lista') return;
+  const res = $('#fac-res');
+  if (!res) { render(); return; }
+  res.innerHTML = htmlFacResultados();
+  const aviso = $('#fac-buscando');
+  if (aviso) aviso.hidden = !(f.cargando && f.lista);
+}
+
 async function cargarListaFac(reiniciar) {
   const f = estadoFac();
+  const turno = (f.turnoBusqueda || 0) + 1;
+  f.turnoBusqueda = turno;
+  if (!facFiltroActivo(f)) { f.cargando = false; f.lista = null; f.error = ''; refrescarResultadosFac(); return; }
+  const filtro = { q: f.q, mes: f.mes };
+  const sumar = !reiniciar && f.lista && f.listaFiltro && f.listaFiltro.q === filtro.q && f.listaFiltro.mes === filtro.mes;
   f.cargando = true;
   f.error = '';
-  const aviso = $('#fac-buscando');
-  if (aviso) aviso.hidden = false; // si ya hay resultados, se quedan a la vista y se avisa arriba
+  refrescarResultadosFac(); // si ya hay resultados, se quedan a la vista y se avisa arriba
   try {
-    const offset = reiniciar || !f.lista ? 0 : f.lista.filas.length;
-    const r = await za('listarFacturas', ['__PIN__', { query: f.q, mes: f.mes, offset, limite: 30 }], true);
-    f.lista = reiniciar || !f.lista ? r : { filas: f.lista.filas.concat(r.filas), total: r.total, hayMas: r.hayMas };
+    const offset = sumar ? f.lista.filas.length : 0;
+    let reloj;
+    const limite = new Promise((_, mal) => { reloj = setTimeout(() => mal(new Error('Google tardó demasiado en contestar.')), FAC_ESPERA_MAX); });
+    let r;
+    try {
+      r = await Promise.race([za('listarFacturas', ['__PIN__', { query: filtro.q, mes: filtro.mes, offset, limite: 30 }], true), limite]);
+    } finally { clearTimeout(reloj); }
+    if (turno !== f.turnoBusqueda) return; // llegó tarde: ya se pidió otra búsqueda
+    f.lista = sumar ? { filas: f.lista.filas.concat(r.filas), total: r.total, hayMas: r.hayMas } : r;
+    f.listaFiltro = filtro;
   } catch (e) {
+    if (turno !== f.turnoBusqueda) return;
     f.error = e.message;
-  } finally {
-    f.cargando = false;
-    if (ui.pantalla === 'facturas' && f.vista === 'lista') render();
+    f.lista = null;
   }
+  f.cargando = false;
+  refrescarResultadosFac();
 }
 
 // ---- elegir qué cargar
@@ -854,7 +896,8 @@ async function accionFac(b) {
     return;
   }
   if (x === 'abrir') { abrirDetalleFac(b.dataset.id); return; }
-  if (x === 'mas') { cargarListaFac(false); return; }
+  if (x === 'mas') { if (!estadoFac().cargando) cargarListaFac(false); return; }
+  if (x === 'reintentar') { cargarListaFac(true); return; }
   if (x === 'excel') {
     toast('Armando el Excel…', 15000);
     try { descargarBase64(await za('exportarFacturasExcel', ['__PIN__', { query: f.q, mes: f.mes }], true), 'Facturas.xlsx'); toast('✓ Excel descargado'); }
@@ -1062,7 +1105,16 @@ function despuesDeRenderFac() {
   const q = $('#fac-q');
   if (q) {
     let t = null;
-    q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { estadoFac().q = q.value.trim(); cargarListaFac(true); }, 500); });
+    q.addEventListener('input', () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        const f = estadoFac();
+        const nuevo = q.value.trim();
+        if (nuevo === f.q && (f.lista || f.cargando)) return;
+        f.q = nuevo;
+        cargarListaFac(true);
+      }, 700);
+    });
   }
   const mes = $('#fac-mes');
   if (mes) mes.addEventListener('change', () => { estadoFac().mes = mes.value; cargarListaFac(true); });
