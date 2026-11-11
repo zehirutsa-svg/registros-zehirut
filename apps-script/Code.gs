@@ -827,6 +827,31 @@ function correccionesBeefUnaVez_(ss) {
   });
 }
 
+/** 11/11/2026, una sola vez (pedido de Quique): el conteo de Brangus Negro Robusto (193) quedó con fecha 03/11 y la
+ *  IATF PRIMAVERA 2026 de L5-L7 es del 02/11, así que no se descontaba (el stock cuenta desde el primer conteo).
+ *  Se pasa el conteo al 01/11; la próxima llamada de la estancia escribe el consumo del 02/11. */
+function conteoRobustoUnaVez_(ss) {
+  const props = props_();
+  if (props.getProperty('conteoRobusto1')) return;
+  conLock_(() => {
+    const sh = ss.getSheetByName('Movimientos');
+    const ahora = new Date();
+    const log = [];
+    leerMovimientos_(ss).forEach((m) => {
+      if (m.id !== 'mw0nr93hcp365y' || m.fecha !== '2026-11-03' || m.tipo !== 'Conteo') return;
+      const celda = sh.getRange(m.fila, COLS_MOV.indexOf('Fecha') + 1);
+      const v = celda.getValue();
+      if (v instanceof Date) { const d = new Date(v.getTime()); d.setFullYear(2026, 10, 1); celda.setValue(d); }
+      else celda.setValue(String(v).replace('2026-11-03', '2026-11-01').replace('03/11/2026', '01/11/2026'));
+      log.push([ahora, 'Claude (pedido de Quique Delfante)', 'Cambio de fecha', 'Conteo ' + m.insumo + ' ' + m.cantidad +
+        ': 03/11/2026 → 01/11/2026 (para que se descuente la IATF del 02/11)', 'aplicado', m.id]);
+    });
+    registrar_(ss, log);
+    if (log.length) reconstruirStock_(ss);
+    props.setProperty('conteoRobusto1', String(log.length));
+  });
+}
+
 function conLock_(fn) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -844,6 +869,7 @@ function doGet() {
   limpiarReemplazosTapfeed_(SpreadsheetApp.getActive());
   destinoBeefUnaVez_(SpreadsheetApp.getActive());
   correccionesBeefUnaVez_(SpreadsheetApp.getActive());
+  conteoRobustoUnaVez_(SpreadsheetApp.getActive());
   publicarDatosInforme_(SpreadsheetApp.getActive());
   const pagos = marcarPagadasViejas_() + recalcularVencChaco_();
   const url = SpreadsheetApp.getActive().getUrl();

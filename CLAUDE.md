@@ -303,6 +303,10 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
   ni anulan desde la app (se corrigen allá). Lo que no se pudo descontar (producto desconocido, unidad
   distinta) se ve arriba de la lista y en la hoja Registro. Código en `apps-script/Sanidad.gs`.
 - **Más adelante (verlo aparte):** descontar semen y hormonas al cargar un Servicio de IATF.
+- **Ojo con la fecha de los conteos (11/11/2026):** el stock arranca en el primer conteo; un consumo de la estancia con
+  fecha anterior no se descuenta. Caso: conteo de Brangus Negro Robusto (193, cargado 03/11 9:22 con fecha 03/11) y la
+  IATF PRIMAVERA 2026 de L5-L7 con fecha 02/11 → no se descontaba. conteoRobustoUnaVez_ (propiedad conteoRobusto1)
+  pasó el conteo al 01/11.
 - **Resumen del confinamiento para la estancia (28/10/2026, `apps-script/Confinamiento.gs`):** `estancia_` devuelve además
   `confinamiento`: lo que `publicarDatosInforme_` ya calculó (stock de insumos con consumo esperado y días de stock, último
   Tapfeed, días sin Tapfeed, avisos de premezcla, alerta de stock y la hoja Corrales de Datos base), guardado en la propiedad
