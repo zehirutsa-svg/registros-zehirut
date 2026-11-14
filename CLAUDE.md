@@ -204,6 +204,13 @@ Parámetros (300). Código: leerDatosBase_ y publicarDatosInforme_.
 - Insumos ↔ Tapfeed por la columna "Nombre en Tapfeed" de la hoja Insumos (solo se edita en la hoja). **Puede
   tener varios nombres separados por punto y coma** (Tapfeed renombra: el 01/10 "Concentrado Desarrollo" pasó a
   "Concen Desarrollo"; agregado solo con agregarNombreTapfeed_). La coma no sirve de separador ("Maiz Molido DGM 1,2").
+- **Cargar PDF de Tapfeed desde Claude (14/11/2026):** con el pedido del usuario se recargaron 11–13/11 por la app
+  misma: servidor node en el scratchpad que sirve `docs/` + los PDF en 127.0.0.1 (la página pública no puede leer
+  localhost), el usuario entra con su PIN en el panel del navegador y Claude llama `tfLeer(File)` + `tfConfirmar()`
+  por javascript_tool (premezcla primero, después por grupo; un informe por llamada). Una acción temporal en doPost
+  sin PIN la frenó el clasificador: no intentarlo. Para rehacer el PDF del informe diario: la conexión Drive de
+  Claude SÍ pudo mandarlo a la papelera (trash_file) + borrar los "FALTA INFORME TAPFEED <día>.txt" del día y
+  RemoteTrigger run de la tarea.
 - Carga inicial (ingresos 2025/2026 y consumo del 21/09, sin PDF: acumulado de la tarea menos los PDF
   22–27): CSV "Registros Zehirut - carga inicial.csv" en la carpeta "Confinamiento ZEHIRUT"; el script
   lo importa solo en doGet y lo renombra "(importado)". Los datos no van al repo (es público).
