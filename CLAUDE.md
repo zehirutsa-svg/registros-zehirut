@@ -343,6 +343,10 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
   - Aviso en Sanidad (`facturasPorAsignar` en datos_) con botón a la factura. Solo módulo Sanidad (MODULOS_FAC_STOCK);
     para sumar Stock de insumos alcanza con agregarlo ahí y en `productosStockFac` (app).
   - Prueba local: `dev/servidor-prueba.js` + llamadas a /api (guardar, asignar, corregir, fecha, eliminar, a mano).
+  - **Presentación (17/11/2026, v1.28.2, pedido del usuario):** `presentacionFac_` lee los ml del ítem ("50 ML", "250 ML-50 DS",
+    "2,5 L", "500 CC"). La sugerencia nunca propone un producto de otra presentación y, con la misma, acepta solo la marca
+    ("BOVISAN 250 ML" → "BOVISAN TOTAL 250 ml"; si dos empatan solo por marca, no sugiere). En el selector: chip verde/naranja
+    con la presentación de cada producto, aviso amarillo y confirmación si se guarda uno que no coincide.
   - 16/11/2026, con OK del usuario, se borraron para recargarlas como prueba real: Consultpec 001-001-0023685 (Id
     261115085754) y Market 001-001-0019156 (Id 261116155813), sin pago, Albor ni comprobantes (función temporal, ya sacada).
 

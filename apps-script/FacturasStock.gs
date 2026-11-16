@@ -114,24 +114,45 @@ function borrarFilasFacStock_(ss, facturaId) {
 function tokensFac_(s) {
   return normalFac_(s).split(' ').filter((t) => t && !PALABRAS_VACIAS[t]);
 }
-/** Producto del stock cuyo nombre aparece en la descripción del ítem: el nombre seguido ("AD3E", "B12"),
- *  o todas sus palabras sueltas si alguna tiene 3+ letras ("CIDENTAL 500 ml" en "CIDENTAL X 500ML").
- *  Si hay varios, el de nombre más largo; con la presentación como desempate. */
+/** Presentación escrita en el ítem, en ml ("50 ML", "250 ML-50 DS", "1 L", "2,5L", "500 CC"), o null. */
+function presentacionFac_(desc) {
+  const t = String(desc || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const m = t.match(/(\d+(?:[.,]\d+)?)\s*(ML|CC|LTS|LT|LITROS|LITRO|L)(?![A-Z])/);
+  if (!m) return null;
+  let n = m[1];
+  n = /^\d{1,3}\.\d{3}$/.test(n) ? Number(n.replace('.', '')) : Number(n.replace(',', '.'));
+  if (!(n > 0)) return null;
+  return /^L/.test(m[2]) ? Math.round(n * 1000) : n;
+}
+const mlProducto_ = (p) => (p.contenido && p.unidadContenido === 'ml' ? Number(p.contenido) : null);
+
+/** Producto del stock para el ítem. Nombre: seguido ("AD3E", "B12"), todas sus palabras sueltas si alguna
+ *  tiene 3+ letras ("CIDENTAL 500 ml" en "CIDENTAL X 500ML"), o la marca (primera palabra de 4+ letras) con la
+ *  MISMA presentación ("BOVISAN 250 ML" → "BOVISAN TOTAL 250 ml"). Nunca uno de otra presentación (17/11/2026,
+ *  pedido del usuario). Si solo coincide la marca y hay dos iguales, no sugiere (que elija la persona). */
 function sugerirProducto_(item, productos) {
   const tk = {};
   tokensFac_(item.descripcion).concat(tokensFac_(item.codigo)).forEach((t) => { tk[t] = true; });
   const texto = ' ' + normalFac_(item.descripcion) + ' ' + normalFac_(item.codigo) + ' ';
-  let mejor = null;
+  const pres = presentacionFac_(item.descripcion);
+  const cand = [];
   productos.forEach((p) => {
+    const pml = mlProducto_(p);
+    if (pres && pml && pres !== pml) return;
     const pt = tokensFac_(p.nombre);
     const nom = normalFac_(p.nombre);
     const seguido = nom.replace(/ /g, '').length >= 3 && texto.indexOf(' ' + nom + ' ') !== -1;
     const sueltas = pt.length && pt.some((t) => /[A-Z]{3,}/.test(t)) && pt.every((t) => tk[t]);
-    if (!seguido && !sueltas) return;
-    const puntos = pt.length * 10 + (p.contenido && tk[String(p.contenido)] ? 5 : 0) + (p.activo ? 1 : 0);
-    if (!mejor || puntos > mejor.puntos) mejor = { nombre: p.nombre, puntos };
+    const marcaTk = pt.find((t) => /^[A-Z]{4,}$/.test(t));
+    const marca = !seguido && !sueltas && marcaTk && tk[marcaTk] && pres && pml === pres;
+    if (!seguido && !sueltas && !marca) return;
+    cand.push({ nombre: p.nombre, soloMarca: !!marca,
+      puntos: (marca ? 5 : pt.length * 10) + (pres && pml === pres ? 5 : 0) + (p.activo ? 1 : 0) });
   });
-  return mejor ? mejor.nombre : '';
+  cand.sort((a, b) => b.puntos - a.puntos);
+  if (!cand.length) return '';
+  if (cand[0].soloMarca && cand[1] && cand[1].soloMarca && cand[1].puntos === cand[0].puntos) return '';
+  return cand[0].nombre;
 }
 
 // ---- plan: qué debería haber en el stock por esta factura
@@ -154,7 +175,7 @@ function planFacturaStock_(ss, det, insumos, equivs) {
     claves.some((k) => (eq = delProv.find((e) => e.item === k)));
     const cant = cantFac_(it.cantidad);
     const r = { i, codigo: String(it.codigo || ''), descripcion: String(it.descripcion || ''), cantidadFactura: cant, insumo: '', factor: 1,
-      cantidad: 0, estado: 'ignorado', sugerido: '' };
+      cantidad: 0, estado: 'ignorado', sugerido: '', presentacion: presentacionFac_(it.descripcion) };
     if (eq && eq.insumo === NO_ES_STOCK) { r.estado = 'noStock'; return r; }
     if (eq && porNombre[eq.insumo]) {
       r.insumo = eq.insumo; r.factor = eq.factor; r.cantidad = redondeoFac_(cant * eq.factor); r.estado = 'cargado';
@@ -284,7 +305,7 @@ function vistaDesdePlan_(plan, fecha, activo, insumos) {
   return {
     activo, fechaIngreso: fecha,
     items: plan.map((p) => ({ i: p.i, estado: p.estado, insumo: p.insumo, factor: p.factor, cantidad: p.cantidad,
-      unidad: unidad[p.insumo] || '', sugerido: p.sugerido, nota: p.nota || '' })),
+      unidad: unidad[p.insumo] || '', sugerido: p.sugerido, nota: p.nota || '', presentacion: p.presentacion || null })),
     hayParaStock: plan.some((p) => p.estado !== 'ignorado'),
   };
 }
@@ -299,6 +320,7 @@ function vistaFacturaStock_(ss, det) {
   const clave = {};
   Object.keys(ESTADOS_FAC).forEach((k) => { clave[ESTADOS_FAC[k]] = k; });
   const plan = filas.map((x) => ({ i: Number(x.v[4]) - 1, insumo: String(x.v[8]), factor: Number(x.v[9]) || 1, cantidad: Number(x.v[10]) || 0,
+    presentacion: presentacionFac_(x.v[6]),
     estado: clave[String(x.v[11])] || 'ignorado', mov: String(x.v[12]), sugerido: String(x.v[15] || '') }));
   // nota de los "ya cargado a mano"
   const conMano = plan.filter((p) => p.estado === 'aMano');
