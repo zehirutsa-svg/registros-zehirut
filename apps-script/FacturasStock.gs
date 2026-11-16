@@ -41,12 +41,24 @@ function provClave_(f) {
   const ruc = String(f.ruc || '').split('-')[0].replace(/\D/g, '');
   return ruc ? 'RUC:' + ruc : 'N:' + normalFac_(f.proveedor);
 }
+/** Descripción sin lote, registro ni vencimiento (Consultpec: "CURACEF DUO 100 ML. L: 260067 RS15660 V: 31/01/2029"),
+ *  que cambian de una compra a otra del mismo producto (17/11/2026). */
+function descSinLote_(d) {
+  return String(d || '').toUpperCase()
+    .replace(/\bV(?:TO|ENC)?\.?\s*:\s*\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}/g, ' ')
+    .replace(/\bL(?:OTE)?\.?\s*:\s*[A-Z0-9\/\-.]+/g, ' ')
+    .replace(/\bR\.?S\.?\s*:?\s*\d+[A-Z]?\b/g, ' ');
+}
+/** Claves del ítem, de la más segura a la menos: código, descripción sin lote, descripción completa (las
+ *  equivalencias aprendidas antes del 17/11 tienen la completa). */
 function itemClaves_(it) {
   const c = [];
   const cod = normalFac_(it.codigo);
   if (cod) c.push('C:' + cod);
-  const d = normalFac_(it.descripcion);
+  const d = normalFac_(descSinLote_(it.descripcion));
   if (d) c.push('D:' + d);
+  const completa = normalFac_(it.descripcion);
+  if (completa && completa !== d) c.push('D:' + completa);
   return c;
 }
 /** Cantidad de la factura ("2", "2,00", "1.000", "1.5") → número. */
@@ -75,9 +87,16 @@ function leerEquivalencias_(ss) {
   const sh = hoja_(ss, HOJA_EQUIV, COLS_EQUIV);
   const n = sh.getLastRow();
   if (n < 2) return [];
-  return sh.getRange(2, 1, n - 1, COLS_EQUIV.length).getValues().map((f, i) => ({
-    fila: i + 2, prov: String(f[0]), item: String(f[1]), insumo: String(f[4]), factor: Number(f[5]) || 1,
-  })).filter((e) => e.prov && e.item && e.insumo);
+  const lista = [];
+  sh.getRange(2, 1, n - 1, COLS_EQUIV.length).getValues().forEach((f, i) => {
+    const e = { fila: i + 2, prov: String(f[0]), item: String(f[1]), insumo: String(f[4]), factor: Number(f[5]) || 1 };
+    if (!e.prov || !e.item || !e.insumo) return;
+    lista.push(e);
+    // Las aprendidas antes del 17/11 guardaron la descripción con lote y vencimiento: vale también sin ellos.
+    const sinLote = normalFac_(descSinLote_(f[3]));
+    if (/^D:/.test(e.item) && sinLote && 'D:' + sinLote !== e.item) lista.push(Object.assign({}, e, { item: 'D:' + sinLote, virtual: true }));
+  });
+  return lista;
 }
 
 /** Guarda (o reemplaza) la equivalencia de un ítem de este proveedor, con todas sus claves. */
@@ -89,7 +108,7 @@ function aprenderEquivalencia_(ss, u, factura, item, insumo, factor) {
   const ahora = new Date();
   claves.forEach((k) => {
     const fila = [prov, k, factura.proveedor, item.descripcion || '', insumo, factor, u.nombre, ahora];
-    const ya = equivs.find((e) => e.prov === prov && e.item === k);
+    const ya = equivs.find((e) => !e.virtual && e.prov === prov && e.item === k);
     if (ya) sh.getRange(ya.fila, 1, 1, COLS_EQUIV.length).setValues([fila]);
     else sh.appendRow(fila);
   });

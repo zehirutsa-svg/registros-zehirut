@@ -352,6 +352,11 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
     Recargada, Market quedó Id 261116175929; el usuario dijo haber asignado B12 y Suiferro, pero en el servidor no quedó NADA
     (sin equivalencias, ingresos ni Registro) → causa sin aclarar. Se borró de nuevo (17/11, pedido del usuario). Desde entonces
     cada pedido `facturaStock` (también los rechazados) queda en Registro (`facturaStockConRegistro_`).
+  - **Primera prueba real OK (16/11/2026, 18:22-18:26):** Market 001-001-0019156 (Id 261116182237: B12 y Suiferro +12) y
+    Consultpec 001-001-0023685 (Id 261116182613: Adaptador Vit/Min +6, Bovisan Total 250 +10 y 100 +2, Curacef Duo +10),
+    asignadas a mano la primera vez. Consultpec trae código de producto (02-144…) → equivalencia por código.
+  - **Lote y vencimiento (17/11/2026):** `descSinLote_` saca "L: …", "RS…" y "V: dd/mm/aaaa" de la clave D: (cambian en cada
+    compra). Las equivalencias viejas (clave con lote) valen también sin lote al leerlas (entradas `virtual`).
 
 ## Excel (Stock y Combustible; Sanidad ver arriba)
 
