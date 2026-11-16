@@ -901,7 +901,7 @@ function doPost(e) {
       case 'correoEstancia': return json_(correoEstancia_(body));
       case 'claveEstancia': return json_(fijarClaveEstancia_(body));
       case 'producto': return json_(guardarProducto_(body));
-      case 'facturaStock': return json_(facturaStock_(body));
+      case 'facturaStock': return json_(facturaStockConRegistro_(body));
       default: return json_({ ok: false, error: 'acción desconocida' });
     }
   } catch (err) {

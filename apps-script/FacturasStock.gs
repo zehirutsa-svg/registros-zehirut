@@ -423,6 +423,24 @@ function facturaStock_(body) {
   return { ok: true, stock: v };
 }
 
+/** Igual que facturaStock_, pero cada pedido queda en Registro (también si falla): el 16/11/2026 una asignación
+ *  desde el celular no llegó a guardarse y no quedó rastro de por qué. */
+function facturaStockConRegistro_(body) {
+  const ss = SpreadsheetApp.getActive();
+  const que = 'Factura ' + body.facturaId + ': ' + body.op + (body.op === 'asignar' ? ' ítem ' + (Number(body.item) + 1) + ' → ' + body.insumo : '') +
+    (body.op === 'fecha' ? ' ' + body.fecha : '');
+  let quien = '';
+  try { quien = usuarioDe_(ss, body.pin).nombre; } catch (e) { /* PIN inválido: lo dice el error */ }
+  try {
+    const r = facturaStock_(body);
+    registrar_(ss, [[new Date(), quien, 'Factura al stock', que, 'Aplicado', '']]);
+    return r;
+  } catch (e) {
+    registrar_(ss, [[new Date(), quien, 'Factura al stock', que, 'Rechazado: ' + String(e.message || e), '']]);
+    throw e;
+  }
+}
+
 /** Para el aviso de Sanidad: facturas con ítems "Por asignar". */
 function facturasPorAsignar_(ss) {
   const sh = ss.getSheetByName(HOJA_FACSTOCK);

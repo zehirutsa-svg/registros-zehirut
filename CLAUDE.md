@@ -349,6 +349,9 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
     con la presentación de cada producto, aviso amarillo y confirmación si se guarda uno que no coincide.
   - 16/11/2026, con OK del usuario, se borraron para recargarlas como prueba real: Consultpec 001-001-0023685 (Id
     261115085754) y Market 001-001-0019156 (Id 261116155813), sin pago, Albor ni comprobantes (función temporal, ya sacada).
+    Recargada, Market quedó Id 261116175929; el usuario dijo haber asignado B12 y Suiferro, pero en el servidor no quedó NADA
+    (sin equivalencias, ingresos ni Registro) → causa sin aclarar. Se borró de nuevo (17/11, pedido del usuario). Desde entonces
+    cada pedido `facturaStock` (también los rechazados) queda en Registro (`facturaStockConRegistro_`).
 
 ## Excel (Stock y Combustible; Sanidad ver arriba)
 
