@@ -1547,7 +1547,7 @@ function datos_(body) {
       proveedores: movs.map((m) => m.proveedor).filter((p, i, a) => p && a.indexOf(p) === i).sort(),
     };
     if (mods.indexOf('Sanidad') !== -1) r.stock.estancia = estadoEstancia_();
-    if (mods.indexOf('Sanidad') !== -1) r.stock.facturasPorAsignar = facturasPorAsignar_(ss);
+    if (mods.indexOf('Sanidad') !== -1 || mods.indexOf('Stock') !== -1) r.stock.facturasPorAsignar = facturasPorAsignar_(ss);
     if (mods.indexOf('Combustible') !== -1) {
       r.horometro = datosHorometro_(ss, desde);
       r.stock.maquinas = leerMaquinas_(ss).filter((q) => q.activo);

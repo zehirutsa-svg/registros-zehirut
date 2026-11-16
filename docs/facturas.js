@@ -994,9 +994,21 @@ function bajarAItemsFac() {
 }
 
 /** Presentación del producto en ml (o null) y si choca con la del ítem de la factura. */
-const mlProd = (p) => (p && p.contenido && p.unidadContenido === 'ml' ? Number(p.contenido) : null);
-const fmtMl = (ml) => (ml >= 1000 && ml % 100 === 0 ? String(ml / 1000).replace('.', ',') + ' L' : String(ml).replace('.', ',') + ' ml');
-function presDistinta(pres, p) { const m = mlProd(p); return !!(pres && m && pres !== m); }
+/** Presentación { n, u }: ml por frasco (Sanidad) o kg por bolsa (insumos). Igual que presProducto_ del script. */
+function presProd(p) {
+  if (!p) return null;
+  if (p.contenido && p.unidadContenido === 'ml') return { n: Number(p.contenido), u: 'ml' };
+  if (p.kgUnidad && p.unidad !== 'kg' && p.kgUnidad !== 1) return { n: Number(p.kgUnidad), u: 'kg' };
+  return null;
+}
+function fmtPres(x) {
+  if (!x) return '';
+  if (x.u === 'ml' && x.n >= 1000 && x.n % 100 === 0) return String(x.n / 1000).replace('.', ',') + ' L';
+  return String(x.n).replace('.', ',') + ' ' + x.u;
+}
+const presIgual = (a, b) => !!(a && b && a.u === b.u && a.n === b.n);
+function presDistinta(pres, p) { const b = presProd(p); return !!(pres && b && pres.u === b.u && pres.n !== b.n); }
+const nombreStock = (p) => p.rubro || (p.modulo === 'Stock' ? 'Insumos' : p.modulo);
 
 function fmtCantStock(n) { return String(Math.round(n * 1000) / 1000).replace('.', ','); }
 
@@ -1007,8 +1019,8 @@ function avisoStockFac(st) {
   if (st.aMano) partes.push('<li><b>' + st.aMano + '</b> ya estaban cargados a mano (no se duplicaron)</li>');
   if (st.porAsignar) partes.push('<li><b>' + st.porAsignar + '</b> para confirmar a qué producto del stock van. Es la primera vez que vienen en una factura de este proveedor; después entran solos.</li>');
   if (st.cargados || st.aMano) sincronizar();
-  if (!st.porAsignar) { if (st.cargados) toast('📦 ' + st.cargados + ' ítem(s) al stock de Sanidad', 3500); return; }
-  cartel({ icono: '📦', titulo: 'Stock de Sanidad', html: '<ul>' + partes.join('') + '</ul>', si: 'Asignar ahora', no: 'Después' })
+  if (!st.porAsignar) { if (st.cargados) toast('📦 ' + st.cargados + ' ítem(s) al stock', 3500); return; }
+  cartel({ icono: '📦', titulo: 'Stock', html: '<ul>' + partes.join('') + '</ul>', si: 'Asignar ahora', no: 'Después' })
     .then((ok) => { if (ok) { estadoFac().irItems = true; abrirDetalleFac(st.facturaId); } });
 }
 
@@ -1018,7 +1030,7 @@ function htmlStockCabecera(st) {
       (st.puede ? ' <button class="link" data-a="fac" data-x="stkFecha">cambiar</button>' : '') + '</p>';
   }
   if (!st.puede) return '';
-  return '<div class="aviso">📦 Los ítems de esta factura no se pasaron al stock de Sanidad.' +
+  return '<div class="aviso">📦 Los ítems de esta factura no se pasaron al stock.' +
     '<br><button class="btn sec chico" data-a="fac" data-x="stkActivar" style="margin-top:8px">Pasar ítems al stock</button></div>';
 }
 
@@ -1044,9 +1056,10 @@ function htmlStockItem(st, i) {
   return st.puede ? '<div class="stk-linea">' + cambiar('📦 Al stock') + '</div>' : '';
 }
 
-/** Productos del stock donde se puede cargar desde una factura (los de Sanidad, con permiso de cargar). */
+/** Productos del stock donde se puede cargar desde una factura: Sanidad e insumos (no los de producción propia ni
+ *  por estancia, como Fardos), con permiso de cargar. Igual que productosFacStock_ del script. */
 function productosStockFac() {
-  return stockDatos().insumos.filter((i) => i.modulo === 'Sanidad' && nivel(i.modulo) >= NIVELES.CARGAR);
+  return stockDatos().insumos.filter((i) => (i.modulo === 'Sanidad' || i.modulo === 'Stock') && !i.propia && !i.porEstancia && nivel(i.modulo) >= NIVELES.CARGAR);
 }
 
 function htmlFacStockItem() {
@@ -1056,11 +1069,11 @@ function htmlFacStockItem() {
   const it = f.det.items[k.i] || {};
   const prod = k.insumo && productosStockFac().find((p) => p.nombre === k.insumo);
   let h = '<div class="tarjeta"><small>Ítem de la factura</small><p style="margin:4px 0 0"><b>' + esc(it.descripcion || '') + '</b><br><small>Cant: ' + esc(it.cantidad || '-') +
-    (k.pres ? ' · Presentación: <b>' + fmtMl(k.pres) + '</b>' : '') + ' · ' + esc(f.det.factura.proveedor) + '</small></p></div>';
+    (k.pres ? ' · Presentación: <b>' + fmtPres(k.pres) + '</b>' : '') + ' · ' + esc(f.det.factura.proveedor) + '</small></p></div>';
   if (prod) {
-    h += '<div class="tarjeta"><small>Producto del stock</small><p style="margin:4px 0 8px"><b>' + esc(prod.nombre) + '</b> <small>(' + esc(prod.rubro || prod.modulo) + ')</small> ' +
+    h += '<div class="tarjeta"><small>Producto del stock</small><p style="margin:4px 0 8px"><b>' + esc(prod.nombre) + '</b> <small>(' + esc(nombreStock(prod)) + ')</small> ' +
       '<button class="link" data-a="fac" data-x="stkOtro">cambiar</button></p>' +
-      (presDistinta(k.pres, prod) ? '<div class="aviso amarillo">⚠️ La factura dice <b>' + fmtMl(k.pres) + '</b> y este producto es de <b>' + fmtMl(mlProd(prod)) +
+      (presDistinta(k.pres, prod) ? '<div class="aviso amarillo">⚠️ La factura dice <b>' + fmtPres(k.pres) + '</b> y este producto es de <b>' + fmtPres(presProd(prod)) +
         '</b>. Revisá que sea el producto correcto (o el factor).</div>' : '') +
       '<div class="campo"><label for="stk-factor">1 en la factura equivale a</label><div class="fila-monto"><input class="txt" id="stk-factor" inputmode="decimal" value="' +
       esc(String(k.factor).replace('.', ',')) + '"><span style="align-self:center">' + esc(prod.unidad) + '</span></div>' +
@@ -1078,14 +1091,15 @@ function htmlFacStockItem() {
 function htmlStockResultados() {
   const k = estadoFac().stk;
   const q = String(k.q || '').trim().toUpperCase();
-  const coincide = (p) => (k.pres && mlProd(p) === k.pres ? 1 : 0);
+  const coincide = (p) => (presIgual(k.pres, presProd(p)) ? 1 : 0);
   const lista = productosStockFac().filter((p) => (q ? [p.nombre, p.principio, p.laboratorio, p.proveedor].join(' ').toUpperCase().indexOf(q) !== -1 : p.nombre === k.sugerido))
     .sort((a, b) => (coincide(b) - coincide(a)) || (b.activo - a.activo) || a.nombre.localeCompare(b.nombre, 'es')).slice(0, 30);
-  if (!lista.length) return '<p class="vacio">' + (q ? 'Ningún producto con "' + esc(k.q.trim()) + '". Si es nuevo, crealo en Sanidad (➕ Nuevo producto) y volvé.' : 'Escribí parte del nombre.') + '</p>';
+  if (!lista.length) return '<p class="vacio">' + (q ? 'Ningún producto con "' + esc(k.q.trim()) + '". Si es nuevo, crealo primero en su stock (en Sanidad: ➕ Nuevo producto) y volvé.' : 'Escribí parte del nombre.') + '</p>';
   return (!q ? '<p class="nota-estancia">Sugerido:</p>' : '') + '<div class="lista-san">' + lista.map((p) =>
     '<button class="fila-san" data-a="fac" data-x="stkProd" data-n="' + esc(p.nombre) + '"><span class="nom">' + esc(p.nombre) +
     (!p.activo ? ' <span class="chip">Desactivado</span>' : '') +
-    (k.pres && mlProd(p) ? (mlProd(p) === k.pres ? ' <span class="chip verde">' + fmtMl(mlProd(p)) + ' ✓</span>' : ' <span class="chip naranja">' + fmtMl(mlProd(p)) + '</span>') : '') + '<small>' + esc([p.rubro, p.contenido ? p.unidad + ' de ' + p.contenido + ' ' + p.unidadContenido : p.unidad, lindo(p.proveedor)].filter(Boolean).join(' · ')) +
+    (k.pres && presProd(p) && k.pres.u === presProd(p).u ? (presIgual(k.pres, presProd(p)) ? ' <span class="chip verde">' + fmtPres(presProd(p)) + ' ✓</span>' : ' <span class="chip naranja">' + fmtPres(presProd(p)) + '</span>') : '') +
+    '<small>' + esc([nombreStock(p), p.contenido ? p.unidad + ' de ' + p.contenido + ' ' + p.unidadContenido : p.kgUnidad && p.unidad !== 'kg' ? p.unidad + ' de ' + p.kgUnidad + ' kg' : p.unidad, lindo(p.proveedor)].filter(Boolean).join(' · ')) +
     '</small></span></button>').join('') + '</div>';
 }
 
@@ -1134,7 +1148,7 @@ async function accionStockFac(b) {
     if (prod && presDistinta(k.pres, prod)) {
       k.factor = factor;
       const ok = await cartel({ icono: '⚠️', titulo: 'La presentación no coincide', si: 'Guardar igual',
-        html: '<p>La factura dice <b>' + fmtMl(k.pres) + '</b> y <b>' + esc(prod.nombre) + '</b> es de <b>' + fmtMl(mlProd(prod)) + '</b>.</p>' +
+        html: '<p>La factura dice <b>' + fmtPres(k.pres) + '</b> y <b>' + esc(prod.nombre) + '</b> es de <b>' + fmtPres(presProd(prod)) + '</b>.</p>' +
           '<p>Va a quedar así para las próximas facturas de este proveedor con este ítem.</p>' });
       if (!ok) return;
     }
@@ -1149,7 +1163,7 @@ async function accionStockFac(b) {
   }
   if (x === 'stkActivar') {
     const ok = await cartel({ icono: '📦', titulo: 'Pasar ítems al stock', si: 'Pasar',
-      html: '<p>Los ítems que se reconocen entran como <b>ingreso</b> al stock de Sanidad, con la fecha de la factura (se puede cambiar).</p>' +
+      html: '<p>Los ítems que se reconocen entran como <b>ingreso</b> al stock, con la fecha de la factura (se puede cambiar).</p>' +
         '<p>Si ya los cargaste a mano con este N° de factura (o sin factura, misma cantidad y fecha cercana), no se duplican.</p>' });
     if (!ok) return;
     toast('Pasando al stock…', 15000);

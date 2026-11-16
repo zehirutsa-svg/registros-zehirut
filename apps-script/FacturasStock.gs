@@ -25,7 +25,9 @@ const COLS_FACSTOCK = ['Factura ID', 'Fecha factura', 'N° factura', 'Proveedor'
   'Insumo', 'Factor', 'Cantidad stock', 'Estado', 'Movimiento', 'Fecha ingreso', 'Actualizado', 'Sugerido'];
 const NO_ES_STOCK = '(no es stock)';
 const PREFIJO_FAC = 'FAC-';
-const MODULOS_FAC_STOCK = ['Sanidad'];
+// Sanidad (Medicamentos, Materiales sanitarios, Semen) y, desde el 17/11/2026, el stock de insumos (Stock).
+// Combustible no. Los de producción propia (Fardos) o por estancia no vienen de facturas.
+const MODULOS_FAC_STOCK = ['Sanidad', 'Stock'];
 const ESTADOS_FAC = { cargado: 'Cargado', aMano: 'Ya cargado a mano', porAsignar: 'Por asignar', noStock: 'No es stock', ignorado: '' };
 const PALABRAS_VACIAS = { X: 1, DE: 1, ML: 1, CC: 1, UN: 1, UND: 1, UNID: 1, LT: 1, LTS: 1, L: 1, KG: 1, GR: 1, G: 1, FRASCO: 1, FCO: 1,
   CAJA: 1, CJ: 1, BIDON: 1, POR: 1, CON: 1, Y: 1, LA: 1, EL: 1, P: 1, DOSIS: 1, PAQUETE: 1, PAQ: 1, SOBRE: 1, ENVASE: 1 };
@@ -133,17 +135,26 @@ function borrarFilasFacStock_(ss, facturaId) {
 function tokensFac_(s) {
   return normalFac_(s).split(' ').filter((t) => t && !PALABRAS_VACIAS[t]);
 }
-/** Presentación escrita en el ítem, en ml ("50 ML", "250 ML-50 DS", "1 L", "2,5L", "500 CC"), o null. */
+/** Presentación escrita en el ítem: { n, u } con u = 'ml' ("50 ML", "250 ML-50 DS", "2,5 L", "500 CC") o 'kg'
+ *  ("X 40 KG", "BOLSA 30KG"), o null. */
 function presentacionFac_(desc) {
-  const t = String(desc || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const m = t.match(/(\d+(?:[.,]\d+)?)\s*(ML|CC|LTS|LT|LITROS|LITRO|L)(?![A-Z])/);
+  const t = String(desc || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const m = t.match(/(\d+(?:[.,]\d+)?)\s*(ML|CC|LTS|LT|LITROS|LITRO|L|KGS|KG|KILOS|KILO)(?![A-Z])/);
   if (!m) return null;
   let n = m[1];
   n = /^\d{1,3}\.\d{3}$/.test(n) ? Number(n.replace('.', '')) : Number(n.replace(',', '.'));
   if (!(n > 0)) return null;
-  return /^L/.test(m[2]) ? Math.round(n * 1000) : n;
+  if (/^K/.test(m[2])) return { n, u: 'kg' };
+  return { n: /^L/.test(m[2]) ? Math.round(n * 1000) : n, u: 'ml' };
 }
-const mlProducto_ = (p) => (p.contenido && p.unidadContenido === 'ml' ? Number(p.contenido) : null);
+/** Presentación del producto del stock: ml por frasco (Sanidad) o kg por bolsa (insumos), o null. */
+function presProducto_(p) {
+  if (p.contenido && p.unidadContenido === 'ml') return { n: Number(p.contenido), u: 'ml' };
+  if (p.kgUnidad && p.unidad !== 'kg' && p.kgUnidad !== 1) return { n: Number(p.kgUnidad), u: 'kg' };
+  return null;
+}
+const presIgual_ = (a, b) => !!(a && b && a.u === b.u && a.n === b.n);
+const presDistinta_ = (a, b) => !!(a && b && a.u === b.u && a.n !== b.n);
 
 /** Producto del stock para el ítem. Nombre: seguido ("AD3E", "B12"), todas sus palabras sueltas si alguna
  *  tiene 3+ letras ("CIDENTAL 500 ml" en "CIDENTAL X 500ML"), o la marca (primera palabra de 4+ letras) con la
@@ -156,17 +167,17 @@ function sugerirProducto_(item, productos) {
   const pres = presentacionFac_(item.descripcion);
   const cand = [];
   productos.forEach((p) => {
-    const pml = mlProducto_(p);
-    if (pres && pml && pres !== pml) return;
+    const pp = presProducto_(p);
+    if (presDistinta_(pres, pp)) return;
     const pt = tokensFac_(p.nombre);
     const nom = normalFac_(p.nombre);
     const seguido = nom.replace(/ /g, '').length >= 3 && texto.indexOf(' ' + nom + ' ') !== -1;
     const sueltas = pt.length && pt.some((t) => /[A-Z]{3,}/.test(t)) && pt.every((t) => tk[t]);
     const marcaTk = pt.find((t) => /^[A-Z]{4,}$/.test(t));
-    const marca = !seguido && !sueltas && marcaTk && tk[marcaTk] && pres && pml === pres;
+    const marca = !seguido && !sueltas && marcaTk && tk[marcaTk] && presIgual_(pres, pp);
     if (!seguido && !sueltas && !marca) return;
     cand.push({ nombre: p.nombre, soloMarca: !!marca,
-      puntos: (marca ? 5 : pt.length * 10) + (pres && pml === pres ? 5 : 0) + (p.activo ? 1 : 0) });
+      puntos: (marca ? 5 : pt.length * 10) + (presIgual_(pres, pp) ? 5 : 0) + (p.activo ? 1 : 0) });
   });
   cand.sort((a, b) => b.puntos - a.puntos);
   if (!cand.length) return '';
@@ -176,7 +187,7 @@ function sugerirProducto_(item, productos) {
 
 // ---- plan: qué debería haber en el stock por esta factura
 function productosFacStock_(insumos) {
-  return insumos.filter((i) => MODULOS_FAC_STOCK.indexOf(i.modulo) !== -1);
+  return insumos.filter((i) => MODULOS_FAC_STOCK.indexOf(i.modulo) !== -1 && !i.propia && !i.porEstancia);
 }
 
 function planFacturaStock_(ss, det, insumos, equivs) {
@@ -239,9 +250,12 @@ function sincronizarFacturaStock_(ss, u, det, fechaIngreso) {
       // ¿Ya está cargado a mano? (mismo producto y N° de factura, o "sin factura" con igual cantidad y fecha cercana)
       const aMano = movs.find((m) => !m.anulado && m.tipo === 'Ingreso' && m.insumo === p.insumo && m.id.indexOf(PREFIJO_FAC) !== 0 &&
         !usados[m.id] && numero && numFac_(m.factura) === numero);
-      const sinFac = aMano ? null : movs.find((m) => !m.anulado && m.tipo === 'Ingreso' && m.insumo === p.insumo && m.id.indexOf(PREFIJO_FAC) !== 0 &&
-        !usados[m.id] && !m.factura && Math.abs(m.cantidad - p.cantidad) < 0.001 &&
-        Math.abs((new Date(m.fecha) - new Date(fecha)) / 86400000) <= 20);
+      // Insumos: llegan antes que la factura y se cargan a mano al recibirlos (pesados): vale hasta 5% de diferencia; el más parecido.
+      const tol = (porNombre[p.insumo] || {}).modulo === 'Stock' ? Math.max(0.001, p.cantidad * 0.05) : 0.001;
+      const sinFac = aMano ? null : movs.filter((m) => !m.anulado && m.tipo === 'Ingreso' && m.insumo === p.insumo && m.id.indexOf(PREFIJO_FAC) !== 0 &&
+        !usados[m.id] && !m.factura && Math.abs(m.cantidad - p.cantidad) <= tol &&
+        Math.abs((new Date(m.fecha) - new Date(fecha)) / 86400000) <= 20)
+        .sort((a, b) => Math.abs(a.cantidad - p.cantidad) - Math.abs(b.cantidad - p.cantidad))[0];
       const ya = aMano || sinFac;
       if (ya) {
         usados[ya.id] = true;
@@ -423,7 +437,7 @@ function facturaStock_(body) {
     let factor = 1;
     if (insumo !== NO_ES_STOCK) {
       const ins = leerInsumos_(ss).find((i) => i.nombre === insumo);
-      if (!ins || MODULOS_FAC_STOCK.indexOf(ins.modulo) === -1) throw new Error('ese producto no está en el stock');
+      if (!ins || !productosFacStock_([ins]).length) throw new Error('ese producto no se carga desde facturas');
       exigir_(u, ins.modulo, 'CARGAR');
       factor = Number(String(body.factor || '1').replace(',', '.'));
       if (!(factor > 0) || factor > 100000) throw new Error('el factor tiene que ser un número mayor que 0');

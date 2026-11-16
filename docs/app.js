@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.28.2';
+const VERSION = '1.29.0';
 
 
 const DIAS_HISTORIAL = 60;
@@ -654,7 +654,8 @@ function htmlSaldo() {
   const c7 = consumo7();
   const ins = insumosMod().filter((i) => i.activo || (s[i.nombre] && s[i.nombre].cantidad));
   const sinFactura = movimientos().filter((m) => esSinFactura(m) && enVista(m.insumo)).length;
-  return (sinFactura ? '<button class="aviso amarillo aviso-btn" data-a="vista" data-v="sinFactura">🧾 Hay <b>' + sinFactura +
+  return (ui.modStock === 'Stock' ? htmlFacturasPorAsignar() : '') +
+    (sinFactura ? '<button class="aviso amarillo aviso-btn" data-a="vista" data-v="sinFactura">🧾 Hay <b>' + sinFactura +
     (sinFactura === 1 ? ' ingreso' : ' ingresos') + ' sin factura</b>. Tocá para verlos.</button>' : '') +
     (esSanidad() ? htmlListaSanidad(ins, s, c7) : ins.length ? '<div class="saldos">' + ins.map((i) => {
       if (i.porEstancia) {
@@ -701,7 +702,7 @@ function htmlEstadoEstancia() {
 function htmlFacturasPorAsignar() {
   const l = stockDatos().facturasPorAsignar || [];
   if (!l.length) return '';
-  const abre = zaP() && puede('Sanidad', 'CARGAR');
+  const abre = zaP() && (puede('Sanidad', 'CARGAR') || puede('Stock', 'CARGAR'));
   return '<div class="aviso amarillo">📦 Facturas con ítems para asignar al stock:' + l.map((x) =>
     '<div class="stk-pend"><span>' + esc(lindo(x.proveedor)) + ' · N° ' + esc(x.numero) + ' <small>(' + x.n + ' ítem' + (x.n > 1 ? 's' : '') + ')</small></span>' +
     (abre ? '<button class="btn sec chico" data-a="abrirFacStock" data-id="' + esc(x.id) + '">Asignar</button>' : '') + '</div>').join('') + '</div>';

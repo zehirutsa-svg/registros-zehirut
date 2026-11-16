@@ -357,6 +357,12 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
     asignadas a mano la primera vez. Consultpec trae código de producto (02-144…) → equivalencia por código.
   - **Lote y vencimiento (17/11/2026):** `descSinLote_` saca "L: …", "RS…" y "V: dd/mm/aaaa" de la clave D: (cambian en cada
     compra). Las equivalencias viejas (clave con lote) valen también sin lote al leerlas (entradas `virtual`).
+  - **Stock de insumos (17/11/2026, v1.29.0, pedido del usuario):** MODULOS_FAC_STOCK = Sanidad + Stock (Semen ya estaba: es
+    un rubro de Sanidad). Fuera: Combustible, producción propia y por estancia (Fardos) → `productosFacStock_` / `productosStockFac`.
+    Presentación generalizada a { n, u }: ml por frasco (Sanidad) o kg por bolsa (`kgUnidad` si la unidad no es kg; "X 40 KG").
+    Los insumos llegan antes que la factura y se cargan a mano: un Ingreso "sin factura" del mismo insumo, ±20 días y hasta 5%
+    de diferencia de cantidad (el más parecido) se toma como "Ya cargado a mano" y se le pone el N° de factura (no suma).
+    Aviso de facturas por asignar también en la pantalla de insumos; asigna quien tiene Stock o Sanidad ≥ Cargar (Osmar incluido).
 
 ## Excel (Stock y Combustible; Sanidad ver arriba)
 
