@@ -321,6 +321,28 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
   (stock_actual, insumos_a_pedir, dias_faltantes_informe, diferencias_confinamiento). Registros sigue siendo el dueño de esos
   números; no cambia ninguna planilla ni la tarea del informe.
 - Arranque: cuando el usuario actualice su planilla, se carga el stock inicial como Conteo.
+- **Ítems de facturas → stock (16/11/2026, v1.28.0, `apps-script/FacturasStock.gs`; pantalla en `docs/facturas.js`).**
+  Pedido del usuario: la foto de una factura de veterinaria carga sola los ingresos de Sanidad. Sin cambios en ZehirutApp:
+  `zehirut_` llama a `facturaStockTrasZA_` después de guardarFactura / actualizarFactura / eliminarFactura /
+  obtenerDetalleFactura (al detalle le agrega `stock`). Hojas nuevas (se crean solas):
+  **"Equivalencias de facturas"** (clave proveedor = RUC sin DV, o nombre normalizado; clave ítem = `C:`código y
+  `D:`descripción normalizada → Insumo + Factor; `(no es stock)` también se aprende) y **"Facturas al stock"** (una
+  fila por ítem de cada factura que participa; que tenga filas = participa; guarda la fecha de ingreso cambiada).
+  - Al guardar: si algún ítem tiene equivalencia, se parece a un producto (`sugerirProducto_`: nombre seguido o
+    todas sus palabras) o el proveedor es "sanitario" (tiene equivalencias o figura como proveedor de un producto),
+    la factura participa: lo conocido entra como Ingreso `FAC-<facturaId>-<ítem>-<marca>` (fecha = la de la factura,
+    "Cargado por" = quien la cargó), lo demás queda "Por asignar". guardarFactura no devuelve el ID: se busca con
+    listarFacturas (N° sin guiones + proveedor). Facturas sin nada de stock no hacen ninguna consulta extra.
+  - Detalle de la factura (Sanidad ≥ Cargar): cada ítem muestra su estado; "✓ Es X" (sugerido) u "Otro…" abre el
+    selector (buscador + factor "1 en la factura = N unidades del stock") o "No es stock". Acción `facturaStock`
+    (op asignar / fecha / activar), que pasa por ZA.obtenerDetalleFactura (controla que pueda ver la factura).
+  - Corregir la factura recalcula (lo distinto se anula y se carga de nuevo); eliminarla anula sus FAC-.
+  - No duplica: Ingreso a mano del producto con el mismo N° de factura, o "sin factura" con igual cantidad y ±20 días
+    (a ese se le pone el N°) → estado "Ya cargado a mano".
+  - Facturas cargadas ANTES del 16/11 no se tocan solas (su stock ya se contó): en su detalle, "Pasar ítems al stock".
+  - Aviso en Sanidad (`facturasPorAsignar` en datos_) con botón a la factura. Solo módulo Sanidad (MODULOS_FAC_STOCK);
+    para sumar Stock de insumos alcanza con agregarlo ahí y en `productosStockFac` (app).
+  - Prueba local: `dev/servidor-prueba.js` + llamadas a /api (guardar, asignar, corregir, fecha, eliminar, a mano).
 
 ## Excel (Stock y Combustible; Sanidad ver arriba)
 

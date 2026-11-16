@@ -901,6 +901,7 @@ function doPost(e) {
       case 'correoEstancia': return json_(correoEstancia_(body));
       case 'claveEstancia': return json_(fijarClaveEstancia_(body));
       case 'producto': return json_(guardarProducto_(body));
+      case 'facturaStock': return json_(facturaStock_(body));
       default: return json_({ ok: false, error: 'acción desconocida' });
     }
   } catch (err) {
@@ -1546,6 +1547,7 @@ function datos_(body) {
       proveedores: movs.map((m) => m.proveedor).filter((p, i, a) => p && a.indexOf(p) === i).sort(),
     };
     if (mods.indexOf('Sanidad') !== -1) r.stock.estancia = estadoEstancia_();
+    if (mods.indexOf('Sanidad') !== -1) r.stock.facturasPorAsignar = facturasPorAsignar_(ss);
     if (mods.indexOf('Combustible') !== -1) {
       r.horometro = datosHorometro_(ss, desde);
       r.stock.maquinas = leerMaquinas_(ss).filter((q) => q.activo);
@@ -2353,7 +2355,10 @@ function zehirut_(body) {
   if (/FondeoFondoFijo$/.test(fn) && nivel_(u, 'Fondo fijo') < NIVELES.CARGAR) throw new Error('tu usuario solo puede ver el Fondo fijo');
   const args = (Array.isArray(body.args) ? body.args : []).map((a) => (a === '__PIN__' ? String(body.pin) : a));
   // Lo que devuelve ZehirutApp viaja como JSON (las fechas ya vienen como texto).
-  return { ok: true, resultado: ZA[fn].apply(null, args) };
+  const resultado = ZA[fn].apply(null, args);
+  // Ítems de la factura → stock de Sanidad (FacturasStock.gs).
+  const stock = facturaStockTrasZA_(ss, u, fn, args, resultado, String(body.pin));
+  return stock ? { ok: true, resultado, stock } : { ok: true, resultado };
 }
 
 // ---------------------------------------------------------------- limpieza (una sola vez)

@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.27.6';
+const VERSION = '1.28.0';
 
 
 const DIAS_HISTORIAL = 60;
@@ -696,12 +696,23 @@ function htmlEstadoEstancia() {
     (e.ultima ? ' (última actualización ' + haceCuanto(e.ultima) + ')' : ' (todavía no se conectó)') + '.</p>' + errores;
 }
 
+/** Facturas con ítems que todavía no se sabe a qué producto van (FacturasStock.gs, 16/11/2026). Se asignan
+ *  en el detalle de la factura; acá solo el aviso con el acceso. */
+function htmlFacturasPorAsignar() {
+  const l = stockDatos().facturasPorAsignar || [];
+  if (!l.length) return '';
+  const abre = zaP() && puede('Sanidad', 'CARGAR');
+  return '<div class="aviso amarillo">📦 Facturas con ítems para asignar al stock:' + l.map((x) =>
+    '<div class="stk-pend"><span>' + esc(lindo(x.proveedor)) + ' · N° ' + esc(x.numero) + ' <small>(' + x.n + ' ítem' + (x.n > 1 ? 's' : '') + ')</small></span>' +
+    (abre ? '<button class="btn sec chico" data-a="abrirFacStock" data-id="' + esc(x.id) + '">Asignar</button>' : '') + '</div>').join('') + '</div>';
+}
+
 /** Sanidad: son casi cien productos, así que van en lista corta (nombre y saldo) con un buscador
  *  (nombre comercial, principio activo, laboratorio, proveedor o indicación); la ficha se abre al tocar. */
 function htmlListaSanidad(ins, s, c7) {
   if (!insumosMod().length) return '<p class="vacio">Todavía no hay productos en ' + esc(ui.rubro) + '.</p>';
   const bajos = ins.filter((i) => infoInsumo(i, s, c7).bajo).length;
-  return htmlEstadoEstancia() +
+  return htmlEstadoEstancia() + htmlFacturasPorAsignar() +
     '<div class="buscar-fila"><input class="txt buscar" id="buscar-san" type="search" placeholder="' + (ui.rubro === 'Semen' ? '🔍 Toro o cabaña…' : '🔍 Nombre, principio activo, laboratorio…') + '" autocomplete="off" value="' + esc(ui.buscarSan || '') + '">' +
     (ui.rubro !== 'Semen' ? '<button class="chip-filtro' + (ui.filtroIatf ? ' activo' : '') + '" data-a="filtroIatf">🏷 IATF</button>' : '') + '</div>' +
     '<div id="res-san">' + htmlResultadosSanidad() + '</div>' +
@@ -1948,6 +1959,7 @@ document.addEventListener('click', (e) => {
     case 'tfConfirmar': tfConfirmar(); break;
     case 'bajarExcel': bajarExcel(); break;
     case 'fac': accionFac(b); break;
+    case 'abrirFacStock': ui.fac = null; estadoFac().raiz = 'lista'; estadoFac().irItems = true; ui.pantalla = 'facturas'; abrirDetalleFac(b.dataset.id); break;
     case 'ff': accionFF(b); break;
     case 'hor': accionHor(b); break;
 

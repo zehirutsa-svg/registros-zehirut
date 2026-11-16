@@ -420,3 +420,9 @@ label.btn { text-align: center; cursor: pointer; }
 .barra-sel { position: sticky; bottom: 0; display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 12px; box-shadow: var(--sombra); padding: 10px 12px; margin-top: 12px; }
 .barra-sel > div { flex: 1; }
 .ayuda-sel { margin: 4px 2px 12px; font-size: 14px; color: var(--gris); }
+/* Ítems de factura → stock de Sanidad */
+.stk-linea { margin-top: 6px; }
+.stk-linea.gris, .stk-linea small { color: var(--gris); font-size: 14px; }
+button.link { background: none; border: 0; padding: 4px 2px; color: var(--azul); font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; }
+.stk-pend { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
+.stk-botones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }

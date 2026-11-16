@@ -34,8 +34,11 @@ async function za(fn, args, repetible) {
   const payload = { accion: 'za', pin: sesion.pin, fn, args };
   const r = repetible ? await llamar(payload) : await llamarUnaVez(payload);
   if (!r.ok) throw new Error(r.error || 'error del servidor');
+  zaStock = r.stock || null;
   return r.resultado;
 }
+// Lo que pasó con el stock de Sanidad en la última llamada (guardar / corregir una factura; ver FacturasStock.gs).
+let zaStock = null;
 
 /** Permisos de ZehirutApp de esta persona (vienen con los datos), o null si no lo ve. */
 function zaP() {
@@ -136,12 +139,12 @@ function htmlFacturas() {
   const f = estadoFac();
   const p = zaP();
   const titulos = { lista: 'Ver facturas', tipo: 'Comprobantes', carga: 'Cargar factura', form: f.form && f.form.modo === 'editar' ? 'Corregir factura' : 'Revisá los datos',
-    detalle: 'Factura', comprobante: 'Agregar comprobante', vincular: 'Vincular anticipo', anticipo: 'Anticipo a proveedor', pagoSF: 'Pago sin factura',
+    detalle: 'Factura', stockItem: 'Ítem al stock', comprobante: 'Agregar comprobante', vincular: 'Vincular anticipo', anticipo: 'Anticipo a proveedor', pagoSF: 'Pago sin factura',
     pagos: 'Facturas a crédito', pagar: f.marca && f.marca.ids ? 'Marcar pagadas' : 'Marcar pagada' };
   let cuerpo;
   if (!p) cuerpo = '<div class="aviso amarillo">' + esc((datos && datos.za && datos.za.error) || 'No se pudo conectar con los permisos de ZehirutApp.') + '</div>';
   else cuerpo = ({ lista: htmlFacLista, tipo: htmlFacTipo, carga: htmlFacCarga, form: htmlFacForm, detalle: htmlFacDetalle,
-    comprobante: htmlFacComprobante, vincular: htmlFacVincular, anticipo: htmlFacAnticipo, pagoSF: htmlFacPagoSF,
+    stockItem: htmlFacStockItem, comprobante: htmlFacComprobante, vincular: htmlFacVincular, anticipo: htmlFacAnticipo, pagoSF: htmlFacPagoSF,
     pagos: htmlFacPagos, pagar: htmlFacPagar }[f.vista] || htmlFacLista)();
   return barra(titulos[f.vista] || 'Comprobantes', true) + '<div class="contenido"><div class="form">' + cuerpo + '</div></div>';
 }
@@ -150,7 +153,7 @@ function htmlFacturas() {
 function atrasFacturas() {
   const f = estadoFac();
   if (f.vista === f.raiz) return false;
-  const antes = { carga: 'tipo', anticipo: 'tipo', pagoSF: 'tipo', detalle: f.raiz === 'pagos' ? 'pagos' : 'lista', comprobante: 'detalle', vincular: 'detalle', pagar: f.marca && f.marca.ids ? 'pagos' : 'detalle' };
+  const antes = { carga: 'tipo', anticipo: 'tipo', pagoSF: 'tipo', detalle: f.raiz === 'pagos' ? 'pagos' : 'lista', comprobante: 'detalle', stockItem: 'detalle', vincular: 'detalle', pagar: f.marca && f.marca.ids ? 'pagos' : 'detalle' };
   if (f.vista === 'form') {
     if (f.form && f.form.modo === 'editar') { f.vista = 'detalle'; render(); return true; }
     descartarCargaFac(); return true;
@@ -422,18 +425,21 @@ async function guardarFormFac() {
     if (x.modo === 'editar') {
       await za('actualizarFactura', ['__PIN__', x.id, d]);
       toast('✓ Factura corregida');
+      if (zaStock && !zaStock.error) sincronizar();
       f.form = null;
       await abrirDetalleFac(x.id);
     } else {
       d.archivoUrl = x.archivoUrl;
       d.anticiposVinculados = x.anticipos;
       await za('guardarFactura', [d, '__PIN__']);
+      const st = zaStock;
       toast('✓ Factura guardada', 3000);
       f.form = null;
       f.lista = null;
       f.vista = f.raiz;
       render();
       window.scrollTo(0, 0);
+      if (st) avisoStockFac(st);
     }
   } catch (e) {
     x.guardando = false;
@@ -660,7 +666,7 @@ async function abrirDetalleFac(id) {
   } catch (e) {
     f.det = { error: e.message };
   }
-  if (ui.pantalla === 'facturas' && f.vista === 'detalle') render();
+  if (ui.pantalla === 'facturas' && f.vista === 'detalle') { render(); bajarAItemsFac(); }
 }
 
 function htmlFacDetalle() {
@@ -698,9 +704,10 @@ function htmlFacDetalle() {
   const items = f.det.items || [];
   if (items.length) {
     f.itemsTexto = items.map((it) => [it.descripcion || '', it.cantidad || '', fmtMonto(it.precioUnitario, x.moneda), fmtMonto(it.subtotal, x.moneda)].join('\t'));
-    h += '<div class="tarjeta"><h3 class="subt">Ítems</h3>' + items.map((it, i) =>
+    const st = f.det.stock;
+    h += '<div class="tarjeta" id="fac-items"><h3 class="subt">Ítems</h3>' + (st ? htmlStockCabecera(st) : '') + items.map((it, i) =>
       '<div class="item-det"><div><b>' + esc(it.descripcion || '(sin descripción)') + '</b><br><small>Cant: ' + esc(it.cantidad || '-') + ' · P. unit: ' +
-      fmtMonto(it.precioUnitario, x.moneda) + ' · Subtotal: ' + fmtMonto(it.subtotal, x.moneda) + '</small></div>' +
+      fmtMonto(it.precioUnitario, x.moneda) + ' · Subtotal: ' + fmtMonto(it.subtotal, x.moneda) + '</small>' + (st ? htmlStockItem(st, i) : '') + '</div>' +
       '<button class="copiar" data-a="fac" data-x="copiarItem" data-i="' + i + '" aria-label="Copiar">📋</button></div>').join('') +
       '<button class="btn sec chico" data-a="fac" data-x="copiarItems">📋 Copiar todos los ítems</button></div>';
   }
@@ -967,8 +974,182 @@ async function accionFac(b) {
     if (ok) guardarPagoFac(false);
     return;
   }
+  if (/^stk/.test(x)) { accionStockFac(b); return; }
   if (x === 'guardarAnticipo') { guardarAnticipoFac(); return; }
   if (x === 'guardarPagoSF') { guardarPagoSFFac(); return; }
+}
+
+// ---- ítems → stock de Sanidad (16/11/2026; servidor en FacturasStock.gs)
+// Cada ítem dice a qué producto del stock fue. La primera vez que aparece un ítem de un proveedor, quien
+// tiene Sanidad ≥ Cargar lo asigna acá (o marca "no es stock"); desde ahí ese ítem entra solo al guardar.
+const NO_ES_STOCK = '(no es stock)';
+
+/** Al abrir la factura para asignar (desde Sanidad o el aviso) y al volver de elegir: directo a los ítems. */
+function bajarAItemsFac() {
+  const f = estadoFac();
+  if (!f.irItems) return;
+  f.irItems = false;
+  const el = $('#fac-items');
+  if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 70);   // que no quede bajo la barra de arriba
+}
+
+function fmtCantStock(n) { return String(Math.round(n * 1000) / 1000).replace('.', ','); }
+
+function avisoStockFac(st) {
+  if (st.error) { toast('La factura se guardó, pero no se pudo pasar al stock: ' + st.error, 5000); return; }
+  const partes = [];
+  if (st.cargados) partes.push('<li><b>' + st.cargados + '</b> ítem(s) entraron solos al stock</li>');
+  if (st.aMano) partes.push('<li><b>' + st.aMano + '</b> ya estaban cargados a mano (no se duplicaron)</li>');
+  if (st.porAsignar) partes.push('<li><b>' + st.porAsignar + '</b> para asignar (es la primera vez que aparecen)</li>');
+  if (st.cargados || st.aMano) sincronizar();
+  if (!st.porAsignar) { if (st.cargados) toast('📦 ' + st.cargados + ' ítem(s) al stock de Sanidad', 3500); return; }
+  cartel({ icono: '📦', titulo: 'Stock de Sanidad', html: '<ul>' + partes.join('') + '</ul>', si: 'Asignar ahora', no: 'Después' })
+    .then((ok) => { if (ok) { estadoFac().irItems = true; abrirDetalleFac(st.facturaId); } });
+}
+
+function htmlStockCabecera(st) {
+  if (st.activo) {
+    return '<p class="nota-estancia">📦 Ingresó al depósito el <b>' + esc(isoADdmm(st.fechaIngreso)) + '</b>' +
+      (st.puede ? ' <button class="link" data-a="fac" data-x="stkFecha">cambiar</button>' : '') + '</p>';
+  }
+  if (!st.puede) return '';
+  return '<div class="aviso">📦 Los ítems de esta factura no se pasaron al stock de Sanidad.' +
+    '<br><button class="btn sec chico" data-a="fac" data-x="stkActivar" style="margin-top:8px">Pasar ítems al stock</button></div>';
+}
+
+function htmlStockItem(st, i) {
+  const it = (st.items || []).find((x) => x.i === i);
+  if (!it) return '';
+  const cambiar = (txt) => (st.puede ? ' <button class="link" data-a="fac" data-x="stkElegir" data-i="' + i + '">' + txt + '</button>' : '');
+  if (!st.activo) return it.estado === 'cargado' ? '<div class="stk-linea gris">📦 Iría a ' + esc(it.insumo) + '</div>' : '';
+  if (it.estado === 'cargado') {
+    return '<div class="stk-linea"><span class="chip verde">📦 ' + esc(it.insumo) + ' +' + fmtCantStock(it.cantidad) + ' ' + esc(it.unidad) + '</span>' + cambiar('cambiar') + '</div>';
+  }
+  if (it.estado === 'aMano') {
+    return '<div class="stk-linea"><span class="chip azul">📦 ' + esc(it.insumo) + ': ya estaba cargado</span>' + cambiar('cambiar') + '<br><small>' + esc(it.nota) + '</small></div>';
+  }
+  if (it.estado === 'porAsignar') {
+    if (!st.puede) return '<div class="stk-linea"><span class="chip pend">📦 ¿Va al stock?</span></div>';
+    return '<div class="stk-linea"><span class="chip pend">📦 ¿Va al stock?</span><div class="stk-botones">' +
+      (it.sugerido ? '<button class="btn chico" data-a="fac" data-x="stkSi" data-i="' + i + '">✓ Es ' + esc(it.sugerido) + '</button>' +
+        '<button class="btn sec chico" data-a="fac" data-x="stkElegir" data-i="' + i + '">Otro…</button>'
+        : '<button class="btn chico" data-a="fac" data-x="stkElegir" data-i="' + i + '">Asignar</button>') + '</div></div>';
+  }
+  if (it.estado === 'noStock') return '<div class="stk-linea gris">No va al stock' + cambiar('cambiar') + '</div>';
+  return st.puede ? '<div class="stk-linea">' + cambiar('📦 Al stock') + '</div>' : '';
+}
+
+/** Productos del stock donde se puede cargar desde una factura (los de Sanidad, con permiso de cargar). */
+function productosStockFac() {
+  return stockDatos().insumos.filter((i) => i.modulo === 'Sanidad' && nivel(i.modulo) >= NIVELES.CARGAR);
+}
+
+function htmlFacStockItem() {
+  const f = estadoFac();
+  const k = f.stk;
+  if (!k || !f.det) return '<p class="vacio">—</p>';
+  const it = f.det.items[k.i] || {};
+  const prod = k.insumo && productosStockFac().find((p) => p.nombre === k.insumo);
+  let h = '<div class="tarjeta"><small>Ítem de la factura</small><p style="margin:4px 0 0"><b>' + esc(it.descripcion || '') + '</b><br><small>Cant: ' + esc(it.cantidad || '-') +
+    ' · ' + esc(f.det.factura.proveedor) + '</small></p></div>';
+  if (prod) {
+    h += '<div class="tarjeta"><small>Producto del stock</small><p style="margin:4px 0 8px"><b>' + esc(prod.nombre) + '</b> <small>(' + esc(prod.rubro || prod.modulo) + ')</small> ' +
+      '<button class="link" data-a="fac" data-x="stkOtro">cambiar</button></p>' +
+      '<div class="campo"><label for="stk-factor">1 en la factura equivale a</label><div class="fila-monto"><input class="txt" id="stk-factor" inputmode="decimal" value="' +
+      esc(String(k.factor).replace('.', ',')) + '"><span style="align-self:center">' + esc(prod.unidad) + '</span></div>' +
+      '<small>Casi siempre 1. Ej.: si la factura cuenta vainas sueltas y el stock va por caja de 100, poné 0,01.</small></div></div>' +
+      '<div class="acciones"><button class="btn" data-a="fac" data-x="stkGuardar"' + (k.guardando ? ' disabled' : '') + '>' + (k.guardando ? rueda() + 'Guardando…' : 'Guardar') + '</button></div>';
+  } else {
+    h += '<div class="campo"><label for="stk-q">¿Qué producto del stock es?</label><input class="txt" id="stk-q" type="search" autocomplete="off" placeholder="🔍 Buscar producto…" value="' + esc(k.q || '') + '"></div>' +
+      '<div id="stk-res">' + htmlStockResultados() + '</div>';
+  }
+  h += '<div class="acciones"><button class="btn sec" data-a="fac" data-x="stkNo"' + (k.guardando ? ' disabled' : '') + '>🚫 No es stock (no preguntar más)</button></div>' +
+    '<p class="nota-estancia">Se recuerda para este proveedor: la próxima factura con este ítem entra sola.</p>';
+  return h;
+}
+
+function htmlStockResultados() {
+  const k = estadoFac().stk;
+  const q = String(k.q || '').trim().toUpperCase();
+  const lista = productosStockFac().filter((p) => (q ? [p.nombre, p.principio, p.laboratorio, p.proveedor].join(' ').toUpperCase().indexOf(q) !== -1 : p.nombre === k.sugerido))
+    .sort((a, b) => (b.activo - a.activo) || a.nombre.localeCompare(b.nombre, 'es')).slice(0, 30);
+  if (!lista.length) return '<p class="vacio">' + (q ? 'Ningún producto con "' + esc(k.q.trim()) + '". Si es nuevo, crealo en Sanidad (➕ Nuevo producto) y volvé.' : 'Escribí parte del nombre.') + '</p>';
+  return (!q ? '<p class="nota-estancia">Sugerido:</p>' : '') + '<div class="lista-san">' + lista.map((p) =>
+    '<button class="fila-san" data-a="fac" data-x="stkProd" data-n="' + esc(p.nombre) + '"><span class="nom">' + esc(p.nombre) +
+    (!p.activo ? ' <span class="chip">Desactivado</span>' : '') + '<small>' + esc([p.rubro, p.contenido ? p.unidad + ' de ' + p.contenido + ' ' + p.unidadContenido : p.unidad, lindo(p.proveedor)].filter(Boolean).join(' · ')) +
+    '</small></span></button>').join('') + '</div>';
+}
+
+async function llamarStockFac(extra) {
+  const f = estadoFac();
+  const r = await llamarUnaVez(Object.assign({ accion: 'facturaStock', pin: sesion.pin, facturaId: f.detId }, extra));
+  if (!r.ok) throw new Error(r.error || 'error del servidor');
+  if (f.det) f.det.stock = r.stock;
+  sincronizar();
+  return r.stock;
+}
+
+async function accionStockFac(b) {
+  const f = estadoFac();
+  const x = b.dataset.x;
+  if (!navigator.onLine) { toast('Sin señal: hace falta señal para pasar ítems al stock.', 3000); return; }
+  if (x === 'stkElegir') {
+    const i = Number(b.dataset.i);
+    const it = (f.det.stock.items || []).find((y) => y.i === i) || {};
+    f.stk = { i, q: '', insumo: it.insumo && it.insumo !== NO_ES_STOCK ? it.insumo : '', factor: it.factor || 1, sugerido: it.sugerido || '' };
+    f.vista = 'stockItem'; render(); window.scrollTo(0, 0);
+    return;
+  }
+  if (x === 'stkSi') {
+    const i = Number(b.dataset.i);
+    const it = (f.det.stock.items || []).find((y) => y.i === i) || {};
+    b.disabled = true;
+    b.innerHTML = rueda() + 'Guardando…';
+    try {
+      const st = await llamarStockFac({ op: 'asignar', item: i, insumo: it.sugerido, factor: 1 });
+      const n = (st.items || []).find((y) => y.i === i) || {};
+      toast(n.estado === 'aMano' ? '📦 Ya estaba cargado a mano: no se duplicó' : '✓ ' + it.sugerido + ' +' + fmtCantStock(n.cantidad || 0) + ' ' + (n.unidad || ''), 3500);
+    } catch (e) { cartel({ icono: '⚠️', titulo: 'No se pudo', html: '<p>' + esc(e.message) + '</p>', si: 'Entendido', no: '' }); }
+    const y = window.scrollY;
+    render(); window.scrollTo(0, y);
+    return;
+  }
+  if (x === 'stkProd') { f.stk.insumo = b.dataset.n; f.stk.factor = 1; render(); return; }
+  if (x === 'stkOtro') { f.stk.insumo = ''; f.stk.q = ''; render(); return; }
+  if (x === 'stkGuardar' || x === 'stkNo') {
+    const k = f.stk;
+    const insumo = x === 'stkNo' ? NO_ES_STOCK : k.insumo;
+    const factor = x === 'stkNo' ? 1 : Number(String(($('#stk-factor') || {}).value || '1').replace(',', '.'));
+    if (!(factor > 0)) { toast('El factor tiene que ser un número mayor que 0.', 3000); return; }
+    k.guardando = true; render();
+    try {
+      const st = await llamarStockFac({ op: 'asignar', item: k.i, insumo, factor });
+      const it = (st.items || []).find((y) => y.i === k.i) || {};
+      toast(insumo === NO_ES_STOCK ? 'Listo: no va al stock' : it.estado === 'aMano' ? '📦 Ya estaba cargado a mano: no se duplicó' : '✓ ' + insumo + ' +' + fmtCantStock(it.cantidad || 0) + ' ' + (it.unidad || ''), 3500);
+      f.stk = null; f.vista = 'detalle'; f.irItems = true; render(); bajarAItemsFac();
+    } catch (e) { k.guardando = false; render(); cartel({ icono: '⚠️', titulo: 'No se pudo', html: '<p>' + esc(e.message) + '</p>', si: 'Entendido', no: '' }); }
+    return;
+  }
+  if (x === 'stkActivar') {
+    const ok = await cartel({ icono: '📦', titulo: 'Pasar ítems al stock', si: 'Pasar',
+      html: '<p>Los ítems que se reconocen entran como <b>ingreso</b> al stock de Sanidad, con la fecha de la factura (se puede cambiar).</p>' +
+        '<p>Si ya los cargaste a mano con este N° de factura (o sin factura, misma cantidad y fecha cercana), no se duplican.</p>' });
+    if (!ok) return;
+    toast('Pasando al stock…', 15000);
+    try { const st = await llamarStockFac({ op: 'activar' }); toast('📦 ' + st.items.filter((y) => y.estado === 'cargado').length + ' ítem(s) al stock', 3000); render(); }
+    catch (e) { toast('No se pudo: ' + e.message, 4000); }
+    return;
+  }
+  if (x === 'stkFecha') {
+    const v = await cartel({ icono: '📅', titulo: 'Fecha de ingreso al depósito', html: '<p>Día en que la mercadería llegó (DD/MM/AAAA).</p>',
+      input: { valor: isoADdmm(f.det.stock.fechaIngreso), placeholder: 'DD/MM/AAAA' }, si: 'Guardar',
+      validar: (t) => (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(t) ? '' : 'Escribila como DD/MM/AAAA') });
+    if (!v) return;
+    const [d, m, a] = v.split('/');
+    toast('Guardando…', 15000);
+    try { await llamarStockFac({ op: 'fecha', fecha: a + '-' + ('0' + m).slice(-2) + '-' + ('0' + d).slice(-2) }); toast('✓ Fecha cambiada', 2500); render(); }
+    catch (e) { toast('No se pudo: ' + e.message, 4000); }
+  }
 }
 
 // ================================================================ FONDO FIJO
@@ -1149,6 +1330,8 @@ function despuesDeRenderFac() {
     const i = l.indexOf(c.dataset.otra);
     if (c.checked && i === -1) l.push(c.dataset.otra); else if (!c.checked && i !== -1) l.splice(i, 1);
   }));
+  const stq = $('#stk-q');
+  if (stq) stq.addEventListener('input', () => { const k = estadoFac().stk; if (k) { k.q = stq.value; $('#stk-res').innerHTML = htmlStockResultados(); } });
   const vinc = $('#fac-vinc');
   if (vinc) vinc.addEventListener('input', () => buscarAnticipoFac(vinc.value));
   // Montos: al salir del campo se muestran con el formato de la moneda.
