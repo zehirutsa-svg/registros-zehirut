@@ -343,6 +343,8 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
   - Aviso en Sanidad (`facturasPorAsignar` en datos_) con botón a la factura. Solo módulo Sanidad (MODULOS_FAC_STOCK);
     para sumar Stock de insumos alcanza con agregarlo ahí y en `productosStockFac` (app).
   - Prueba local: `dev/servidor-prueba.js` + llamadas a /api (guardar, asignar, corregir, fecha, eliminar, a mano).
+  - 16/11/2026, con OK del usuario, se borraron para recargarlas como prueba real: Consultpec 001-001-0023685 (Id
+    261115085754) y Market 001-001-0019156 (Id 261116155813), sin pago, Albor ni comprobantes (función temporal, ya sacada).
 
 ## Excel (Stock y Combustible; Sanidad ver arriba)
 
