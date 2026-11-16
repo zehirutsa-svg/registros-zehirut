@@ -1000,7 +1000,7 @@ function avisoStockFac(st) {
   const partes = [];
   if (st.cargados) partes.push('<li><b>' + st.cargados + '</b> ítem(s) entraron solos al stock</li>');
   if (st.aMano) partes.push('<li><b>' + st.aMano + '</b> ya estaban cargados a mano (no se duplicaron)</li>');
-  if (st.porAsignar) partes.push('<li><b>' + st.porAsignar + '</b> para asignar (es la primera vez que aparecen)</li>');
+  if (st.porAsignar) partes.push('<li><b>' + st.porAsignar + '</b> para confirmar a qué producto del stock van. Es la primera vez que vienen en una factura de este proveedor; después entran solos.</li>');
   if (st.cargados || st.aMano) sincronizar();
   if (!st.porAsignar) { if (st.cargados) toast('📦 ' + st.cargados + ' ítem(s) al stock de Sanidad', 3500); return; }
   cartel({ icono: '📦', titulo: 'Stock de Sanidad', html: '<ul>' + partes.join('') + '</ul>', si: 'Asignar ahora', no: 'Después' })
