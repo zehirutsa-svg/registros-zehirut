@@ -184,6 +184,7 @@ Parámetros (300). Código: leerDatosBase_ y publicarDatosInforme_.
 - Diagnóstico sin acceso a la planilla principal (la conexión Drive de Claude no la ve): una función temporal en
   doGet que escriba en la planilla del informe (DESPUÉS de publicarDatosInforme_, que borra hojas extra), clasp push
   + update-deployment y `curl -sL` al /exec; leerla con read_file_content (muestra ~30 filas por hoja: agrupar).
+- **Fecha del período en formato EE.UU. (20/11/2026, v1.29.1).** A veces TAP Feed exporta "Desde 11-17-2026 a 11-17-2026" (mes-día con guiones) en vez de "Desde 17/11/2026 a …". periodoTapfeed (app.js) acepta los dos: con "/" es día/mes, con "-" es mes-día, y si un número pasa de 12 ese es el día.
 - **Stock con peso CARGADO (05/10/2026, v1.21.0).** Tapfeed da dos números distintos: "Uso ingrediente & premezcla"
   = peso **cargado** al mixer (lo que sale del depósito) y "Uso de ingredientes por grupo" = peso **entregado** a los
   corrales (menor: residuo en el mixer, balanza en movimiento; 04/10: 19.512 vs 19.456 kg). **Stock = cargado;

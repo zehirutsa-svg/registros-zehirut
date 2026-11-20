@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.29.0';
+const VERSION = '1.29.1';
 
 
 const DIAS_HISTORIAL = 60;
@@ -1178,10 +1178,24 @@ function tipoInformeTapfeed(lineas) {
   return '';
 }
 
+// TAP Feed suele poner "Desde 17/11/2026 a 17/11/2026", pero a veces exporta en formato de EE.UU.:
+// "Desde 11-17-2026 a 11-17-2026" (mes-día). Con "/" es día/mes, con "-" es mes-día; si un número
+// pasa de 12, ese es el día sí o sí.
+function fechaTapfeed(a, sep, b, y) {
+  let d = Number(a), m = Number(b);
+  if (sep === '-') { d = Number(b); m = Number(a); }
+  if (m > 12 && d <= 12) [d, m] = [m, d];
+  if (m < 1 || m > 12 || d < 1 || d > 31) return '';
+  return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+}
+
 function periodoTapfeed(r, l) {
-  const p = l.match(/Desde (\d{2})\/(\d{2})\/(\d{4}) a (\d{2})\/(\d{2})\/(\d{4})/);
-  if (p) { r.desde = p[3] + '-' + p[2] + '-' + p[1]; r.hasta = p[6] + '-' + p[5] + '-' + p[4]; }
-  return !!p;
+  const p = l.match(/Desde (\d{1,2})([\/-])(\d{1,2})\2(\d{4}) a (\d{1,2})([\/-])(\d{1,2})\6(\d{4})/);
+  if (!p) return false;
+  const desde = fechaTapfeed(p[1], p[2], p[3], p[4]), hasta = fechaTapfeed(p[5], p[6], p[7], p[8]);
+  if (!desde || !hasta) return false;
+  r.desde = desde; r.hasta = hasta;
+  return true;
 }
 
 /** { desde, hasta (AAAA-MM-DD), corrales: [{ nombre, cabezas, items: [{ nombre, kg, ms }] }], total: [...] } */
