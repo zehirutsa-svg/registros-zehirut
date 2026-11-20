@@ -334,6 +334,8 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
     la factura participa: lo conocido entra como Ingreso `FAC-<facturaId>-<ítem>-<marca>` (fecha = la de la factura,
     "Cargado por" = quien la cargó), lo demás queda "Por asignar". guardarFactura no devuelve el ID: se busca con
     listarFacturas (N° sin guiones + proveedor). Facturas sin nada de stock no hacen ninguna consulta extra.
+  - Fletes y servicios (`SERVICIO_FAC`: flete, servicio, transporte, envío, acarreo, honorarios, mano de obra,
+    consulta) sin equivalencia aprendida → "No es stock" directo, sin preguntar (v1.29.2, 20/11/2026).
   - Detalle de la factura (Sanidad ≥ Cargar): cada ítem muestra su estado; "✓ Es X" (sugerido) u "Otro…" abre el
     selector (buscador + factor "1 en la factura = N unidades del stock") o "No es stock". Acción `facturaStock`
     (op asignar / fecha / activar), que pasa por ZA.obtenerDetalleFactura (controla que pueda ver la factura).

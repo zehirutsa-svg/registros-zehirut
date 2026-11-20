@@ -25,6 +25,8 @@ const COLS_FACSTOCK = ['Factura ID', 'Fecha factura', 'N° factura', 'Proveedor'
   'Insumo', 'Factor', 'Cantidad stock', 'Estado', 'Movimiento', 'Fecha ingreso', 'Actualizado', 'Sugerido'];
 const NO_ES_STOCK = '(no es stock)';
 const PREFIJO_FAC = 'FAC-';
+// Ítems que son servicios, no mercadería (sobre la descripción normalizada, con espacios en los bordes).
+const SERVICIO_FAC = / (FLETES?|SERVICIOS?|TRANSPORTES?|ENVIOS?|ACARREOS?|HONORARIOS?|MANO DE OBRA|CONSULTAS?) /;
 // Sanidad (Medicamentos, Materiales sanitarios, Semen) y, desde el 17/11/2026, el stock de insumos (Stock).
 // Combustible no. Los de producción propia (Fardos) o por estancia no vienen de facturas.
 const MODULOS_FAC_STOCK = ['Sanidad', 'Stock'];
@@ -212,6 +214,8 @@ function planFacturaStock_(ss, det, insumos, equivs) {
       if (!(r.cantidad > 0)) { r.estado = 'porAsignar'; r.sugerido = eq.insumo; }
       return r;
     }
+    // Fletes y servicios nunca van al stock (20/11/2026, pedido del usuario): ni se pregunta.
+    if (SERVICIO_FAC.test(' ' + normalFac_(it.descripcion) + ' ')) { r.estado = 'noStock'; return r; }
     r.sugerido = sugerirProducto_(it, productos);
     if (r.sugerido || provSanitario) r.estado = 'porAsignar';
     return r;
