@@ -483,8 +483,13 @@ function facturasPorAsignar_(ss) {
   const sh = ss.getSheetByName(HOJA_FACSTOCK);
   if (!sh || sh.getLastRow() < 2) return [];
   const por = {};
-  sh.getRange(2, 1, sh.getLastRow() - 1, COLS_FACSTOCK.length).getValues().forEach((f) => {
+  sh.getRange(2, 1, sh.getLastRow() - 1, COLS_FACSTOCK.length).getValues().forEach((f, i) => {
     if (String(f[11]) !== ESTADOS_FAC.porAsignar) return;
+    // Fletes/servicios que quedaron "Por asignar" antes de la v1.29.2: se corrigen acá (20/11/2026).
+    if (!String(f[8]) && SERVICIO_FAC.test(' ' + normalFac_(f[6]) + ' ')) {
+      sh.getRange(i + 2, 12).setValue(ESTADOS_FAC.noStock);
+      return;
+    }
     const id = String(f[0]);
     (por[id] = por[id] || { id, fecha: iso_(f[1]) ? ddmmaaaa_(iso_(f[1])) : String(f[1]), numero: String(f[2]), proveedor: String(f[3]), n: 0 }).n++;
   });
