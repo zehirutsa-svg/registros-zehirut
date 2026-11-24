@@ -29,10 +29,10 @@ const FOTO_CALIDAD = 0.88;
 // ---------------------------------------------------------------- llamada al script
 /** Llama a una función de ZehirutApp. "__PIN__" en los argumentos lo completa el script. Las que
  *  guardan algo van una sola vez (un reintento podría cargar dos veces la misma factura). */
-async function za(fn, args, repetible) {
+async function za(fn, args, repetible, msLimite) {
   if (!navigator.onLine) throw new Error('Sin señal: Facturas y Fondo fijo necesitan señal.');
   const payload = { accion: 'za', pin: sesion.pin, fn, args };
-  const r = repetible ? await llamar(payload) : await llamarUnaVez(payload);
+  const r = repetible ? await llamar(payload, msLimite) : await llamarUnaVez(payload);
   if (!r.ok) throw new Error(r.error || 'error del servidor');
   zaStock = r.stock || null;
   return r.resultado;
@@ -662,7 +662,7 @@ async function abrirDetalleFac(id) {
   render();
   window.scrollTo(0, 0);
   try {
-    f.det = await za('obtenerDetalleFactura', ['__PIN__', id], true);
+    f.det = await za('obtenerDetalleFactura', ['__PIN__', id], true, 60000);
   } catch (e) {
     f.det = { error: e.message };
   }

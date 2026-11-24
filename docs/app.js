@@ -7,7 +7,7 @@
 // que todavía está en la cola, así la app se usa igual sin señal.
 'use strict';
 
-const VERSION = '1.29.3';
+const VERSION = '1.29.4';
 
 
 const DIAS_HISTORIAL = 60;
@@ -194,13 +194,26 @@ function cartel(o) {
 }
 
 // ---------------------------------------------------------------- comunicación con Google
-async function llamarUnaVez(payload) {
-  const r = await fetch(SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // evita el "preflight" CORS con Apps Script
-    body: JSON.stringify(payload),
-    redirect: 'follow',
-  });
+/** msLimite (opcional, solo para consultas): si Google no contesta en ese tiempo se corta con un error
+ *  en vez de dejar la ruedita girando para siempre (24/11/2026: un detalle de factura quedó colgado). */
+async function llamarUnaVez(payload, msLimite) {
+  const corte = msLimite ? new AbortController() : null;
+  const reloj = corte ? setTimeout(() => corte.abort(), msLimite) : null;
+  let r;
+  try {
+    r = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // evita el "preflight" CORS con Apps Script
+      body: JSON.stringify(payload),
+      redirect: 'follow',
+      signal: corte ? corte.signal : undefined,
+    });
+  } catch (e) {
+    if (corte && corte.signal.aborted) throw Object.assign(new Error('Google no contestó a tiempo. Probá de nuevo.'), { definitivo: true });
+    throw e;
+  } finally {
+    if (reloj) clearTimeout(reloj);
+  }
   if (!r.ok) throw new Error('HTTP ' + r.status);
   const texto = await r.text();
   try { return JSON.parse(texto); } catch (e) { throw new Error('respuesta inesperada de Google'); }
@@ -208,12 +221,12 @@ async function llamarUnaVez(payload) {
 
 // Google a veces devuelve una página de error pasajera: se reintenta 2 veces. Todo lo que
 // se manda se puede repetir sin efecto doble (el script ignora un id ya recibido).
-async function llamar(payload) {
+async function llamar(payload, msLimite) {
   let ultimoError;
   for (let intento = 0; intento < 3; intento++) {
     if (intento) await new Promise((res) => setTimeout(res, 1500 * intento));
     try {
-      const j = await llamarUnaVez(payload);
+      const j = await llamarUnaVez(payload, msLimite);
       if (!j.ok) throw Object.assign(new Error(j.error || 'error del servidor'), { definitivo: true });
       return j;
     } catch (e) {
