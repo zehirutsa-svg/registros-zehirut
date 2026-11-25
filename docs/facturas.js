@@ -1010,6 +1010,21 @@ const presIgual = (a, b) => !!(a && b && a.u === b.u && a.n === b.n);
 function presDistinta(pres, p) { const b = presProd(p); return !!(pres && b && pres.u === b.u && pres.n !== b.n); }
 const nombreStock = (p) => p.rubro || (p.modulo === 'Stock' ? 'Insumos' : p.modulo);
 
+/** Insumo que va por bolsa (o bidón…) con kg por unidad: la factura puede contar kg o bolsas (25/11/2026: Baris
+ *  factura en kg y "✓ Es Balanceado Pre destete" había cargado 33.000 kg como 33.000 bolsas). */
+const porBolsaFac = (p) => !!(p && p.modulo === 'Stock' && p.unidad !== 'kg' && Number(p.kgUnidad) > 1);
+function cantFacCli(v) {
+  if (typeof v === 'number') return v;
+  let t = String(v || '').trim().replace(/\s/g, '');
+  if (t.indexOf(',') !== -1) t = t.replace(/\./g, '').replace(',', '.');
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+  return Number(t) || 0;
+}
+/** ¿La factura cuenta kg? Si el ítem dice "X 40 KG" cuenta bolsas; si no, cantidades grandes (5+ bolsas en kg) son kg. */
+function adivinaEnKg(cant, pres, prod) {
+  if (pres && pres.u === 'kg') return false;
+  return cant >= Number(prod.kgUnidad) * 5;
+}
 function fmtCantStock(n) { return String(Math.round(n * 1000) / 1000).replace('.', ','); }
 
 function avisoStockFac(st) {
@@ -1075,9 +1090,10 @@ function htmlFacStockItem() {
       '<button class="link" data-a="fac" data-x="stkOtro">cambiar</button></p>' +
       (presDistinta(k.pres, prod) ? '<div class="aviso amarillo">⚠️ La factura dice <b>' + fmtPres(k.pres) + '</b> y este producto es de <b>' + fmtPres(presProd(prod)) +
         '</b>. Revisá que sea el producto correcto (o el factor).</div>' : '') +
+      (porBolsaFac(prod) ? htmlFacEnKg(k, it, prod) :
       '<div class="campo"><label for="stk-factor">1 en la factura equivale a</label><div class="fila-monto"><input class="txt" id="stk-factor" inputmode="decimal" value="' +
       esc(String(k.factor).replace('.', ',')) + '"><span style="align-self:center">' + esc(prod.unidad) + '</span></div>' +
-      '<small>Casi siempre 1. Ej.: si la factura cuenta vainas sueltas y el stock va por caja de 100, poné 0,01.</small></div></div>' +
+      '<small>Casi siempre 1. Ej.: si la factura cuenta vainas sueltas y el stock va por caja de 100, poné 0,01.</small></div>') + '</div>' +
       '<div class="acciones"><button class="btn" data-a="fac" data-x="stkGuardar"' + (k.guardando ? ' disabled' : '') + '>' + (k.guardando ? rueda() + 'Guardando…' : 'Guardar') + '</button></div>';
   } else {
     h += '<div class="campo"><label for="stk-q">¿Qué producto del stock es?</label><input class="txt" id="stk-q" type="search" autocomplete="off" placeholder="🔍 Buscar producto…" value="' + esc(k.q || '') + '"></div>' +
@@ -1086,6 +1102,18 @@ function htmlFacStockItem() {
   h += '<div class="acciones"><button class="btn sec" data-a="fac" data-x="stkNo"' + (k.guardando ? ' disabled' : '') + '>🚫 No es stock (no preguntar más)</button></div>' +
     '<p class="nota-estancia">Se recuerda para este proveedor: la próxima factura con este ítem entra sola.</p>';
   return h;
+}
+
+function htmlFacEnKg(k, it, prod) {
+  const cant = cantFacCli(it.cantidad);
+  const kgU = Number(prod.kgUnidad);
+  const n = k.enKg ? cant / kgU : cant;
+  const u = prod.unidad;
+  return '<div class="campo"><span class="etq">La factura cuenta…</span><div class="segmento">' +
+    '<button class="' + (k.enKg ? 'activo neutro' : '') + '" data-a="fac" data-x="stkEnKg" data-v="1">kg</button>' +
+    '<button class="' + (!k.enKg ? 'activo neutro' : '') + '" data-a="fac" data-x="stkEnKg" data-v="0">' + esc(u) + 's de ' + fmtCantStock(kgU) + ' kg</button></div>' +
+    '<p style="margin:8px 0 0">Entran <b>' + num(n) + ' ' + esc(u) + (n === 1 ? '' : 's') + '</b>' +
+    (k.enKg ? ' (' + num(cant) + ' kg ÷ ' + fmtCantStock(kgU) + ')' : '') + '</p></div>';
 }
 
 function htmlStockResultados() {
@@ -1120,12 +1148,22 @@ async function accionStockFac(b) {
     const i = Number(b.dataset.i);
     const it = (f.det.stock.items || []).find((y) => y.i === i) || {};
     f.stk = { i, q: '', insumo: it.insumo && it.insumo !== NO_ES_STOCK ? it.insumo : '', factor: it.factor || 1, sugerido: it.sugerido || '', pres: it.presentacion || null };
+    const prod = f.stk.insumo && productosStockFac().find((p) => p.nombre === f.stk.insumo);
+    if (porBolsaFac(prod)) f.stk.enKg = it.insumo ? (it.factor || 1) < 1 : adivinaEnKg(cantFacCli((f.det.items[i] || {}).cantidad), f.stk.pres, prod);
     f.vista = 'stockItem'; render(); window.scrollTo(0, 0);
     return;
   }
   if (x === 'stkSi') {
     const i = Number(b.dataset.i);
     const it = (f.det.stock.items || []).find((y) => y.i === i) || {};
+    const prodSug = productosStockFac().find((p) => p.nombre === it.sugerido);
+    if (porBolsaFac(prodSug)) {
+      // Va por bolsa: hay que confirmar si la factura cuenta kg o bolsas (pantalla del ítem, ya con el producto elegido).
+      f.stk = { i, q: '', insumo: it.sugerido, factor: 1, sugerido: it.sugerido, pres: it.presentacion || null,
+        enKg: adivinaEnKg(cantFacCli((f.det.items[i] || {}).cantidad), it.presentacion || null, prodSug) };
+      f.vista = 'stockItem'; render(); window.scrollTo(0, 0);
+      return;
+    }
     b.disabled = true;
     b.innerHTML = rueda() + 'Guardando…';
     try {
@@ -1137,12 +1175,20 @@ async function accionStockFac(b) {
     render(); window.scrollTo(0, y);
     return;
   }
-  if (x === 'stkProd') { f.stk.insumo = b.dataset.n; f.stk.factor = 1; render(); return; }
+  if (x === 'stkProd') {
+    f.stk.insumo = b.dataset.n; f.stk.factor = 1;
+    const prod = productosStockFac().find((p) => p.nombre === b.dataset.n);
+    if (porBolsaFac(prod)) f.stk.enKg = adivinaEnKg(cantFacCli((f.det.items[f.stk.i] || {}).cantidad), f.stk.pres, prod);
+    render(); return;
+  }
+  if (x === 'stkEnKg') { f.stk.enKg = b.dataset.v === '1'; render(); return; }
   if (x === 'stkOtro') { f.stk.insumo = ''; f.stk.q = ''; render(); return; }
   if (x === 'stkGuardar' || x === 'stkNo') {
     const k = f.stk;
     const insumo = x === 'stkNo' ? NO_ES_STOCK : k.insumo;
-    const factor = x === 'stkNo' ? 1 : Number(String(($('#stk-factor') || {}).value || '1').replace(',', '.'));
+    const prodB = x === 'stkGuardar' && productosStockFac().find((p) => p.nombre === insumo);
+    const factor = x === 'stkNo' ? 1 : porBolsaFac(prodB) ? (k.enKg ? 1 / Number(prodB.kgUnidad) : 1)
+      : Number(String(($('#stk-factor') || {}).value || '1').replace(',', '.'));
     if (!(factor > 0)) { toast('El factor tiene que ser un número mayor que 0.', 3000); return; }
     const prod = x === 'stkGuardar' && productosStockFac().find((p) => p.nombre === insumo);
     if (prod && presDistinta(k.pres, prod)) {

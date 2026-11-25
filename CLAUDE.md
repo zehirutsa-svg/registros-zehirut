@@ -367,6 +367,15 @@ Permisos: columna **Sanidad** de Usuarios (hoy solo Enrique = Administrar).
     Los insumos llegan antes que la factura y se cargan a mano: un Ingreso "sin factura" del mismo insumo, ±20 días y hasta 5%
     de diferencia de cantidad (el más parecido) se toma como "Ya cargado a mano" y se le pone el N° de factura (no suma).
     Aviso de facturas por asignar también en la pantalla de insumos; asigna quien tiene Stock o Sanidad ≥ Cargar (Osmar incluido).
+  - **kg o bolsas (25/11/2026, v1.29.5).** Baris factura en kg y "✓ Es Balanceado Pre destete" guardaba factor 1 → 33.000 kg
+    entraron como 33.000 bolsas (facturas 001-001-0001101 y 0001139). Para insumos de Stock por bolsa (kgUnidad > 1,
+    `porBolsaFac`) el "✓ Es X" ya no guarda directo: abre el ítem con "La factura cuenta… kg | bolsas de N kg" (adivina kg si el
+    ítem no dice "X 40 KG" y la cantidad es ≥ 5 bolsas) y muestra cuántas entran; el factor es 1/kgUnidad o 1. Los dos ingresos y
+    la equivalencia de Baris se corrigieron en el lugar (preDesteteKgUnaVez_, propiedad preDesteteKg1: 33.000 → 825, ID nuevo
+    igual al que calcula sincronizarFacturaStock_, sin anulados).
+  - **Revisión de Concentrado Desarrollo (25/11/2026):** las 4 facturas de Baris (938, 970, 995, 1022 = 115.000 kg = 2.875 bolsas)
+    están todas como ingreso; ninguna de noviembre (el ingreso de 1022 se cargó el 10/11 con fecha 21/10). Nada borrado ni
+    reemplazado. Saldo −64 bolsas al 25/11 → falta cargar algún ingreso (camión de noviembre sin factura, o carga offline).
 
 ## Excel (Stock y Combustible; Sanidad ver arriba)
 

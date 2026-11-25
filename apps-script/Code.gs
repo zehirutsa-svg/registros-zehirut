@@ -852,6 +852,50 @@ function conteoRobustoUnaVez_(ss) {
   });
 }
 
+/** Una sola vez (25/11/2026, pedido de Quique Delfante): las facturas de Baris de Balanceado Pre destete vienen en kg
+ *  y el ítem se asignó con factor 1 → 33.000 kg entraron como 33.000 bolsas. Equivalencia a 1/40 y los ingresos
+ *  FAC- corregidos en el lugar (cantidad e ID nuevo, el mismo que calcularía sincronizarFacturaStock_). */
+function preDesteteKgUnaVez_(ss) {
+  const props = props_();
+  if (props.getProperty('preDesteteKg1')) return;
+  conLock_(() => {
+    const ins = leerInsumos_(ss).find((i) => i.nombre === 'Balanceado Pre destete');
+    const factor = 1 / ins.kgUnidad;
+    const ahora = new Date();
+    const quien = 'Claude (pedido de Quique Delfante)';
+    const log = [];
+    const shE = ss.getSheetByName(HOJA_EQUIV);
+    const shF = ss.getSheetByName(HOJA_FACSTOCK);
+    if (!ins || !shE || !shF || shE.getLastRow() < 2 || shF.getLastRow() < 2) { props.setProperty('preDesteteKg1', 'nada'); return; }
+    const ve = shE.getRange(2, 1, shE.getLastRow() - 1, COLS_EQUIV.length).getValues();
+    ve.forEach((f, i) => {
+      if (f[4] !== ins.nombre || Number(f[5]) !== 1 || !/BARIS/i.test(String(f[2]))) return;
+      shE.getRange(i + 2, 6).setValue(factor);
+      log.push([ahora, quien, 'Factura al stock', 'Equivalencia ' + f[1] + ' → ' + ins.nombre + ': factor 1 → ' + factor + ' (la factura viene en kg)', 'Aplicado', '']);
+    });
+    const vf = shF.getRange(2, 1, shF.getLastRow() - 1, COLS_FACSTOCK.length).getValues();
+    const shM = ss.getSheetByName('Movimientos');
+    const movs = leerMovimientos_(ss);
+    vf.forEach((f, i) => {
+      if (f[8] !== ins.nombre || Number(f[9]) !== 1 || f[11] !== ESTADOS_FAC.cargado) return;
+      const m = movs.find((x) => x.id === String(f[12]) && !x.anulado);
+      if (!m) return;
+      const cant = redondeoFac_(cantFac_(f[7]) * factor);
+      const fecha = esFecha_(iso_(f[13])) ? iso_(f[13]) : m.fecha;
+      const id = PREFIJO_FAC + f[0] + '-' + f[4] + '-' + marcaFac_(ins.nombre + '|' + cant + '|' + fecha);
+      shM.getRange(m.fila, 1).setValue(id);
+      shM.getRange(m.fila, 5).setValue(cant);
+      shF.getRange(i + 2, 10, 1, 2).setValues([[factor, cant]]);
+      shF.getRange(i + 2, 13).setValue(id);
+      log.push([ahora, quien, 'Factura al stock', 'Ingreso ' + ins.nombre + ' de la factura ' + f[2] + ': ' + m.cantidad + ' → ' + cant + ' ' + ins.unidad +
+        ' (' + cantFac_(f[7]) + ' kg ÷ ' + ins.kgUnidad + ')', 'Aplicado', id]);
+    });
+    registrar_(ss, log);
+    if (log.length) { reconstruirStock_(ss); publicarDatosInforme_(ss); }
+    props.setProperty('preDesteteKg1', ahora.toISOString() + ' (' + log.length + ')');
+  });
+}
+
 function conLock_(fn) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -870,6 +914,7 @@ function doGet() {
   destinoBeefUnaVez_(SpreadsheetApp.getActive());
   correccionesBeefUnaVez_(SpreadsheetApp.getActive());
   conteoRobustoUnaVez_(SpreadsheetApp.getActive());
+  preDesteteKgUnaVez_(SpreadsheetApp.getActive());
   publicarDatosInforme_(SpreadsheetApp.getActive());
   const pagos = marcarPagadasViejas_() + recalcularVencChaco_();
   const url = SpreadsheetApp.getActive().getUrl();
